@@ -31,11 +31,24 @@ public:
 
   jobject evaluate(JNIEnv* env, jstring sourceCode, jstring fileName) const;
 
+  void waitForDebugger();
+  void pushObject(JNIEnv* env, jobject object);
+  jobject popObject(JNIEnv* env) const;
+  jobject getKeyString(JNIEnv* env, jlong object, jstring key);
+  jobject getKeyInteger(JNIEnv* env, jlong object, jint index);
+  jobject getKeyObject(JNIEnv* env, jlong object, jobject key);
+  jobject call(JNIEnv* env, jlong object, jobjectArray args);
+  jobject callProperty(JNIEnv* env, jlong object, jobject target, jobjectArray args);
+  void setGlobalProperty(JNIEnv *env, jobject property, jobject value);
+
   void set(JNIEnv *env, jstring name, jobject object, jobjectArray methods);
 
   const JavaScriptObject* get(JNIEnv *env, jstring name, jobjectArray methods);
 
 private:
+  jobject popObject2(JNIEnv* env) const;
+  void pushObject(JNIEnv* env, jlong object);
+
   duk_context* m_context;
   std::list<JavaScriptObject> m_jsObjects;
   JavaTypeMap m_javaValues;

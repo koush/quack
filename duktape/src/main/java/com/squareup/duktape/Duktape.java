@@ -19,13 +19,42 @@ import java.io.Closeable;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
+import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.logging.Logger;
 
 /** A simple EMCAScript (Javascript) interpreter. */
 public final class Duktape implements Closeable {
+  private static final Map<Class, JavaCoercion> JavaCoercions = new LinkedHashMap<>();
   static {
     System.loadLibrary("duktape");
+
+    setJavaCoercion(String.class, new JavaCoercion<String>() {
+      @Override
+      public String coerce(Object o) {
+        return o.toString();
+      }
+    });
+  }
+
+  public interface JavaCoercion<T> {
+    T coerce(Object o);
+  }
+
+  public static synchronized <T> void setJavaCoercion(Class<T> clazz, JavaCoercion<T> coercion) {
+    JavaCoercions.put(clazz, coercion);
+  }
+
+  public static Object coerce(Object o, Class<?> clazz) {
+    if (clazz.isInstance(o))
+      return o;
+    for (Map.Entry<Class, JavaCoercion> check: JavaCoercions.entrySet()) {
+      if (clazz.isAssignableFrom(check.getKey()))
+        return check.getValue().coerce(o);
+    }
+
+    return null;
   }
 
   /**
@@ -37,7 +66,19 @@ public final class Duktape implements Closeable {
     if (context == 0) {
       throw new OutOfMemoryError("Cannot create Duktape instance");
     }
-    return new Duktape(context);
+    Duktape duktape = new Duktape(context);
+    duktape.evaluate(
+            "var __proxyHandler = {\n" +
+                    "\thas: function(f, key){ return key == '__java_this' || !!get(key); },\n" +
+                    "\tget: function(f, prop, receiver) { return f.target.__duktape_get(f.target, prop, receiver); },\n" +
+                    "\tapply: function(f, thisArg, argumentsList) { return f.target.__duktape_apply(f.target, thisArg, argumentsList); },\n" +
+                    "};\n" +
+                    "function __makeProxy(obj) {\n" +
+                    "\tfunction f() {}; f.target = obj;\n" +
+                    "\treturn new Proxy(f, __proxyHandler);\n" +
+                    "};\n"
+    );
+    return duktape;
   }
 
   private long context;
@@ -159,10 +200,26 @@ public final class Duktape implements Closeable {
     }
   }
 
+  public void setGlobalProperty(Object property, Object value) {
+    setGlobalProperty(context, property, value);
+  }
+
+  public void waitForDebugger() {
+    waitForDebugger(context);
+  }
+
   private static native long createContext();
   private static native void destroyContext(long context);
   private static native Object evaluate(long context, String sourceCode, String fileName);
   private static native void set(long context, String name, Object object, Object[] methods);
   private static native long get(long context, String name, Object[] methods);
   private static native Object call(long context, long instance, Object method, Object[] args);
+
+  static native void waitForDebugger(long context);
+  static native Object getKeyObject(long context, long object, Object key);
+  static native Object getKeyString(long context, long object, String key);
+  static native Object getKeyInteger(long context, long object, int index);
+  static native Object callSelf(long context, long object, Object... args);
+  static native Object callProperty(long context, long object, Object property, Object... args);
+  static native void setGlobalProperty(long context, Object property, Object value);
 }

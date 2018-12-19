@@ -30,7 +30,7 @@ void queueNullPointerException(JNIEnv* env, const std::string& message);
  * Determines if an exception has been thrown in this JNI thread.  If so, creates a Duktape error
  * with the Java exception embedded in it, and throws it.
  */
-void checkRethrowDuktapeError(JNIEnv *env, duk_context *ctx);
+bool checkRethrowDuktapeError(JNIEnv *env, duk_context *ctx);
 
 /**
  * Sets up a Java {@code DuktapeException} based on the Duktape JavaScript error at the top of the

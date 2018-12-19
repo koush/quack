@@ -40,9 +40,9 @@ void queueNullPointerException(JNIEnv* env, const std::string& message) {
   env->ThrowNew(exceptionClass, message.c_str());
 }
 
-void checkRethrowDuktapeError(JNIEnv* env, duk_context* ctx) {
+bool checkRethrowDuktapeError(JNIEnv* env, duk_context* ctx) {
   if (!env->ExceptionCheck()) {
-    return;
+    return true;
   }
 
   // The Java call threw an exception - it should be propagated back through JavaScript.
@@ -51,6 +51,7 @@ void checkRethrowDuktapeError(JNIEnv* env, duk_context* ctx) {
   env->ExceptionClear();
   duk_put_prop_string(ctx, -2, JAVA_EXCEPTION_PROP_NAME);
   duk_throw(ctx);
+  return false;
 }
 
 void queueJavaExceptionForDuktapeError(JNIEnv *env, duk_context *ctx) {
