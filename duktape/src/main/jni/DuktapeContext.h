@@ -30,7 +30,9 @@ public:
   DuktapeContext & operator=(const DuktapeContext &) = delete;
 
   jobject evaluate(JNIEnv* env, jstring sourceCode, jstring fileName) const;
+  jobject compile(JNIEnv* env, jstring sourceCode, jstring fileName) const;
 
+  void attachDebugger(int fd);
   void waitForDebugger();
   void pushObject(JNIEnv* env, jobject object);
   jobject popObject(JNIEnv* env) const;

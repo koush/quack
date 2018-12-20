@@ -418,7 +418,8 @@ jobject DuktapeContext::callProperty(JNIEnv *env, jlong object, jobject property
       return nullptr;
   }
 
-  return popObject(env);
+  // pop twice since property call does not pop the indexed object
+  return popObject2(env);
 }
 
 void DuktapeContext::setGlobalProperty(JNIEnv *env, jobject property, jobject value) {
@@ -464,6 +465,19 @@ jobject DuktapeContext::evaluate(JNIEnv* env, jstring code, jstring fname) const
     return nullptr;
   }
 
+  return popObject(env);
+}
+
+jobject DuktapeContext::compile(JNIEnv* env, jstring code, jstring fname) const {
+  CHECK_STACK(m_context);
+  const JString sourceCode(env, code);
+  const JString fileName(env, fname);
+
+  duk_push_string(m_context, fileName);
+  if (duk_pcompile_string_filename(m_context, DUK_COMPILE_FUNCTION, sourceCode) != DUK_EXEC_SUCCESS) {
+      queueJavaExceptionForDuktapeError(env, m_context);
+      return nullptr;
+  }
   return popObject(env);
 }
 
@@ -532,9 +546,20 @@ const JavaScriptObject* DuktapeContext::get(JNIEnv *env, jstring name, jobjectAr
 void DuktapeContext::waitForDebugger() {
   duk_trans_socket_init();
   duk_trans_socket_waitconn();
-#ifdef DUK_USE_DEBUGGER_SUPPORT
-#error fuck
-#endif
+
+  duk_debugger_attach(m_context,
+                      duk_trans_socket_read_cb,
+                      duk_trans_socket_write_cb,
+                      duk_trans_socket_peek_cb,
+                      duk_trans_socket_read_flush_cb,
+                      duk_trans_socket_write_flush_cb,
+                      NULL,
+                      NULL,
+                      NULL);
+}
+
+void DuktapeContext::attachDebugger(jint fd) {
+  duk_trans_socket_attach(fd);
 
   duk_debugger_attach(m_context,
                       duk_trans_socket_read_cb,

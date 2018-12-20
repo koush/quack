@@ -89,6 +89,10 @@ void duk_trans_socket_finish(void) {
 	}
 }
 
+void duk_trans_socket_attach(int socket) {
+	client_sock = socket;
+}
+
 void duk_trans_socket_waitconn(void) {
 	struct sockaddr_in addr;
 	socklen_t sz;

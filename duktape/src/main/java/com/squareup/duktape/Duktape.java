@@ -36,6 +36,13 @@ public final class Duktape implements Closeable {
         return o.toString();
       }
     });
+
+    setJavaCoercion(boolean.class, new JavaCoercion<Boolean>() {
+      @Override
+      public Boolean coerce(Object o) {
+        return null;
+      }
+    });
   }
 
   public interface JavaCoercion<T> {
@@ -48,6 +55,20 @@ public final class Duktape implements Closeable {
 
   public static Object coerce(Object o, Class<?> clazz) {
     if (clazz.isInstance(o))
+      return o;
+    if (clazz == boolean.class && o instanceof Boolean)
+      return o;
+    if (clazz == byte.class && o instanceof Byte)
+      return o;
+    if (clazz == short.class && o instanceof Short)
+      return o;
+    if (clazz == int.class && o instanceof Integer)
+      return o;
+    if (clazz == long.class && o instanceof Long)
+      return o;
+    if (clazz == float.class && o instanceof Float)
+      return o;
+    if (clazz == double.class && o instanceof Double)
       return o;
     for (Map.Entry<Class, JavaCoercion> check: JavaCoercions.entrySet()) {
       if (clazz.isAssignableFrom(check.getKey()))
@@ -105,6 +126,10 @@ public final class Duktape implements Closeable {
    */
   public synchronized Object evaluate(String script) {
     return evaluate(context, script, "?");
+  }
+
+  public synchronized Object compile(String script, String fileName) {
+    return compile(context, script, fileName);
   }
 
   /**
@@ -208,14 +233,20 @@ public final class Duktape implements Closeable {
     waitForDebugger(context);
   }
 
+  public void attachDebugger(int fd) {
+    attachDebugger(context, fd);
+  }
+
   private static native long createContext();
   private static native void destroyContext(long context);
   private static native Object evaluate(long context, String sourceCode, String fileName);
+  private static native Object compile(long context, String sourceCode, String fileName);
   private static native void set(long context, String name, Object object, Object[] methods);
   private static native long get(long context, String name, Object[] methods);
   private static native Object call(long context, long instance, Object method, Object[] args);
 
   static native void waitForDebugger(long context);
+  static native void attachDebugger(long context, int fd);
   static native Object getKeyObject(long context, long object, Object key);
   static native Object getKeyString(long context, long object, String key);
   static native Object getKeyInteger(long context, long object, int index);

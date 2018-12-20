@@ -109,8 +109,14 @@ Java_com_squareup_duktape_Duktape_destroyContext(JNIEnv *env, jclass type, jlong
 
 JNIEXPORT void JNICALL
 Java_com_squareup_duktape_Duktape_waitForDebugger(JNIEnv *env, jclass type, jlong context) {
-    DuktapeContext* duktape = reinterpret_cast<DuktapeContext*>(context);
-    duktape->waitForDebugger();
+  DuktapeContext* duktape = reinterpret_cast<DuktapeContext*>(context);
+  duktape->waitForDebugger();
+}
+
+JNIEXPORT void JNICALL
+Java_com_squareup_duktape_Duktape_attachDebugger(JNIEnv *env, jclass type, jlong context, jint fd) {
+  DuktapeContext* duktape = reinterpret_cast<DuktapeContext*>(context);
+  duktape->attachDebugger(fd);
 }
 
 JNIEXPORT void JNICALL
@@ -166,6 +172,24 @@ Java_com_squareup_duktape_Duktape_getKeyString(JNIEnv *env, jclass type, jlong c
         return nullptr;
     }
     return duktape->getKeyString(env, object, key);
+}
+
+JNIEXPORT jobject JNICALL
+Java_com_squareup_duktape_Duktape_compile__JLjava_lang_String_2Ljava_lang_String_2(
+        JNIEnv* env, jclass type, jlong context, jstring code, jstring fname) {
+  DuktapeContext* duktape = reinterpret_cast<DuktapeContext*>(context);
+  if (duktape == nullptr) {
+    queueNullPointerException(env, "Null Duktape context - did you close your Duktape?");
+    return nullptr;
+  }
+  try {
+    return duktape->compile(env, code, fname);
+  } catch (const std::invalid_argument& e) {
+    queueIllegalArgumentException(env, e.what());
+  } catch (const std::exception& e) {
+    queueDuktapeException(env, e.what());
+  }
+  return nullptr;
 }
 
 JNIEXPORT jobject JNICALL
