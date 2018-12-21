@@ -6,16 +6,17 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 
-public class JavaMethodObject extends JavaObject<String> {
+final class JavaMethodObject implements DuktapeObject {
+    String target;
     public JavaMethodObject(String method) {
-        super(method);
+        this.target = method;
     }
 
     @Override
-    public Object callProperty(Object thiz, Object... args) {
+    public Object invoke(Object thiz, Object... args) {
         if (thiz == null)
             throw new UnsupportedOperationException("can not call " + target);
-        thiz = ((JavaObject)thiz).target;
+        thiz = Duktape.coerceToJava(thiz, Object.class);
         int bestScore = Integer.MAX_VALUE;
         Method best = null;
         for (Method method: thiz.getClass().getMethods()) {
@@ -64,7 +65,22 @@ public class JavaMethodObject extends JavaObject<String> {
     }
 
     @Override
+    public Object get(String key) {
+        return get((Object)key);
+    }
+
+    @Override
+    public Object get(int index) {
+        return get((Object)index);
+    }
+
+    @Override
+    public Object get(Object key) {
+        throw new UnsupportedOperationException("can not get + " + key + " on a JavaMethodObject");
+    }
+
+    @Override
     public Object call(Object... args) {
-        throw new UnsupportedOperationException("can not call " + target);
+        throw new UnsupportedOperationException("no 'this' provided. can not call " + target);
     }
 }

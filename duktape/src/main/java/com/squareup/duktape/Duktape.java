@@ -25,14 +25,8 @@ import java.util.logging.Logger;
 
 /** A simple EMCAScript (Javascript) interpreter. */
 public final class Duktape implements Closeable {
-  /**
-   * Customize how Java objects are coerced when being passed to Javascript.
-   */
-  public static final Map<Class, DuktapeCoercion> JavaCoercions = new LinkedHashMap<>();
-  /**
-   * Customize how Javascript objects are coerced when passed to Java.
-   */
-  public static final Map<Class, DuktapeCoercion> JavascriptCoercions = new LinkedHashMap<>();
+  private static final Map<Class, DuktapeCoercion> JavaCoercions = new LinkedHashMap<>();
+  private static final Map<Class, DuktapeCoercion> JavascriptCoercions = new LinkedHashMap<>();
 
   static {
     System.loadLibrary("duktape");
@@ -58,6 +52,14 @@ public final class Duktape implements Closeable {
     });
   }
 
+  public static <T> void putJavaCoercion(Class<T> clazz, DuktapeCoercion<T, Object> coercion) {
+    JavaCoercions.put(clazz, coercion);
+  }
+
+  public static <F> void putJavascriptCoercion(Class<F> clazz, DuktapeCoercion<Object, F> coercion) {
+    JavascriptCoercions.put(clazz, coercion);
+  }
+
   /**
    * Coerce a value passing through Duktape to the desired output class.
    * @param <T>
@@ -73,6 +75,13 @@ public final class Duktape implements Closeable {
   }
 
   public static Object coerceToJava(Object o, Class<?> clazz) {
+    if (o == null)
+      return null;
+    while (o instanceof DuktapeJavaObject) {
+      o = ((DuktapeJavaObject)o).getObject();
+    }
+    if (clazz == null)
+      return o;
     if (clazz.isInstance(o))
       return o;
     if (clazz == boolean.class && o instanceof Boolean)

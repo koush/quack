@@ -291,7 +291,7 @@ static duk_ret_t __duktape_apply(duk_context *ctx) {
     return DUK_RET_REFERENCE_ERROR;
   }
 
-  jmethodID callProperty = env->GetMethodID(clazz, "callProperty", "(Ljava/lang/Object;[Ljava/lang/Object;)Ljava/lang/Object;");
+  jmethodID callProperty = env->GetMethodID(clazz, "invoke", "(Ljava/lang/Object;[Ljava/lang/Object;)Ljava/lang/Object;");
   jobject push = env->CallObjectMethod(object, callProperty, javaThis, javaArgs);
   if (!checkRethrowDuktapeError(env, ctx)) {
       return DUK_RET_ERROR;
@@ -327,8 +327,11 @@ void DuktapeContext::pushObject(JNIEnv *env, jobject object) {
     }
   }
 
+  // a JavaScriptObject can be unpacked back into a native duktape heap pointer/object
   const jclass javascriptObjectClass = env->FindClass("com/squareup/duktape/JavaScriptObject");
-  const jclass javaobjectClass = env->FindClass("com/squareup/duktape/JavaObject");
+
+  // a DuktapeObject can support a duktape Proxy, and does not need any further boxing
+  const jclass duktapeobjectClass = env->FindClass("com/squareup/duktape/DuktapeObject");
   jclass objectClass = env->GetObjectClass(object);
   if (env->IsAssignableFrom(objectClass, javascriptObjectClass)) {
     jfieldID contextField = env->GetFieldID(javascriptObjectClass, "context", "J");
@@ -344,14 +347,16 @@ void DuktapeContext::pushObject(JNIEnv *env, jobject object) {
     // a proxy already exists, but not for the correct DuktapeContext, so native javascript heap
     // pointer can't be used.
   }
-  else if (!env->IsAssignableFrom(objectClass, javaobjectClass)) {
-    // this is a true Java object, so create a proxy and hold a strong reference to prevent JVM garbage collection
+  else if (!env->IsAssignableFrom(objectClass, duktapeobjectClass)) {
+    // this is a normal Java object, so create a proxy for it to access fields and methods
+    const jclass javaobjectClass = env->FindClass("com/squareup/duktape/JavaObject");
     jmethodID constructor = env->GetMethodID(javaobjectClass, "<init>", "(Ljava/lang/Object;)V");
     object = env->NewObject(javaobjectClass, constructor, object);
   }
 
-  // at this point, the object is guaranteed to be a JavaScriptObject from another Duktape Context
-  // or a JavaObject.
+  // at this point, the object is guaranteed to be a JavaScriptObject from another DuktapeContext
+  // or a DuktapeObject (java proxy of some sort). JavaScriptObject implements DuktapeObject,
+  // so, it works without any further coercion.
 
   duk_get_global_string(m_context, "__makeProxy");
 

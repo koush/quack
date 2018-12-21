@@ -18,18 +18,23 @@ public class JavaScriptObject implements DuktapeObject {
         return duktape.getKeyInteger(pointer, index);
     }
 
-    @Override
-    public Object call(Object... args) {
-        return duktape.callSelf(pointer, args);
-    }
-
-    @Override
-    public Object callProperty(Object thiz, Object... args) {
+    private void coerceArgs(Object... args) {
         if (args != null) {
             for (int i = 0; i < args.length; i++) {
                 args[i] = Duktape.coerceToJavascript(args[i]);
             }
         }
+    }
+
+    @Override
+    public Object call(Object... args) {
+        coerceArgs(args);
+        return duktape.callSelf(pointer, args);
+    }
+
+    @Override
+    public Object invoke(Object thiz, Object... args) {
+        coerceArgs(args);
         return duktape.callProperty(pointer, thiz, args);
     }
 

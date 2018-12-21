@@ -6,11 +6,16 @@ import java.lang.reflect.Method;
 import java.util.List;
 import java.util.Map;
 
-public class JavaObject<T> implements DuktapeObject {
-    public final T target;
+public final class JavaObject implements DuktapeJavaObject {
+    private final Object target;
 
-    public JavaObject(T target) {
+    public JavaObject(Object target) {
         this.target = target;
+    }
+
+    @Override
+    public Object getObject() {
+        return target;
     }
 
     @Override
@@ -76,7 +81,7 @@ public class JavaObject<T> implements DuktapeObject {
     }
 
     @Override
-    public Object callProperty(Object thiz, Object... args) {
+    public Object invoke(Object thiz, Object... args) {
         if (thiz == null)
             return call(args);
         if (thiz instanceof String) {
