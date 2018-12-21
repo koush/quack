@@ -38,7 +38,7 @@ public class JavaMethodObject extends JavaObject<String> {
             int i = 0;
             for (; i < numParameters; i++) {
                 if (i < args.length)
-                    coerced.add(Duktape.coerce(args[i], best.getParameterTypes()[i]));
+                    coerced.add(Duktape.coerceToJava(args[i], best.getParameterTypes()[i]));
                 else
                     coerced.add(null);
             }
@@ -46,7 +46,7 @@ public class JavaMethodObject extends JavaObject<String> {
                 Class varargType = best.getParameterTypes()[numParameters].getComponentType();
                 ArrayList<Object> varargs = new ArrayList<>();
                 for (; i < args.length; i++) {
-                    varargs.add(Duktape.coerce(args[i], varargType));
+                    varargs.add(Duktape.coerceToJava(args[i], varargType));
                 }
                 coerced.add(varargs.toArray());
             }

@@ -89,14 +89,14 @@ duk_bool_t android__date_parse_string(duk_context* ctx, const char* str) {
 }
 
 JNIEXPORT jlong JNICALL
-Java_com_squareup_duktape_Duktape_createContext(JNIEnv* env, jclass type) {
+Java_com_squareup_duktape_Duktape_createContext(JNIEnv* env, jclass type, jobject javaDuktape) {
   static std::once_flag initialized;
   std::call_once(initialized, initialize, std::ref(env), type);
 
   JavaVM* javaVM;
   env->GetJavaVM(&javaVM);
   try {
-    return reinterpret_cast<jlong>(new DuktapeContext(javaVM));
+    return reinterpret_cast<jlong>(new DuktapeContext(javaVM, javaDuktape));
   } catch (std::bad_alloc&) {
     return 0L;
   }
@@ -114,9 +114,15 @@ Java_com_squareup_duktape_Duktape_waitForDebugger(JNIEnv *env, jclass type, jlon
 }
 
 JNIEXPORT void JNICALL
-Java_com_squareup_duktape_Duktape_attachDebugger(JNIEnv *env, jclass type, jlong context, jint fd) {
+Java_com_squareup_duktape_Duktape_cooperateDebugger(JNIEnv *env, jclass type, jlong context) {
+    DuktapeContext* duktape = reinterpret_cast<DuktapeContext*>(context);
+    duktape->cooperateDebugger();
+}
+
+JNIEXPORT jboolean JNICALL
+Java_com_squareup_duktape_Duktape_isDebugging(JNIEnv *env, jclass type, jlong context) {
   DuktapeContext* duktape = reinterpret_cast<DuktapeContext*>(context);
-  duktape->attachDebugger(fd);
+  return (jboolean)duktape->isDebugging();
 }
 
 JNIEXPORT void JNICALL

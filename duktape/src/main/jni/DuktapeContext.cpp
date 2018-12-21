@@ -121,12 +121,15 @@ void fatalErrorHandler(void* udata, const char* msg) {
 
 } // anonymous namespace
 
-DuktapeContext::DuktapeContext(JavaVM* javaVM)
+DuktapeContext::DuktapeContext(JavaVM* javaVM, jobject javaDuktape)
     : m_context(duk_create_heap(nullptr, nullptr, nullptr, &m_context, fatalErrorHandler))
     , m_objectType(m_javaValues.getObjectType(getEnvFromJavaVM(javaVM))) {
   if (!m_context) {
     throw std::bad_alloc();
   }
+
+  m_javaDuktape = getEnvFromJavaVM(javaVM)->NewWeakGlobalRef(javaDuktape);
+  m_DebuggerSocket.client_sock = -1;
 
   // Stash the JVM object in the context, so we can find our way back from a Duktape C callback.
   duk_push_global_stash(m_context);
@@ -187,8 +190,8 @@ jobject DuktapeContext::popObject(JNIEnv *env) const {
 
     // create a new holder for this JavaScript object
     jclass clazz = env->FindClass("com/squareup/duktape/JavaScriptObject");
-    jmethodID constructor = env->GetMethodID(clazz, "<init>", "(JJ)V");
-    javaThis = env->NewObject(clazz, constructor, reinterpret_cast<jlong>(this), reinterpret_cast<jlong>(ptr));
+    jmethodID constructor = env->GetMethodID(clazz, "<init>", "(Lcom/squareup/duktape/Duktape;J)V");
+    javaThis = env->NewObject(clazz, constructor, reinterpret_cast<jlong>(m_javaDuktape), reinterpret_cast<jlong>(ptr));
 
     // since this is a Javascript object, put a weak reference to the Java object in the JavaScript object
     // no need for a finalizer. if the Java object gets garbage collected, can always just spin
@@ -326,7 +329,6 @@ void DuktapeContext::pushObject(JNIEnv *env, jobject object) {
 
   const jclass javascriptObjectClass = env->FindClass("com/squareup/duktape/JavaScriptObject");
   const jclass javaobjectClass = env->FindClass("com/squareup/duktape/JavaObject");
-  const jclass javamethodobjectClass = env->FindClass("com/squareup/duktape/JavaMethodObject");
   jclass objectClass = env->GetObjectClass(object);
   if (env->IsAssignableFrom(objectClass, javascriptObjectClass)) {
     jfieldID contextField = env->GetFieldID(javascriptObjectClass, "context", "J");
@@ -342,16 +344,10 @@ void DuktapeContext::pushObject(JNIEnv *env, jobject object) {
     // a proxy already exists, but not for the correct DuktapeContext, so native javascript heap
     // pointer can't be used.
   }
-//  else if (!env->IsAssignableFrom(objectClass, javamethodobjectClass)) {
-//  }
   else if (!env->IsAssignableFrom(objectClass, javaobjectClass)) {
     // this is a true Java object, so create a proxy and hold a strong reference to prevent JVM garbage collection
     jmethodID constructor = env->GetMethodID(javaobjectClass, "<init>", "(Ljava/lang/Object;)V");
     object = env->NewObject(javaobjectClass, constructor, object);
-  }
-  else {
-      // this object is already JavaObject. possibly thunk from JavaScript -> JavaScript?
-      int __watch_me = 0;
   }
 
   // at this point, the object is guaranteed to be a JavaScriptObject from another Duktape Context
@@ -386,10 +382,13 @@ jobject DuktapeContext::call(JNIEnv *env, jlong object, jobjectArray args) {
 
   pushObject(env, object);
 
-  jsize length = env->GetArrayLength(args);
-  for (int i = 0; i < length; i++) {
-    jobject arg = env->GetObjectArrayElement(args, i);
-    pushObject(env, arg);
+  jsize length = 0;
+  if (args != nullptr) {
+      length = env->GetArrayLength(args);
+      for (int i = 0; i < length; i++) {
+          jobject arg = env->GetObjectArrayElement(args, i);
+          pushObject(env, arg);
+      }
   }
 
   if (duk_pcall(m_context, length) != DUK_EXEC_SUCCESS) {
@@ -407,14 +406,19 @@ jobject DuktapeContext::callProperty(JNIEnv *env, jlong object, jobject property
   duk_idx_t objectIndex = duk_normalize_index(m_context, -1);
   pushObject(env, property);
 
-  jsize length = env->GetArrayLength(args);
-  for (int i = 0; i < length; i++) {
-    jobject arg = env->GetObjectArrayElement(args, i);
-    pushObject(env, arg);
+  jsize length = 0;
+  if (args != nullptr) {
+      length = env->GetArrayLength(args);
+      for (int i = 0; i < length; i++) {
+          jobject arg = env->GetObjectArrayElement(args, i);
+          pushObject(env, arg);
+      }
   }
 
   if (duk_pcall_prop(m_context, objectIndex, length) != DUK_EXEC_SUCCESS) {
       queueJavaExceptionForDuktapeError(env, m_context);
+      // pop off indexed object before rethrowing error
+      duk_pop(m_context);
       return nullptr;
   }
 
@@ -455,8 +459,9 @@ jobject DuktapeContext::getKeyString(JNIEnv *env, jlong object, jstring key) {
   return popObject2(env);
 }
 
-jobject DuktapeContext::evaluate(JNIEnv* env, jstring code, jstring fname) const {
+jobject DuktapeContext::evaluate(JNIEnv* env, jstring code, jstring fname) {
   CHECK_STACK(m_context);
+
   const JString sourceCode(env, code);
   const JString fileName(env, fname);
 
@@ -468,8 +473,9 @@ jobject DuktapeContext::evaluate(JNIEnv* env, jstring code, jstring fname) const
   return popObject(env);
 }
 
-jobject DuktapeContext::compile(JNIEnv* env, jstring code, jstring fname) const {
+jobject DuktapeContext::compile(JNIEnv* env, jstring code, jstring fname) {
   CHECK_STACK(m_context);
+
   const JString sourceCode(env, code);
   const JString fileName(env, fname);
 
@@ -545,7 +551,7 @@ const JavaScriptObject* DuktapeContext::get(JNIEnv *env, jstring name, jobjectAr
 
 void DuktapeContext::waitForDebugger() {
   duk_trans_socket_init();
-  duk_trans_socket_waitconn();
+  duk_trans_socket_waitconn(&m_DebuggerSocket);
 
   duk_debugger_attach(m_context,
                       duk_trans_socket_read_cb,
@@ -554,20 +560,14 @@ void DuktapeContext::waitForDebugger() {
                       duk_trans_socket_read_flush_cb,
                       duk_trans_socket_write_flush_cb,
                       NULL,
-                      NULL,
-                      NULL);
+                      duk_trans_socket_detached_cb,
+                      &m_DebuggerSocket);
 }
 
-void DuktapeContext::attachDebugger(jint fd) {
-  duk_trans_socket_attach(fd);
+void DuktapeContext::cooperateDebugger() {
+    duk_debugger_cooperate(m_context);
+}
 
-  duk_debugger_attach(m_context,
-                      duk_trans_socket_read_cb,
-                      duk_trans_socket_write_cb,
-                      duk_trans_socket_peek_cb,
-                      duk_trans_socket_read_flush_cb,
-                      duk_trans_socket_write_flush_cb,
-                      NULL,
-                      NULL,
-                      NULL);
+bool DuktapeContext::isDebugging() {
+    return m_DebuggerSocket.client_sock > 0;
 }

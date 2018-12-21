@@ -21,19 +21,21 @@
 #include "duktape/duktape.h"
 #include "javascript/JavaScriptObject.h"
 #include "java/JavaType.h"
+#include "duktape/duk_trans_socket.h"
 
 class DuktapeContext {
 public:
-  explicit DuktapeContext(JavaVM* javaVM);
+  explicit DuktapeContext(JavaVM* javaVM, jobject javaDuktape);
   ~DuktapeContext();
   DuktapeContext(const DuktapeContext &) = delete;
   DuktapeContext & operator=(const DuktapeContext &) = delete;
 
-  jobject evaluate(JNIEnv* env, jstring sourceCode, jstring fileName) const;
-  jobject compile(JNIEnv* env, jstring sourceCode, jstring fileName) const;
+  jobject evaluate(JNIEnv* env, jstring sourceCode, jstring fileName);
+  jobject compile(JNIEnv* env, jstring sourceCode, jstring fileName);
 
-  void attachDebugger(int fd);
+  void cooperateDebugger();
   void waitForDebugger();
+  bool isDebugging();
   void pushObject(JNIEnv* env, jobject object);
   jobject popObject(JNIEnv* env) const;
   jobject getKeyString(JNIEnv* env, jlong object, jstring key);
@@ -52,9 +54,11 @@ private:
   void pushObject(JNIEnv* env, jlong object);
 
   duk_context* m_context;
+  jobject m_javaDuktape;
   std::list<JavaScriptObject> m_jsObjects;
   JavaTypeMap m_javaValues;
   const JavaType* m_objectType;
+  client_sock_t m_DebuggerSocket;
 };
 
 #endif // DUKTAPE_ANDROID_DUKTAPE_CONTEXT_H

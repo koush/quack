@@ -30,7 +30,6 @@
 #endif
 
 static int server_sock = -1;
-static int client_sock = -1;
 
 /*
  *  Transport init and finish
@@ -78,10 +77,10 @@ void duk_trans_socket_init(void) {
 	}
 }
 
-void duk_trans_socket_finish(void) {
-	if (client_sock >= 0) {
+void duk_trans_socket_finish(struct client_sock_t *client_sock) {
+	if (client_sock->client_sock >= 0) {
 		(void) close(client_sock);
-		client_sock = -1;
+		client_sock->client_sock = -1;
 	}
 	if (server_sock >= 0) {
 		(void) close(server_sock);
@@ -89,11 +88,7 @@ void duk_trans_socket_finish(void) {
 	}
 }
 
-void duk_trans_socket_attach(int socket) {
-	client_sock = socket;
-}
-
-void duk_trans_socket_waitconn(void) {
+void duk_trans_socket_waitconn(struct client_sock_t *client_sock_holder) {
 	struct sockaddr_in addr;
 	socklen_t sz;
 
@@ -103,17 +98,17 @@ void duk_trans_socket_waitconn(void) {
 		fflush(stderr);
 		return;
 	}
-	if (client_sock >= 0) {
-		(void) close(client_sock);
-		client_sock = -1;
+	if (client_sock_holder->client_sock >= 0) {
+		(void) close(client_sock_holder->client_sock);
+		client_sock_holder->client_sock = -1;
 	}
 
 	fprintf(stderr, "Waiting for debug connection on port %d\n", (int) DUK_DEBUG_PORT);
 	fflush(stderr);
 
 	sz = (socklen_t) sizeof(addr);
-	client_sock = accept(server_sock, (struct sockaddr *) &addr, &sz);
-	if (client_sock < 0) {
+	client_sock_holder->client_sock = accept(server_sock, (struct sockaddr *) &addr, &sz);
+	if (client_sock_holder->client_sock < 0) {
 		fprintf(stderr, "%s: accept() failed, skip waiting for connection: %s\n",
 		        __FILE__, strerror(errno));
 		fflush(stderr);
@@ -135,9 +130,9 @@ void duk_trans_socket_waitconn(void) {
 	return;
 
  fail:
-	if (client_sock >= 0) {
-		(void) close(client_sock);
-		client_sock = -1;
+	if (client_sock_holder->client_sock >= 0) {
+		(void) close(client_sock_holder->client_sock);
+		client_sock_holder->client_sock = -1;
 	}
 }
 
@@ -156,8 +151,9 @@ duk_size_t duk_trans_socket_read_cb(void *udata, char *buffer, duk_size_t length
 	        __func__, (void *) udata, (void *) buffer, (long) length);
 	fflush(stderr);
 #endif
+	struct client_sock_t *client_sock_holder = (struct client_sock_t*)udata;
 
-	if (client_sock < 0) {
+	if (client_sock_holder->client_sock < 0) {
 		return 0;
 	}
 
@@ -181,7 +177,7 @@ duk_size_t duk_trans_socket_read_cb(void *udata, char *buffer, duk_size_t length
 	 * timeout here to recover from "black hole" disconnects.
 	 */
 
-	ret = read(client_sock, (void *) buffer, (size_t) length);
+	ret = read(client_sock_holder->client_sock, (void *) buffer, (size_t) length);
 	if (ret < 0) {
 		fprintf(stderr, "%s: debug read failed, closing connection: %s\n",
 		        __FILE__, strerror(errno));
@@ -202,9 +198,9 @@ duk_size_t duk_trans_socket_read_cb(void *udata, char *buffer, duk_size_t length
 	return (duk_size_t) ret;
 
  fail:
-	if (client_sock >= 0) {
-		(void) close(client_sock);
-		client_sock = -1;
+	if (client_sock_holder->client_sock >= 0) {
+		(void) close(client_sock_holder->client_sock);
+		client_sock_holder->client_sock = -1;
 	}
 	return 0;
 }
@@ -221,7 +217,8 @@ duk_size_t duk_trans_socket_write_cb(void *udata, const char *buffer, duk_size_t
 	fflush(stderr);
 #endif
 
-	if (client_sock < 0) {
+	struct client_sock_t *client_sock_holder = (struct client_sock_t*)udata;
+	if (client_sock_holder->client_sock < 0) {
 		return 0;
 	}
 
@@ -245,7 +242,7 @@ duk_size_t duk_trans_socket_write_cb(void *udata, const char *buffer, duk_size_t
 	 * timeout here to recover from "black hole" disconnects.
 	 */
 
-	ret = write(client_sock, (const void *) buffer, (size_t) length);
+	ret = write(client_sock_holder->client_sock, (const void *) buffer, (size_t) length);
 	if (ret <= 0 || ret > (ssize_t) length) {
 		fprintf(stderr, "%s: debug write failed, closing connection: %s\n",
 		        __FILE__, strerror(errno));
@@ -256,9 +253,9 @@ duk_size_t duk_trans_socket_write_cb(void *udata, const char *buffer, duk_size_t
 	return (duk_size_t) ret;
 
  fail:
-	if (client_sock >= 0) {
-		(void) close(client_sock);
-		client_sock = -1;
+	if (client_sock_holder->client_sock >= 0) {
+		(void) close(client_sock_holder->client_sock);
+		client_sock_holder->client_sock = -1;
 	}
 	return 0;
 }
@@ -280,7 +277,8 @@ duk_size_t duk_trans_socket_peek_cb(void *udata) {
 	fflush(stderr);
 #endif
 
-	if (client_sock < 0) {
+	struct client_sock_t *client_sock_holder = (struct client_sock_t*)udata;
+	if (client_sock_holder->client_sock < 0) {
 		return 0;
 	}
 #if defined(USE_SELECT)
@@ -295,7 +293,7 @@ duk_size_t duk_trans_socket_peek_cb(void *udata) {
 	}
 	goto fail;
 #else  /* USE_SELECT */
-	fds[0].fd = client_sock;
+	fds[0].fd = client_sock_holder->client_sock;
 	fds[0].events = POLLIN;
 	fds[0].revents = 0;
 
@@ -317,9 +315,9 @@ duk_size_t duk_trans_socket_peek_cb(void *udata) {
 	}
 #endif  /* USE_SELECT */
  fail:
-	if (client_sock >= 0) {
-		(void) close(client_sock);
-		client_sock = -1;
+	if (client_sock_holder->client_sock >= 0) {
+		(void) close(client_sock_holder->client_sock);
+		client_sock_holder->client_sock = -1;
 	}
 	return 0;
 }
@@ -365,4 +363,15 @@ void duk_trans_socket_write_flush_cb(void *udata) {
 	 * implement this callback at all.
 	 */
 	return;
+}
+
+void duk_trans_socket_detached_cb(duk_context *ctx, void *udata) {
+    (void) udata;  /* not needed by the example */
+
+    struct client_sock_t *client_sock_holder = (struct client_sock_t*)udata;
+    if (client_sock_holder->client_sock >= 0) {
+        (void) close(client_sock_holder->client_sock);
+        client_sock_holder->client_sock = -1;
+    }
+    return;
 }

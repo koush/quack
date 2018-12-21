@@ -1,31 +1,36 @@
 package com.squareup.duktape;
 
 public class JavaScriptObject implements DuktapeObject {
-    final public long context;
+    final public Duktape duktape;
     final public long pointer;
-    public JavaScriptObject(long context, long pointer) {
-        this.context = context;
+    public JavaScriptObject(Duktape duktape, long pointer) {
+        this.duktape = duktape;
         this.pointer = pointer;
     }
 
     @Override
     public Object get(String key) {
-        return Duktape.getKeyString(context, pointer, key);
+        return duktape.getKeyString(pointer, key);
     }
 
     @Override
     public Object get(int index) {
-        return Duktape.getKeyInteger(context, pointer, index);
+        return duktape.getKeyInteger(pointer, index);
     }
 
     @Override
     public Object call(Object... args) {
-        return Duktape.callSelf(context, pointer, args);
+        return duktape.callSelf(pointer, args);
     }
 
     @Override
     public Object callProperty(Object thiz, Object... args) {
-        return Duktape.callProperty(context, pointer, thiz, args);
+        if (args != null) {
+            for (int i = 0; i < args.length; i++) {
+                args[i] = Duktape.coerceToJavascript(args[i]);
+            }
+        }
+        return duktape.callProperty(pointer, thiz, args);
     }
 
     @Override
@@ -39,6 +44,6 @@ public class JavaScriptObject implements DuktapeObject {
                 return get(number.intValue());
         }
 
-        return Duktape.getKeyObject(context, pointer, key);
+        return duktape.getKeyObject(pointer, key);
     }
 }

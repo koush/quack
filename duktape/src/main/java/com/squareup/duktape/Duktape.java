@@ -19,41 +19,60 @@ import java.io.Closeable;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
-import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.logging.Logger;
 
 /** A simple EMCAScript (Javascript) interpreter. */
 public final class Duktape implements Closeable {
-  private static final Map<Class, JavaCoercion> JavaCoercions = new LinkedHashMap<>();
+  /**
+   * Customize how Java objects are coerced when being passed to Javascript.
+   */
+  public static final Map<Class, DuktapeCoercion> JavaCoercions = new LinkedHashMap<>();
+  /**
+   * Customize how Javascript objects are coerced when passed to Java.
+   */
+  public static final Map<Class, DuktapeCoercion> JavascriptCoercions = new LinkedHashMap<>();
+
   static {
     System.loadLibrary("duktape");
 
-    setJavaCoercion(String.class, new JavaCoercion<String>() {
+    // coercing javascript string into an enum for java
+    JavaCoercions.put(Enum.class, new DuktapeCoercion<Enum, Object>() {
       @Override
-      public String coerce(Object o) {
+      public Enum coerce(Object o, Class clazz) {
+        if (o == null)
+          return null;
+        return Enum.valueOf(clazz, o.toString());
+      }
+    });
+
+    // coercing a java enum into javascript string
+    JavascriptCoercions.put(Enum.class, new DuktapeCoercion<Object, Enum>() {
+      @Override
+      public Object coerce(Enum o, Class clazz) {
+        if (o == null)
+          return null;
         return o.toString();
       }
     });
-
-    setJavaCoercion(boolean.class, new JavaCoercion<Boolean>() {
-      @Override
-      public Boolean coerce(Object o) {
-        return null;
-      }
-    });
   }
 
-  public interface JavaCoercion<T> {
-    T coerce(Object o);
+  /**
+   * Coerce a value passing through Duktape to the desired output class.
+   * @param <T>
+   */
+  public interface DuktapeCoercion<T, F> {
+    T coerce(F o, Class clazz);
   }
 
-  public static synchronized <T> void setJavaCoercion(Class<T> clazz, JavaCoercion<T> coercion) {
-    JavaCoercions.put(clazz, coercion);
+  public static Object coerceToJavascript(Object o) {
+    if (o == null)
+      return null;
+    return coerce(JavascriptCoercions, o, o.getClass());
   }
 
-  public static Object coerce(Object o, Class<?> clazz) {
+  public static Object coerceToJava(Object o, Class<?> clazz) {
     if (clazz.isInstance(o))
       return o;
     if (clazz == boolean.class && o instanceof Boolean)
@@ -70,12 +89,29 @@ public final class Duktape implements Closeable {
       return o;
     if (clazz == double.class && o instanceof Double)
       return o;
-    for (Map.Entry<Class, JavaCoercion> check: JavaCoercions.entrySet()) {
-      if (clazz.isAssignableFrom(check.getKey()))
-        return check.getValue().coerce(o);
+
+    return coerce(JavaCoercions, o, clazz);
+  }
+
+  private static Object coerce(Map<Class, DuktapeCoercion> coerce, Object o, Class<?> clazz) {
+    DuktapeCoercion coercion = coerce.get(clazz);
+    if (coercion != null) {
+      return coercion.coerce(o, clazz);
     }
 
-    return null;
+    // check to see if there exists a superclass converter.
+    for (Map.Entry<Class, DuktapeCoercion> check: coerce.entrySet()) {
+      if (clazz.isAssignableFrom(check.getKey()))
+        return check.getValue().coerce(o, clazz);
+    }
+
+    // check to see if there is a subclass converter (ie, Enum.class as a catch all).
+    for (Map.Entry<Class, DuktapeCoercion> check: coerce.entrySet()) {
+      if (check.getKey().isAssignableFrom(clazz))
+        return check.getValue().coerce(o, clazz);
+    }
+
+    return o;
   }
 
   /**
@@ -83,11 +119,13 @@ public final class Duktape implements Closeable {
    * calls to {@link #close()} on the returned instance to avoid leaking native memory.
    */
   public static Duktape create() {
-    long context = createContext();
+    Duktape duktape = new Duktape();
+    // context will hold a weak ref, so this doesn't matter if it fails.
+    long context = createContext(duktape);
     if (context == 0) {
       throw new OutOfMemoryError("Cannot create Duktape instance");
     }
-    Duktape duktape = new Duktape(context);
+    duktape.context = context;
     duktape.evaluate(
             "var __proxyHandler = {\n" +
                     "\thas: function(f, key){ return key == '__java_this' || !!get(key); },\n" +
@@ -104,8 +142,7 @@ public final class Duktape implements Closeable {
 
   private long context;
 
-  private Duktape(long context) {
-    this.context = context;
+  private Duktape() {
   }
 
   /**
@@ -220,24 +257,47 @@ public final class Duktape implements Closeable {
   }
 
   @Override protected synchronized void finalize() throws Throwable {
+    // this isn't THAT bad, as JavaScriptObjects may be passed around without concern for the
+    // Duktape collection.
     if (context != 0) {
       Logger.getLogger(getClass().getName()).warning("Duktape instance leaked!");
     }
+    // definitely close it though.
+    close();
   }
 
-  public void setGlobalProperty(Object property, Object value) {
+  public synchronized void setGlobalProperty(Object property, Object value) {
     setGlobalProperty(context, property, value);
   }
 
+  public synchronized void cooperateDebugger() {
+    cooperateDebugger(context);
+  }
   public void waitForDebugger() {
     waitForDebugger(context);
   }
 
-  public void attachDebugger(int fd) {
-    attachDebugger(context, fd);
+  public boolean isDebugging() {
+    return isDebugging(context);
   }
 
-  private static native long createContext();
+  synchronized Object getKeyObject(long object, Object key) {
+    return getKeyObject(context, object, key);
+  }
+  synchronized Object getKeyString(long object, String key) {
+    return getKeyString(context, object, key);
+  }
+  synchronized Object getKeyInteger(long object, int index) {
+    return getKeyInteger(context, object, index);
+  }
+  synchronized Object callSelf(long object, Object... args) {
+    return callSelf(context, object, args);
+  }
+  synchronized Object callProperty(long object, Object property, Object... args) {
+    return callProperty(context, object, property, args);
+  }
+
+  private static native long createContext(Duktape duktape);
   private static native void destroyContext(long context);
   private static native Object evaluate(long context, String sourceCode, String fileName);
   private static native Object compile(long context, String sourceCode, String fileName);
@@ -245,12 +305,13 @@ public final class Duktape implements Closeable {
   private static native long get(long context, String name, Object[] methods);
   private static native Object call(long context, long instance, Object method, Object[] args);
 
-  static native void waitForDebugger(long context);
-  static native void attachDebugger(long context, int fd);
-  static native Object getKeyObject(long context, long object, Object key);
-  static native Object getKeyString(long context, long object, String key);
-  static native Object getKeyInteger(long context, long object, int index);
-  static native Object callSelf(long context, long object, Object... args);
-  static native Object callProperty(long context, long object, Object property, Object... args);
-  static native void setGlobalProperty(long context, Object property, Object value);
+  private static native void cooperateDebugger(long context);
+  private static native void waitForDebugger(long context);
+  private static native boolean isDebugging(long context);
+  private static native Object getKeyObject(long context, long object, Object key);
+  private static native Object getKeyString(long context, long object, String key);
+  private static native Object getKeyInteger(long context, long object, int index);
+  private static native Object callSelf(long context, long object, Object... args);
+  private static native Object callProperty(long context, long object, Object property, Object... args);
+  private static native void setGlobalProperty(long context, Object property, Object value);
 }
