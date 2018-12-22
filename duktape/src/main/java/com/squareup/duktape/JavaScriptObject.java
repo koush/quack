@@ -2,9 +2,11 @@ package com.squareup.duktape;
 
 public class JavaScriptObject implements DuktapeObject {
     final public Duktape duktape;
+    public final long context;
     final public long pointer;
-    public JavaScriptObject(Duktape duktape, long pointer) {
+    public JavaScriptObject(Duktape duktape, long context, long pointer) {
         this.duktape = duktape;
+        this.context = context;
         this.pointer = pointer;
     }
 
@@ -33,9 +35,9 @@ public class JavaScriptObject implements DuktapeObject {
     }
 
     @Override
-    public Object invoke(Object thiz, Object... args) {
+    public Object invoke(Object property, Object... args) {
         coerceArgs(args);
-        return duktape.callProperty(pointer, thiz, args);
+        return duktape.callProperty(pointer, property, args);
     }
 
     @Override
@@ -50,5 +52,13 @@ public class JavaScriptObject implements DuktapeObject {
         }
 
         return duktape.getKeyObject(pointer, key);
+    }
+
+    @Override
+    public String toString() {
+        Object ret = invoke("toString");
+        if (ret == null)
+            return null;
+        return ret.toString();
     }
 }

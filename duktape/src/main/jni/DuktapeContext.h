@@ -36,6 +36,8 @@ public:
   void cooperateDebugger();
   void waitForDebugger();
   bool isDebugging();
+  void debuggerAppNotify(JNIEnv* env, jobjectArray args);
+
   void pushObject(JNIEnv* env, jobject object);
   jobject popObject(JNIEnv* env) const;
   jobject getKeyString(JNIEnv* env, jlong object, jstring key);

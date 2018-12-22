@@ -190,8 +190,8 @@ jobject DuktapeContext::popObject(JNIEnv *env) const {
 
     // create a new holder for this JavaScript object
     jclass clazz = env->FindClass("com/squareup/duktape/JavaScriptObject");
-    jmethodID constructor = env->GetMethodID(clazz, "<init>", "(Lcom/squareup/duktape/Duktape;J)V");
-    javaThis = env->NewObject(clazz, constructor, reinterpret_cast<jlong>(m_javaDuktape), reinterpret_cast<jlong>(ptr));
+    jmethodID constructor = env->GetMethodID(clazz, "<init>", "(Lcom/squareup/duktape/Duktape;JJ)V");
+    javaThis = env->NewObject(clazz, constructor, reinterpret_cast<jlong>(m_javaDuktape), reinterpret_cast<jlong>(this), reinterpret_cast<jlong>(ptr));
 
     // since this is a Javascript object, put a weak reference to the Java object in the JavaScript object
     // no need for a finalizer. if the Java object gets garbage collected, can always just spin
@@ -205,7 +205,7 @@ jobject DuktapeContext::popObject(JNIEnv *env) const {
     // pop the JavaScript object, it is hard referenced
     duk_pop(m_context);
 
-      return javaThis;
+    return javaThis;
   } else {
     // The result is an unsupported type, undefined, or null.
     duk_pop(m_context);
@@ -575,4 +575,19 @@ void DuktapeContext::cooperateDebugger() {
 
 bool DuktapeContext::isDebugging() {
     return m_DebuggerSocket.client_sock > 0;
+}
+
+void DuktapeContext::debuggerAppNotify(JNIEnv *env, jobjectArray args) {
+  CHECK_STACK(m_context);
+
+  jsize length = 0;
+  if (args != nullptr) {
+    length = env->GetArrayLength(args);
+    for (int i = 0; i < length; i++) {
+      jobject arg = env->GetObjectArrayElement(args, i);
+      pushObject(env, arg);
+    }
+  }
+
+  duk_debugger_notify(m_context, length);
 }

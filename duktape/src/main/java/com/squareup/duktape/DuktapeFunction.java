@@ -8,5 +8,5 @@ public interface DuktapeFunction {
         return null;
     }
 
-    Object invoke(Object thiz, Object... args);
+    Object invoke(Object property, Object... args);
 }

@@ -290,6 +290,10 @@ public final class Duktape implements Closeable {
     return isDebugging(context);
   }
 
+  public synchronized void debuggerAppNotify(Object... args) {
+    debuggerAppNotify(context, args);
+  }
+
   synchronized Object getKeyObject(long object, Object key) {
     return getKeyObject(context, object, key);
   }
@@ -317,6 +321,7 @@ public final class Duktape implements Closeable {
   private static native void cooperateDebugger(long context);
   private static native void waitForDebugger(long context);
   private static native boolean isDebugging(long context);
+  private static native void debuggerAppNotify(long context, Object... args);
   private static native Object getKeyObject(long context, long object, Object key);
   private static native Object getKeyString(long context, long object, String key);
   private static native Object getKeyInteger(long context, long object, int index);
