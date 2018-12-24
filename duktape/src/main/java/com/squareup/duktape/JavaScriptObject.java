@@ -31,13 +31,13 @@ public class JavaScriptObject implements DuktapeObject {
     @Override
     public Object call(Object... args) {
         coerceArgs(args);
-        return duktape.callSelf(pointer, args);
+        return Duktape.coerceToJava(duktape.callSelf(pointer, args), null);
     }
 
     @Override
     public Object invoke(Object property, Object... args) {
         coerceArgs(args);
-        return duktape.callProperty(pointer, property, args);
+        return Duktape.coerceToJava(duktape.callProperty(pointer, property, args), null);
     }
 
     @Override

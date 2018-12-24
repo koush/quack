@@ -54,7 +54,7 @@ final class JavaMethodObject implements DuktapeObject {
             else if (i < args.length) {
                 Log.w("Duktape", "dropping javascript to java arguments on the floor: " + (args.length - i));
             }
-            return best.invoke(thiz, coerced.toArray());
+            return Duktape.coerceToJavascript(best.invoke(thiz, coerced.toArray()));
         }
         catch (IllegalAccessException e) {
             throw new IllegalArgumentException(e);
