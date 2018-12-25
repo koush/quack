@@ -156,6 +156,9 @@ jobject DuktapeContext::popObject(JNIEnv *env) const {
   } else if (duk_get_type(m_context, -1) == DUK_TYPE_OBJECT) {
     jobject javaThis = nullptr;
 
+    // JavaScriptObject and JavaObject both contain a __java_this which points to the Java
+    // instance of that object. JavaScriptObject will be created as needed, whereas JavaObject
+    // will retrieve it from the JAVA_THIS_PROP_NAME  with __duktape_get Proxy handler.
     if (duk_has_prop_string(m_context, -1, "__java_this")) {
       duk_get_prop_string(m_context, -1, "__java_this");
       javaThis = reinterpret_cast<jobject>(duk_get_pointer(m_context, -1));
@@ -220,30 +223,44 @@ jobject DuktapeContext::popObject2(JNIEnv *env) const {
 }
 
 static duk_ret_t __duktape_get(duk_context *ctx) {
+  JNIEnv *env = getJNIEnv(ctx);
+  DuktapeContext *duktapeContext = getDuktapeContext(ctx);
+
   // pop the receiver, useless
   duk_pop(ctx);
 
-  // get the property name
-  const char* prop = duk_get_string(ctx, -1);
-  duk_pop(ctx);
+  jobject jprop;
+  jobject object;
+  {
+    // need to specially handle string keys to get the java reference (JAVA_THIS_PROP_NAME)
+    std::string prop;
+    if (duk_get_type(duktapeContext->getContext(), -1) == DUK_TYPE_STRING) {
+      // get the property name
+      const char* cprop = duk_get_string(ctx, -1);
+      jprop = env->NewStringUTF(cprop);
+      prop = cprop;
+      duk_pop(ctx);
+    }
+    else {
+      jprop = duktapeContext->popObject(env);
+    }
 
-  // get the java reference
-  duk_get_prop_string(ctx, -1, JAVA_THIS_PROP_NAME);
-  jobject object = static_cast<jobject>(duk_require_pointer(ctx, -1));
-  duk_pop(ctx);
+    // get the java reference
+    duk_get_prop_string(ctx, -1, JAVA_THIS_PROP_NAME);
+    object = static_cast<jobject>(duk_require_pointer(ctx, -1));
+    duk_pop(ctx);
 
-  if (object == nullptr) {
+    if (object == nullptr) {
       fatalErrorHandler(object, "DuktapeObject is null");
       return DUK_RET_REFERENCE_ERROR;
-  }
+    }
 
-  if (strcmp("__java_this", prop) == 0) {
+    if (prop == "__java_this") {
       // short circuit the pointer retrieval from popObject here.
       duk_push_pointer(ctx, object);
       return 1;
+    }
   }
-
-  JNIEnv *env = getJNIEnv(ctx);
 
   jclass clazz = env->FindClass("com/squareup/duktape/DuktapeObject");
   jclass objectClass = env->GetObjectClass(object);
@@ -253,10 +270,11 @@ static duk_ret_t __duktape_get(duk_context *ctx) {
   }
 
   jmethodID get = env->GetMethodID(clazz, "get", "(Ljava/lang/Object;)Ljava/lang/Object;");
-  jstring jprop = env->NewStringUTF(prop);
   jobject push = env->CallObjectMethod(object, get, jprop);
+  if (!checkRethrowDuktapeError(env, ctx)) {
+      return DUK_RET_ERROR;
+  }
 
-  DuktapeContext *duktapeContext = getDuktapeContext(ctx);
   duktapeContext->pushObject(env, push);
 
   return 1;

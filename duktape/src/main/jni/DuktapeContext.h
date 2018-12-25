@@ -51,6 +51,8 @@ public:
 
   const JavaScriptObject* get(JNIEnv *env, jstring name, jobjectArray methods);
 
+  duk_context* getContext() { return m_context; }
+
 private:
   jobject popObject2(JNIEnv* env) const;
   void pushObject(JNIEnv* env, jlong object);

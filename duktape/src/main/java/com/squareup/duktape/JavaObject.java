@@ -23,7 +23,14 @@ public final class JavaObject implements DuktapeJavaObject {
         Object ret = getMap(key);
         if (ret != null)
             return ret;
+
         Class clazz = target.getClass();
+
+        // length is not a field of the array class. it's a language property.
+        // Nor can arrays be cast to Array.
+        if (clazz.isArray() && "length".equals(key))
+            return Array.getLength(target);
+
         try {
             // try to get fields
             for (Field field : clazz.getFields()) {
@@ -48,7 +55,7 @@ public final class JavaObject implements DuktapeJavaObject {
 
     @Override
     public Object get(int index) {
-        if (target instanceof Array)
+        if (target.getClass().isArray())
             return Array.get(target, index);
         if (target instanceof List)
             return ((List)target).get(index);
@@ -68,7 +75,7 @@ public final class JavaObject implements DuktapeJavaObject {
 
         if (key instanceof Number) {
             Number number = (Number)key;
-            if (((Integer)number.intValue()).equals(number))
+            if (number.doubleValue() == number.intValue())
                 return get(number.intValue());
         }
 
