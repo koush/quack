@@ -1,5 +1,10 @@
 package com.squareup.duktape;
 
+import java.lang.reflect.InvocationHandler;
+import java.lang.reflect.Proxy;
+import java.util.ArrayList;
+import java.util.Collections;
+
 public class JavaScriptObject implements DuktapeObject {
     final public Duktape duktape;
     public final long context;
@@ -60,5 +65,22 @@ public class JavaScriptObject implements DuktapeObject {
         if (ret == null)
             return null;
         return ret.toString();
+    }
+
+    public InvocationHandler createInvocationHandler() {
+        return (proxy, method, args) -> {
+            if (method.getDeclaringClass() == Object.class)
+                return method.invoke(JavaScriptObject.this, args);
+            return Duktape.coerceToJava(JavaScriptObject.this.invoke(method.getName(), args), method.getReturnType());
+        };
+    }
+
+    public <T> T proxyInterface(Class<T> clazz, Class... more) {
+        ArrayList<Class> classes = new ArrayList<>();
+        classes.add(clazz);
+        if (more != null)
+            Collections.addAll(classes, more);
+
+        return (T)Proxy.newProxyInstance(clazz.getClassLoader(), classes.toArray(new Class[0]), createInvocationHandler());
     }
 }

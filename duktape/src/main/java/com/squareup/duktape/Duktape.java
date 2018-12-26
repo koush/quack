@@ -54,10 +54,21 @@ public final class Duktape implements Closeable {
     });
   }
 
+  /**
+   * Register a function that coerces values JavaScript values into an object of type
+   * {@code clazz} before being passed along to Java.
+   */
   public static <T> void putJavaCoercion(Class<T> clazz, DuktapeCoercion<T, Object> coercion) {
     JavaCoercions.put(clazz, coercion);
   }
 
+  /**
+   * Register a function that coerces Java values of type {@code clazz} into a JavaScript object
+   * before being passed along to Duktape.
+   * @param clazz
+   * @param coercion
+   * @param <F>
+   */
   public static <F> void putJavascriptCoercion(Class<F> clazz, DuktapeCoercion<Object, F> coercion) {
     JavascriptCoercions.put(clazz, coercion);
   }
@@ -70,12 +81,18 @@ public final class Duktape implements Closeable {
     T coerce(F o, Class clazz);
   }
 
+  /**
+   * Coerce a Java value into an equivalent JavaScript object.
+   */
   public static Object coerceToJavascript(Object o) {
     if (o == null)
       return null;
     return coerce(JavascriptCoercions, o, o.getClass());
   }
 
+  /**
+   * Coerce a JavaScript value into an equivalent Java object.
+   */
   public static Object coerceToJava(Object o, Class<?> clazz) {
     if (o == null)
       return null;
@@ -245,26 +262,50 @@ public final class Duktape implements Closeable {
 
   /**
    * Evaluate {@code script} and return a result. {@code fileName} will be used in error
-   * reporting. Note that the result must be one of the supported Java types or the call will
-   * return null.
+   * reporting.
    *
    * @throws DuktapeException if there is an error evaluating the script.
    */
-  public synchronized Object evaluate(String script, String fileName) {
+  public synchronized <T> T evaluate(String script, String fileName) {
     return evaluate(context, script, fileName);
   }
+
   /**
-   * Evaluate {@code script} and return a result. Note that the result must be one of the
-   * supported Java types or the call will return null.
+   * Evaluate {@code script} and return a result.
    *
    * @throws DuktapeException if there is an error evaluating the script.
    */
-  public synchronized Object evaluate(String script) {
-    return evaluate(context, script, "?");
+  public synchronized <T> T evaluate(String script) {
+    return evaluate(script, "?");
   }
 
-  public synchronized Object compile(String script, String fileName) {
-    return compile(context, script, fileName);
+  /**
+   * Evaluate {@code script} and return a result. {@code fileName} will be used in error
+   * reporting. {@code fileName} will be used in error reporting.
+   *
+   * @throws DuktapeException if there is an error evaluating the script.
+   */
+  public synchronized JavaScriptObject evaluateForJavaScriptObject(String script, String fileName) {
+    return evaluate(context, script, fileName);
+  }
+
+  /**
+   * Evaluate {@code script} and return a result. The result must be a JavaScript object
+   * or a ClassCastException will be thrown.
+   *
+   * @throws DuktapeException if there is an error evaluating the script.
+   */
+  public synchronized JavaScriptObject evaluateForJavaScriptObject(String script) {
+    return evaluateForJavaScriptObject(script, "?");
+  }
+
+  /**
+   * Compile a JavaScript function and return of JavaScriptObject as the resulting function.
+   *
+   * @throws DuktapeException if there is an error evaluating the script.
+   */
+  public synchronized JavaScriptObject compileFunction(String script, String fileName) {
+    return compileFunction(context, script, fileName);
   }
 
   /**
@@ -293,17 +334,33 @@ public final class Duktape implements Closeable {
     setGlobalProperty(context, property, value);
   }
 
+  /**
+   * Notify any attached debugger to process pending any debugging requests. When
+   * cooperateDebuger is invoked by the caller, the caller must ensure no calls into
+   * the Duktape during that time.
+   */
   public synchronized void cooperateDebugger() {
     cooperateDebugger(context);
   }
+
+  /**
+   * Wait for a debugging connection on port 9091.
+   */
   public void waitForDebugger() {
     waitForDebugger(context);
   }
 
+  /**
+   * Check if a debugger is currently attached.
+   */
   public boolean isDebugging() {
     return isDebugging(context);
   }
 
+  /**
+   * Send an custom app notification to any connected debugging client.
+   * @param args
+   */
   public synchronized void debuggerAppNotify(Object... args) {
     debuggerAppNotify(context, args);
   }
@@ -326,8 +383,8 @@ public final class Duktape implements Closeable {
 
   private static native long createContext(Duktape duktape);
   private static native void destroyContext(long context);
-  private static native Object evaluate(long context, String sourceCode, String fileName);
-  private static native Object compile(long context, String sourceCode, String fileName);
+  private static native <T> T evaluate(long context, String sourceCode, String fileName);
+  private static native JavaScriptObject compileFunction(long context, String sourceCode, String fileName);
 
   private static native void cooperateDebugger(long context);
   private static native void waitForDebugger(long context);
