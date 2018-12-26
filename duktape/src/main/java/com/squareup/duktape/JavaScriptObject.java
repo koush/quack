@@ -28,7 +28,7 @@ public class JavaScriptObject implements DuktapeObject {
     private void coerceArgs(Object... args) {
         if (args != null) {
             for (int i = 0; i < args.length; i++) {
-                args[i] = Duktape.coerceToJavascript(args[i]);
+                args[i] = Duktape.coerceJavaToJavascript(args[i]);
             }
         }
     }
@@ -36,13 +36,13 @@ public class JavaScriptObject implements DuktapeObject {
     @Override
     public Object call(Object... args) {
         coerceArgs(args);
-        return Duktape.coerceToJava(duktape.callSelf(pointer, args), null);
+        return Duktape.coerceJavaScriptToJava(duktape.callSelf(pointer, args), null);
     }
 
     @Override
     public Object invoke(Object property, Object... args) {
         coerceArgs(args);
-        return Duktape.coerceToJava(duktape.callProperty(pointer, property, args), null);
+        return Duktape.coerceJavaScriptToJava(duktape.callProperty(pointer, property, args), null);
     }
 
     @Override
@@ -71,7 +71,7 @@ public class JavaScriptObject implements DuktapeObject {
         return (proxy, method, args) -> {
             if (method.getDeclaringClass() == Object.class)
                 return method.invoke(JavaScriptObject.this, args);
-            return Duktape.coerceToJava(JavaScriptObject.this.invoke(method.getName(), args), method.getReturnType());
+            return Duktape.coerceJavaScriptToJava(JavaScriptObject.this.invoke(method.getName(), args), method.getReturnType());
         };
     }
 

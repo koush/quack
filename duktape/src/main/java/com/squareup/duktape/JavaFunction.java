@@ -28,15 +28,15 @@ public class JavaFunction implements DuktapeObject {
     void coerceArgs(Class[] parameterTypes, Object... args) {
         if (args != null) {
             for (int i = 0; i < args.length; i++) {
-                args[i] = Duktape.coerceToJava(args[i], parameterTypes != null && i < parameterTypes.length ? parameterTypes[i] : null);
+                args[i] = Duktape.coerceJavaScriptToJava(args[i], parameterTypes != null && i < parameterTypes.length ? parameterTypes[i] : null);
             }
         }
     }
 
     @Override
     public Object invoke(Object thiz, Object... args) {
-        thiz = Duktape.coerceToJava(thiz, null);
+        thiz = Duktape.coerceJavaScriptToJava(thiz, null);
         coerceArgs(getParameterTypes(), args);
-        return Duktape.coerceToJavascript(function.invoke(thiz, args));
+        return Duktape.coerceJavaToJavascript(function.invoke(thiz, args));
     }
 }

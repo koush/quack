@@ -16,12 +16,18 @@ final class JavaMethodObject implements DuktapeObject {
     public Object invoke(Object thiz, Object... args) {
         if (thiz == null)
             throw new UnsupportedOperationException("can not call " + target);
-        thiz = Duktape.coerceToJava(thiz, Object.class);
+        thiz = Duktape.coerceJavaScriptToJava(thiz, Object.class);
         int bestScore = Integer.MAX_VALUE;
         Method best = null;
         for (Method method: thiz.getClass().getMethods()) {
             if (method.getName().equals(target)) {
-                int score = Math.abs(args.length - method.getParameterTypes().length);
+                // parameter count is most important
+                int score = Math.abs(args.length - method.getParameterTypes().length) * 100;
+                // tiebreak by checking parameter types
+                for (int i = 0; i < Math.min(method.getParameterTypes().length, args.length); i++) {
+                    if (method.getParameterTypes()[i].isInstance(args[i]))
+                        score--;
+                }
                 if (score < bestScore) {
                     bestScore = score;
                     best = method;
@@ -31,7 +37,13 @@ final class JavaMethodObject implements DuktapeObject {
 
         if (best == null)
             throw new UnsupportedOperationException("can not call " + target);
+
         try {
+            Method interfaceMethod = Duktape.getInterfaceMethod(best);
+            DuktapeMethodCoercion methodCoercion = Duktape.JavaScriptToJavaMethodCoercions.get(interfaceMethod);
+            if (methodCoercion != null)
+                return methodCoercion.invoke(interfaceMethod, thiz, args);
+
             int numParameters = best.getParameterTypes().length;
             if (best.isVarArgs())
                 numParameters--;
@@ -39,7 +51,7 @@ final class JavaMethodObject implements DuktapeObject {
             int i = 0;
             for (; i < numParameters; i++) {
                 if (i < args.length)
-                    coerced.add(Duktape.coerceToJava(args[i], best.getParameterTypes()[i]));
+                    coerced.add(Duktape.coerceJavaScriptToJava(args[i], best.getParameterTypes()[i]));
                 else
                     coerced.add(null);
             }
@@ -47,14 +59,14 @@ final class JavaMethodObject implements DuktapeObject {
                 Class varargType = best.getParameterTypes()[numParameters].getComponentType();
                 ArrayList<Object> varargs = new ArrayList<>();
                 for (; i < args.length; i++) {
-                    varargs.add(Duktape.coerceToJava(args[i], varargType));
+                    varargs.add(Duktape.coerceJavaScriptToJava(args[i], varargType));
                 }
                 coerced.add(varargs.toArray());
             }
             else if (i < args.length) {
                 Log.w("Duktape", "dropping javascript to java arguments on the floor: " + (args.length - i));
             }
-            return Duktape.coerceToJavascript(best.invoke(thiz, coerced.toArray()));
+            return Duktape.coerceJavaToJavascript(best.invoke(thiz, coerced.toArray()));
         }
         catch (IllegalAccessException e) {
             throw new IllegalArgumentException(e);

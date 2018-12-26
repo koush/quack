@@ -21,36 +21,36 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.lang.reflect.UndeclaredThrowableException;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.logging.Logger;
 
 /** A simple EMCAScript (Javascript) interpreter. */
 public final class Duktape implements Closeable {
-  private static final Map<Class, DuktapeCoercion> JavaCoercions = new LinkedHashMap<>();
-  private static final Map<Class, DuktapeCoercion> JavascriptCoercions = new LinkedHashMap<>();
+  private static final Map<Class, DuktapeCoercion> JavaScriptToJavaCoercions = new LinkedHashMap<>();
+  private static final Map<Class, DuktapeCoercion> JavaToJavascriptCoercions = new LinkedHashMap<>();
+  static final Map<Method, DuktapeMethodCoercion> JavaScriptToJavaMethodCoercions = new LinkedHashMap<>();
+  static final Map<Method, DuktapeMethodCoercion> JavaToJavascriptMethodCoercions = new LinkedHashMap<>();
 
   static {
     System.loadLibrary("duktape");
 
     // coercing javascript string into an enum for java
-    JavaCoercions.put(Enum.class, new DuktapeCoercion<Enum, Object>() {
-      @Override
-      public Enum coerce(Object o, Class clazz) {
-        if (o == null)
-          return null;
-        return Enum.valueOf(clazz, o.toString());
-      }
+    JavaScriptToJavaCoercions.put(Enum.class, (DuktapeCoercion<Enum, Object>) (o, clazz) -> {
+      if (o == null)
+        return null;
+      return Enum.valueOf(clazz, o.toString());
     });
 
+    JavaScriptToJavaCoercions.put(Integer.class, (o, clazz) -> o instanceof Number ? ((Number)o).intValue() : o);
+    JavaScriptToJavaCoercions.put(int.class, (o, clazz) -> o instanceof Number ? ((Number)o).intValue() : o);
+
     // coercing a java enum into javascript string
-    JavascriptCoercions.put(Enum.class, new DuktapeCoercion<Object, Enum>() {
-      @Override
-      public Object coerce(Enum o, Class clazz) {
-        if (o == null)
-          return null;
-        return o.toString();
-      }
+    JavaToJavascriptCoercions.put(Enum.class, (DuktapeCoercion<Object, Enum>) (o, clazz) -> {
+      if (o == null)
+        return null;
+      return o;
     });
   }
 
@@ -58,8 +58,8 @@ public final class Duktape implements Closeable {
    * Register a function that coerces values JavaScript values into an object of type
    * {@code clazz} before being passed along to Java.
    */
-  public static <T> void putJavaCoercion(Class<T> clazz, DuktapeCoercion<T, Object> coercion) {
-    JavaCoercions.put(clazz, coercion);
+  public static synchronized <T>  void putJavaScriptToJavaCoercion(Class<T> clazz, DuktapeCoercion<T, Object> coercion) {
+    JavaScriptToJavaCoercions.put(clazz, coercion);
   }
 
   /**
@@ -69,31 +69,23 @@ public final class Duktape implements Closeable {
    * @param coercion
    * @param <F>
    */
-  public static <F> void putJavascriptCoercion(Class<F> clazz, DuktapeCoercion<Object, F> coercion) {
-    JavascriptCoercions.put(clazz, coercion);
-  }
-
-  /**
-   * Coerce a value passing through Duktape to the desired output class.
-   * @param <T>
-   */
-  public interface DuktapeCoercion<T, F> {
-    T coerce(F o, Class clazz);
+  public static synchronized <F> void putJavaToJavascriptCoercion(Class<F> clazz, DuktapeCoercion<Object, F> coercion) {
+    JavaToJavascriptCoercions.put(clazz, coercion);
   }
 
   /**
    * Coerce a Java value into an equivalent JavaScript object.
    */
-  public static Object coerceToJavascript(Object o) {
+  public static Object coerceJavaToJavascript(Object o) {
     if (o == null)
       return null;
-    return coerce(JavascriptCoercions, o, o.getClass());
+    return coerce(JavaToJavascriptCoercions, o, o.getClass());
   }
 
   /**
    * Coerce a JavaScript value into an equivalent Java object.
    */
-  public static Object coerceToJava(Object o, Class<?> clazz) {
+  public static Object coerceJavaScriptToJava(Object o, Class<?> clazz) {
     if (o == null)
       return null;
     while (o instanceof DuktapeJavaObject) {
@@ -123,31 +115,31 @@ public final class Duktape implements Closeable {
       Class componentType = clazz.getComponentType();
       Object ret = Array.newInstance(componentType, length);
       for (int i = 0; i < length; i++) {
-        Array.set(ret, i, coerceToJava(jo.get(i), componentType));
+        Array.set(ret, i, coerceJavaScriptToJava(jo.get(i), componentType));
       }
       return ret;
     }
 
-    return coerce(JavaCoercions, o, clazz);
+    return coerce(JavaScriptToJavaCoercions, o, clazz);
   }
 
   public interface JavaMethodReference<T> {
-    Object invoke(T thiz);
+    void invoke(T thiz);
   }
   public interface JavaMethodReference0<T, A> {
-    Object invoke(T thiz, A arg0);
+    void invoke(T thiz, A arg0);
   }
   public interface JavaMethodReference1<T, A, B> {
-    Object invoke(T thiz, A arg0, B arg1);
+    void invoke(T thiz, A arg0, B arg1);
   }
   public interface JavaMethodReference2<T, A, B, C> {
-    Object invoke(T thiz, A arg0, B arg1, C arg2);
+    void invoke(T thiz, A arg0, B arg1, C arg2);
   }
   public interface JavaMethodReference3<T, A, B, C, D> {
-    Object invoke(T thiz, A arg0, B arg1, C arg2, D arg3);
+    void invoke(T thiz, A arg0, B arg1, C arg2, D arg3);
   }
   public interface JavaMethodReference4<T, A, B, C, D, E> {
-    Object invoke(T thiz, A arg0, B arg1, C arg2, D arg3, E arg4);
+    void invoke(T thiz, A arg0, B arg1, C arg2, D arg3, E arg4);
   }
 
   public static <T> Method getInterfaceMethod(Class<T> clazz, JavaMethodReference<T> ref) {
@@ -169,7 +161,74 @@ public final class Duktape implements Closeable {
     return invokeMethodReferenceProxy(clazz, ref);
   }
 
-  public static class MethodException extends Exception {
+  private interface MemoizeFunc<T> {
+    T process();
+  }
+
+  private static class Memoize<T> {
+    int hash(Object... objects) {
+      int ret = 0;
+      for (Object o: objects) {
+        ret ^= o == null ? 0 : o.hashCode();
+      }
+      return ret;
+    }
+
+    HashMap<Integer, T> store = new HashMap<>();
+    T memoize(MemoizeFunc<T> func, Object... args) {
+      int hash = hash(args);
+      if (store.containsKey(hash)) {
+        return store.get(hash);
+      }
+      T ret = func.process();
+      store.put(hash, ret);
+      return ret;
+    }
+
+    void clear() {
+      store.clear();
+    }
+  }
+
+  static Memoize<Method> interfaceMethods = new Memoize<>();
+  static Method getInterfaceMethod(Method method) {
+    return interfaceMethods.memoize((MemoizeFunc<Method>) () -> {
+      if (method.getDeclaringClass().isInterface())
+        return method;
+
+      Class c = method.getDeclaringClass();
+      for (Class iface: c.getInterfaces()) {
+        for (Method m: iface.getDeclaredMethods()) {
+          if (m.getParameterTypes().length != method.getParameterTypes().length)
+            continue;
+          if (!m.getName().equals(method.getName()))
+            continue;
+          if (!m.getReturnType().isAssignableFrom(method.getReturnType()))
+            continue;
+
+          boolean paramMatch = true;
+          for (int i = 0; i < method.getParameterTypes().length; i++) {
+            if (!m.getParameterTypes()[i].isAssignableFrom(method.getParameterTypes()[i])) {
+              paramMatch = false;
+              break;
+            }
+          }
+
+          if (paramMatch)
+            return m;
+        }
+      }
+
+      return null;
+    }, method);
+  }
+
+  public static synchronized  void putJavaScriptToJavaMethodCoercion(Method method, DuktapeMethodCoercion coercion) {
+    JavaScriptToJavaMethodCoercions.put(method, coercion);
+    interfaceMethods.clear();
+  }
+
+  private static class MethodException extends Exception {
     Method method;
     MethodException(Method method) {
       this.method = method;
