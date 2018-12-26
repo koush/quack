@@ -43,15 +43,17 @@ public final class Duktape implements Closeable {
       return Enum.valueOf(clazz, o.toString());
     });
 
+    // coerce anything into a string for java via toString.
+    JavaScriptToJavaCoercions.put(String.class, (o, clazz) -> o.toString());
+
+    // coerce JavaScript Numbers into Integers and Longs
     JavaScriptToJavaCoercions.put(Integer.class, (o, clazz) -> o instanceof Number ? ((Number)o).intValue() : o);
     JavaScriptToJavaCoercions.put(int.class, (o, clazz) -> o instanceof Number ? ((Number)o).intValue() : o);
+    JavaScriptToJavaCoercions.put(Long.class, (o, clazz) -> o instanceof Number ? ((Number)o).longValue() : o);
+    JavaScriptToJavaCoercions.put(long.class, (o, clazz) -> o instanceof Number ? ((Number)o).longValue() : o);
 
     // coercing a java enum into javascript string
-    JavaToJavascriptCoercions.put(Enum.class, (DuktapeCoercion<Object, Enum>) (o, clazz) -> {
-      if (o == null)
-        return null;
-      return o.toString();
-    });
+    JavaToJavascriptCoercions.put(Enum.class, (DuktapeCoercion<Object, Enum>) (o, clazz) -> o.toString());
   }
 
   /**
