@@ -220,6 +220,12 @@ duk_ret_t DuktapeContext::duktapeGet() {
     if (duk_get_type(m_context, -1) == DUK_TYPE_STRING) {
       // get the property name
       const char* cprop = duk_get_string(m_context, -1);
+      // not a valid utf string. duktape internal.
+      if (cprop[0] == '\x81') {
+          duk_pop_2(m_context);
+          duk_push_undefined(m_context);
+          return 1;
+      }
       jprop = env->NewStringUTF(cprop);
       prop = cprop;
       duk_pop(m_context);

@@ -50,7 +50,7 @@ public final class Duktape implements Closeable {
     JavaToJavascriptCoercions.put(Enum.class, (DuktapeCoercion<Object, Enum>) (o, clazz) -> {
       if (o == null)
         return null;
-      return o;
+      return o.toString();
     });
   }
 
