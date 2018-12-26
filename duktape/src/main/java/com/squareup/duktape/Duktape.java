@@ -124,7 +124,7 @@ public final class Duktape implements Closeable {
   }
 
   public interface JavaMethodReference<T> {
-    void invoke(T thiz);
+    Object invoke(T thiz);
   }
   public interface JavaMethodReference0<T, A> {
     void invoke(T thiz, A arg0);
@@ -245,6 +245,8 @@ public final class Duktape implements Closeable {
 
   private static <T> Method invokeMethodReferenceProxy(Class<T> clazz, Object ref) {
     try {
+      if (ref.getClass().getDeclaredMethods().length != 1)
+        throw new Exception("expecting lambda with 1 method: getInterfaceMethod(Foo.class, Foo::bar)");
       Method method = ref.getClass().getDeclaredMethods()[0];
       Object[] args = new Object[method.getParameterTypes().length];
       // first arg is "this" for the lambda
@@ -257,14 +259,16 @@ public final class Duktape implements Closeable {
         if (invocationTargetException.getTargetException() instanceof UndeclaredThrowableException) {
           UndeclaredThrowableException undeclaredThrowableException = (UndeclaredThrowableException)invocationTargetException.getTargetException();
           if (undeclaredThrowableException.getUndeclaredThrowable() instanceof MethodException) {
-
-            Method calledMethod = ((MethodException)undeclaredThrowableException.getUndeclaredThrowable()).method;
-            return calledMethod;
+            return ((MethodException)undeclaredThrowableException.getUndeclaredThrowable()).method;
           }
         }
+        else if (invocationTargetException.getTargetException() instanceof NullPointerException) {
+          throw new IllegalArgumentException("lambdas with primitive arguments must be invoked with default values: getInterfaceMethod(Foo.class, thiz -> thiz.setInt(0))");
+        }
       }
+      throw new IllegalArgumentException(e);
     }
-    return null;
+    throw new IllegalArgumentException("interface method was not called by lambda.");
   }
 
   private static Object coerce(Map<Class, DuktapeCoercion> coerce, Object o, Class<?> clazz) {
