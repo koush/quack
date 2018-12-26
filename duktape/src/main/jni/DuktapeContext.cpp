@@ -19,7 +19,6 @@
 #include <stdexcept>
 #include <functional>
 #include "java/JString.h"
-#include "java/JavaMethod.h"
 #include "java/GlobalRef.h"
 #include "java/JavaExceptions.h"
 #include "StackChecker.h"
@@ -60,27 +59,11 @@ jobject getJavaThis(duk_context* ctx) {
   return thisObject;
 }
 
-JavaMethod* getJavaMethod(duk_context* ctx) {
-  duk_push_current_function(ctx);
-  duk_get_prop_string(ctx, -1, JAVA_METHOD_PROP_NAME);
-  JavaMethod* method = static_cast<JavaMethod*>(duk_require_pointer(ctx, -1));
-  duk_pop_2(ctx);
-  return method;
-}
-
 duk_int_t eval_string_with_filename(duk_context *ctx, const char *src, const char *fileName) {
   duk_push_string(ctx, fileName);
   const int numArgs = 1;
   return duk_eval_raw(ctx, src, 0, numArgs | DUK_COMPILE_EVAL | DUK_COMPILE_SAFE |
                                    DUK_COMPILE_NOSOURCE | DUK_COMPILE_STRLEN);
-}
-
-// Called by Duktape when JS invokes a method on our bound Java object.
-duk_ret_t javaMethodHandler(duk_context *ctx) {
-  JavaMethod* method = getJavaMethod(ctx);
-  return method != nullptr
-         ? method->invoke(ctx, getJNIEnv(ctx), getJavaThis(ctx))
-         : DUK_RET_ERROR;
 }
 
 // Called by Duktape to handle finalization of bound Java objects.
@@ -90,17 +73,6 @@ duk_ret_t javaObjectFinalizer(duk_context *ctx) {
     getJNIEnv(ctx)->DeleteGlobalRef(static_cast<jobject>(duk_require_pointer(ctx, -1)));
     duk_pop(ctx);
     duk_del_prop_string(ctx, -1, JAVA_METHOD_PROP_NAME);
-  }
-
-  // Iterate over all of the properties, deleting all the JavaMethod objects we attached.
-  duk_enum(ctx, -1, DUK_ENUM_OWN_PROPERTIES_ONLY);
-  while (duk_next(ctx, -1, true)) {
-    if (!duk_get_prop_string(ctx, -1, JAVA_METHOD_PROP_NAME)) {
-      duk_pop_2(ctx);
-      continue;
-    }
-    delete static_cast<JavaMethod*>(duk_require_pointer(ctx, -1));
-    duk_pop_3(ctx);
   }
 
   // Pop the enum and the object passed in as an argument.
@@ -128,7 +100,19 @@ DuktapeContext::DuktapeContext(JavaVM* javaVM, jobject javaDuktape)
     throw std::bad_alloc();
   }
 
-  m_javaDuktape = getEnvFromJavaVM(javaVM)->NewWeakGlobalRef(javaDuktape);
+  JNIEnv *env = getEnvFromJavaVM(javaVM);
+  m_javaDuktape = env->NewWeakGlobalRef(javaDuktape);
+
+  m_objectClass = findClass(env, "java/lang/Object");
+  m_duktapeObjectClass = findClass(env, "com/squareup/duktape/DuktapeObject");
+  m_javaScriptObjectClass = findClass(env, "com/squareup/duktape/JavaScriptObject");
+  m_javaObjectClass = findClass(env, "com/squareup/duktape/JavaObject");
+
+  m_duktapeObjectGetMethod = env->GetMethodID(m_duktapeObjectClass, "get", "(Ljava/lang/Object;)Ljava/lang/Object;");
+  m_duktapeObjectInvokeMethod = env->GetMethodID(m_duktapeObjectClass, "invoke", "(Ljava/lang/Object;[Ljava/lang/Object;)Ljava/lang/Object;");
+  m_javaScriptObjectConstructor = env->GetMethodID(m_javaScriptObjectClass, "<init>", "(Lcom/squareup/duktape/Duktape;JJ)V");
+  m_javaObjectConstructor = env->GetMethodID(m_javaObjectClass, "<init>", "(Ljava/lang/Object;)V");
+
   m_DebuggerSocket.client_sock = -1;
 
   // Stash the JVM object in the context, so we can find our way back from a Duktape C callback.
@@ -140,9 +124,12 @@ DuktapeContext::DuktapeContext(JavaVM* javaVM, jobject javaDuktape)
   duk_pop(m_context);
 }
 
+jclass DuktapeContext::findClass(JNIEnv *env, const char *className) {
+    return (jclass)env->NewGlobalRef(env->FindClass(className));
+}
+
 DuktapeContext::~DuktapeContext() {
   // Delete the proxies before destroying the heap.
-  m_jsObjects.clear();
   duk_destroy_heap(m_context);
 }
 
@@ -151,9 +138,8 @@ jobject DuktapeContext::popObject(JNIEnv *env) const {
   if (duk_check_type_mask(m_context, -1, supportedTypeMask)) {
     // The result is a supported scalar type - return it.
     return m_objectType->pop(m_context, env, false).l;
-  } else if (duk_is_array(m_context, -1)) {
-    return m_objectType->popArray(m_context, env, 1, false, false);
-  } else if (duk_get_type(m_context, -1) == DUK_TYPE_OBJECT) {
+  }
+  else if (duk_get_type(m_context, -1) == DUK_TYPE_OBJECT) {
     jobject javaThis = nullptr;
 
     // JavaScriptObject and JavaObject both contain a __java_this which points to the Java
@@ -192,9 +178,7 @@ jobject DuktapeContext::popObject(JNIEnv *env) const {
     duk_pop(m_context);
 
     // create a new holder for this JavaScript object
-    jclass clazz = env->FindClass("com/squareup/duktape/JavaScriptObject");
-    jmethodID constructor = env->GetMethodID(clazz, "<init>", "(Lcom/squareup/duktape/Duktape;JJ)V");
-    javaThis = env->NewObject(clazz, constructor, reinterpret_cast<jlong>(m_javaDuktape), reinterpret_cast<jlong>(this), reinterpret_cast<jlong>(ptr));
+    javaThis = env->NewObject(m_javaScriptObjectClass, m_javaScriptObjectConstructor, reinterpret_cast<jlong>(m_javaDuktape), reinterpret_cast<jlong>(this), reinterpret_cast<jlong>(ptr));
 
     // since this is a Javascript object, put a weak reference to the Java object in the JavaScript object
     // no need for a finalizer. if the Java object gets garbage collected, can always just spin
@@ -222,33 +206,32 @@ jobject DuktapeContext::popObject2(JNIEnv *env) const {
   return ret;
 }
 
-static duk_ret_t __duktape_get(duk_context *ctx) {
-  JNIEnv *env = getJNIEnv(ctx);
-  DuktapeContext *duktapeContext = getDuktapeContext(ctx);
+duk_ret_t DuktapeContext::duktapeGet() {
+  JNIEnv *env = getJNIEnv(m_context);
 
   // pop the receiver, useless
-  duk_pop(ctx);
+  duk_pop(m_context);
 
   jobject jprop;
   jobject object;
   {
     // need to specially handle string keys to get the java reference (JAVA_THIS_PROP_NAME)
     std::string prop;
-    if (duk_get_type(duktapeContext->getContext(), -1) == DUK_TYPE_STRING) {
+    if (duk_get_type(m_context, -1) == DUK_TYPE_STRING) {
       // get the property name
-      const char* cprop = duk_get_string(ctx, -1);
+      const char* cprop = duk_get_string(m_context, -1);
       jprop = env->NewStringUTF(cprop);
       prop = cprop;
-      duk_pop(ctx);
+      duk_pop(m_context);
     }
     else {
-      jprop = duktapeContext->popObject(env);
+      jprop = popObject(env);
     }
 
     // get the java reference
-    duk_get_prop_string(ctx, -1, JAVA_THIS_PROP_NAME);
-    object = static_cast<jobject>(duk_require_pointer(ctx, -1));
-    duk_pop(ctx);
+    duk_get_prop_string(m_context, -1, JAVA_THIS_PROP_NAME);
+    object = static_cast<jobject>(duk_require_pointer(m_context, -1));
+    duk_pop(m_context);
 
     if (object == nullptr) {
       fatalErrorHandler(object, "DuktapeObject is null");
@@ -257,66 +240,71 @@ static duk_ret_t __duktape_get(duk_context *ctx) {
 
     if (prop == "__java_this") {
       // short circuit the pointer retrieval from popObject here.
-      duk_push_pointer(ctx, object);
+      duk_push_pointer(m_context, object);
       return 1;
     }
   }
 
-  jclass clazz = env->FindClass("com/squareup/duktape/DuktapeObject");
   jclass objectClass = env->GetObjectClass(object);
-  if (!env->IsAssignableFrom(objectClass, clazz)) {
+  if (!env->IsAssignableFrom(objectClass, m_duktapeObjectClass)) {
     fatalErrorHandler(object, "Object is not DuktapeObject");
     return DUK_RET_REFERENCE_ERROR;
   }
 
-  jmethodID get = env->GetMethodID(clazz, "get", "(Ljava/lang/Object;)Ljava/lang/Object;");
-  jobject push = env->CallObjectMethod(object, get, jprop);
-  if (!checkRethrowDuktapeError(env, ctx)) {
-      return DUK_RET_ERROR;
+  jobject push = env->CallObjectMethod(object, m_duktapeObjectGetMethod, jprop);
+  if (!checkRethrowDuktapeError(env, m_context)) {
+    return DUK_RET_ERROR;
   }
 
-  duktapeContext->pushObject(env, push);
+  pushObject(env, push);
 
   return 1;
 }
 
-static duk_ret_t __duktape_apply(duk_context *ctx) {
-  JNIEnv *env = getJNIEnv(ctx);
+static duk_ret_t __duktape_get(duk_context *ctx) {
   DuktapeContext *duktapeContext = getDuktapeContext(ctx);
+  return duktapeContext->duktapeGet();
+}
+
+duk_ret_t DuktapeContext::duktapeApply() {
+  JNIEnv *env = getJNIEnv(m_context);
 
   // unpack the arguments
-  duk_size_t argLen = duk_get_length(ctx, -1);
-  jobjectArray javaArgs = env->NewObjectArray((jsize)argLen, env->FindClass("java/lang/Object"), nullptr);
+  duk_size_t argLen = duk_get_length(m_context, -1);
+  jobjectArray javaArgs = env->NewObjectArray((jsize)argLen, m_objectClass, nullptr);
   for (duk_uarridx_t i = 0; i < argLen; i++) {
-    duk_get_prop_index(ctx, -1, i);
-    env->SetObjectArrayElement(javaArgs, (jsize)i, duktapeContext->popObject(env));
+    duk_get_prop_index(m_context, -1, i);
+    env->SetObjectArrayElement(javaArgs, (jsize)i, popObject(env));
   }
   // done, pop the argument list
-  duk_pop(ctx);
+  duk_pop(m_context);
 
   // get java this
-  jobject javaThis = duktapeContext->popObject(env);
+  jobject javaThis = popObject(env);
 
   // get the java reference
-  duk_get_prop_string(ctx, -1, JAVA_THIS_PROP_NAME);
-  jobject object = static_cast<jobject>(duk_require_pointer(ctx, -1));
-  duk_pop(ctx);
+  duk_get_prop_string(m_context, -1, JAVA_THIS_PROP_NAME);
+  jobject object = static_cast<jobject>(duk_require_pointer(m_context, -1));
+  duk_pop(m_context);
 
-  jclass clazz = env->FindClass("com/squareup/duktape/DuktapeObject");
   jclass objectClass = env->GetObjectClass(object);
-  if (!env->IsAssignableFrom(objectClass, clazz)) {
+  if (!env->IsAssignableFrom(objectClass, m_duktapeObjectClass)) {
     fatalErrorHandler(object, "Object is not DuktapeObject");
     return DUK_RET_REFERENCE_ERROR;
   }
 
-  jmethodID callProperty = env->GetMethodID(clazz, "invoke", "(Ljava/lang/Object;[Ljava/lang/Object;)Ljava/lang/Object;");
-  jobject push = env->CallObjectMethod(object, callProperty, javaThis, javaArgs);
-  if (!checkRethrowDuktapeError(env, ctx)) {
-      return DUK_RET_ERROR;
+  jobject push = env->CallObjectMethod(object, m_duktapeObjectInvokeMethod, javaThis, javaArgs);
+  if (!checkRethrowDuktapeError(env, m_context)) {
+    return DUK_RET_ERROR;
   }
 
-  duktapeContext->pushObject(env, push);
+  pushObject(env, push);
   return 1;
+}
+
+static duk_ret_t __duktape_apply(duk_context *ctx) {
+  DuktapeContext *duktapeContext = getDuktapeContext(ctx);
+  return duktapeContext->duktapeApply();
 }
 
 void DuktapeContext::pushObject(JNIEnv *env, jlong object) {
@@ -346,14 +334,11 @@ void DuktapeContext::pushObject(JNIEnv *env, jobject object) {
   }
 
   // a JavaScriptObject can be unpacked back into a native duktape heap pointer/object
-  const jclass javascriptObjectClass = env->FindClass("com/squareup/duktape/JavaScriptObject");
-
   // a DuktapeObject can support a duktape Proxy, and does not need any further boxing
-  const jclass duktapeobjectClass = env->FindClass("com/squareup/duktape/DuktapeObject");
   jclass objectClass = env->GetObjectClass(object);
-  if (env->IsAssignableFrom(objectClass, javascriptObjectClass)) {
-    jfieldID contextField = env->GetFieldID(javascriptObjectClass, "context", "J");
-    jfieldID pointerField = env->GetFieldID(javascriptObjectClass, "pointer", "J");
+  if (env->IsAssignableFrom(objectClass, m_javaScriptObjectClass)) {
+    jfieldID contextField = env->GetFieldID(m_javaScriptObjectClass, "context", "J");
+    jfieldID pointerField = env->GetFieldID(m_javaScriptObjectClass, "pointer", "J");
 
     DuktapeContext* context = reinterpret_cast<DuktapeContext*>(env->GetLongField(object, contextField));
     if (context == this) {
@@ -365,11 +350,9 @@ void DuktapeContext::pushObject(JNIEnv *env, jobject object) {
     // a proxy already exists, but not for the correct DuktapeContext, so native javascript heap
     // pointer can't be used.
   }
-  else if (!env->IsAssignableFrom(objectClass, duktapeobjectClass)) {
+  else if (!env->IsAssignableFrom(objectClass, m_duktapeObjectClass)) {
     // this is a normal Java object, so create a proxy for it to access fields and methods
-    const jclass javaobjectClass = env->FindClass("com/squareup/duktape/JavaObject");
-    jmethodID constructor = env->GetMethodID(javaobjectClass, "<init>", "(Ljava/lang/Object;)V");
-    object = env->NewObject(javaobjectClass, constructor, object);
+    object = env->NewObject(m_javaObjectClass, m_javaObjectConstructor, object);
   }
 
   // at this point, the object is guaranteed to be a JavaScriptObject from another DuktapeContext
@@ -508,68 +491,6 @@ jobject DuktapeContext::compile(JNIEnv* env, jstring code, jstring fname) {
       return nullptr;
   }
   return popObject(env);
-}
-
-void DuktapeContext::set(JNIEnv *env, jstring name, jobject object, jobjectArray methods) {
-  CHECK_STACK(m_context);
-  duk_push_global_object(m_context);
-  const JString instanceName(env, name);
-  if (duk_has_prop_string(m_context, -1, instanceName)) {
-    duk_pop(m_context);
-    queueIllegalArgumentException(env,
-       "A global object called " + instanceName.str() + " already exists");
-    return;
-  }
-  const duk_idx_t objIndex = duk_require_normalize_index(m_context, duk_push_object(m_context));
-
-  // Hook up a finalizer to decrement the refcount and clean up our JavaMethods.
-  duk_push_c_function(m_context, javaObjectFinalizer, 1);
-  duk_set_finalizer(m_context, objIndex);
-
-  const jsize numMethods = env->GetArrayLength(methods);
-  for (jsize i = 0; i < numMethods; ++i) {
-    jobject method = env->GetObjectArrayElement(methods, i);
-
-    const jmethodID getName =
-        env->GetMethodID(env->GetObjectClass(method), "getName", "()Ljava/lang/String;");
-    const JString methodName(env, static_cast<jstring>(env->CallObjectMethod(method, getName)));
-
-    std::unique_ptr<JavaMethod> javaMethod;
-    try {
-      javaMethod.reset(new JavaMethod(m_javaValues, env, method));
-    } catch (const std::invalid_argument& e) {
-      queueIllegalArgumentException(env, "In bound method \"" +
-          instanceName.str() + "." + methodName.str() + "\": " + e.what());
-      // Pop the object being bound and the duktape global object.
-      duk_pop_2(m_context);
-      return;
-    }
-
-    // Use VARARGS here to allow us to manually validate that the proper number of arguments are
-    // given in the call.  If we specify the actual number of arguments needed, Duktape will try to
-    // be helpful by discarding extra or providing missing arguments. That's not quite what we want.
-    // See http://duktape.org/api.html#duk_push_c_function for details.
-    const duk_idx_t func = duk_push_c_function(m_context, javaMethodHandler, DUK_VARARGS);
-    duk_push_pointer(m_context, javaMethod.release());
-    duk_put_prop_string(m_context, func, JAVA_METHOD_PROP_NAME);
-
-    // Add this method to the bound object.
-    duk_put_prop_string(m_context, objIndex, methodName);
-  }
-
-  // Keep a reference in JavaScript to the object being bound.
-  duk_push_pointer(m_context, env->NewGlobalRef(object));
-  duk_put_prop_string(m_context, objIndex, JAVA_THIS_PROP_NAME);
-
-  // Make our bound Java object a property of the Duktape global object (so it's a JS global).
-  duk_put_prop_string(m_context, -2, instanceName);
-  // Pop the Duktape global object off the stack.
-  duk_pop(m_context);
-}
-
-const JavaScriptObject* DuktapeContext::get(JNIEnv *env, jstring name, jobjectArray methods) {
-  m_jsObjects.emplace_back(m_javaValues, env, m_context, name, methods);
-  return &m_jsObjects.back();
 }
 
 void DuktapeContext::waitForDebugger() {

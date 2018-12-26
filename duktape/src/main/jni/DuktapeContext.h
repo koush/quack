@@ -19,7 +19,6 @@
 #include <jni.h>
 #include <list>
 #include "duktape/duktape.h"
-#include "javascript/JavaScriptObject.h"
 #include "java/JavaType.h"
 #include "duktape/duk_trans_socket.h"
 
@@ -47,19 +46,25 @@ public:
   jobject callProperty(JNIEnv* env, jlong object, jobject target, jobjectArray args);
   void setGlobalProperty(JNIEnv *env, jobject property, jobject value);
 
-  void set(JNIEnv *env, jstring name, jobject object, jobjectArray methods);
-
-  const JavaScriptObject* get(JNIEnv *env, jstring name, jobjectArray methods);
-
-  duk_context* getContext() { return m_context; }
+  duk_ret_t duktapeGet();
+  duk_ret_t duktapeApply();
 
 private:
+  jclass m_objectClass;
+  jclass m_duktapeObjectClass;
+  jclass m_javaScriptObjectClass;
+  jclass m_javaObjectClass;
+  jmethodID m_duktapeObjectGetMethod;
+  jmethodID m_duktapeObjectInvokeMethod;
+  jmethodID m_javaScriptObjectConstructor;
+  jmethodID m_javaObjectConstructor;
   jobject popObject2(JNIEnv* env) const;
   void pushObject(JNIEnv* env, jlong object);
 
+  jclass findClass(JNIEnv* env, const char* className);
+
   duk_context* m_context;
   jobject m_javaDuktape;
-  std::list<JavaScriptObject> m_jsObjects;
   JavaTypeMap m_javaValues;
   const JavaType* m_objectType;
   client_sock_t m_DebuggerSocket;

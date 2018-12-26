@@ -16,9 +16,11 @@
 package com.squareup.duktape;
 
 import java.io.Closeable;
-import java.lang.reflect.InvocationHandler;
+import java.lang.reflect.Array;
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
+import java.lang.reflect.UndeclaredThrowableException;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.logging.Logger;
@@ -98,8 +100,95 @@ public final class Duktape implements Closeable {
       return o;
     if (clazz == double.class && o instanceof Double)
       return o;
+    if (clazz.isArray() && o instanceof JavaScriptObject) {
+      JavaScriptObject jo = (JavaScriptObject)o;
+      int length = ((Number)jo.get("length")).intValue();
+      Class componentType = clazz.getComponentType();
+      Object ret = Array.newInstance(componentType, length);
+      for (int i = 0; i < length; i++) {
+        Array.set(ret, i, coerceToJava(jo.get(i), componentType));
+      }
+      return ret;
+    }
 
     return coerce(JavaCoercions, o, clazz);
+  }
+
+  public interface JavaMethodReference<T> {
+    Object invoke(T thiz);
+  }
+  public interface JavaMethodReference0<T, A> {
+    Object invoke(T thiz, A arg0);
+  }
+  public interface JavaMethodReference1<T, A, B> {
+    Object invoke(T thiz, A arg0, B arg1);
+  }
+  public interface JavaMethodReference2<T, A, B, C> {
+    Object invoke(T thiz, A arg0, B arg1, C arg2);
+  }
+  public interface JavaMethodReference3<T, A, B, C, D> {
+    Object invoke(T thiz, A arg0, B arg1, C arg2, D arg3);
+  }
+  public interface JavaMethodReference4<T, A, B, C, D, E> {
+    Object invoke(T thiz, A arg0, B arg1, C arg2, D arg3, E arg4);
+  }
+
+  public static <T> Method getInterfaceMethod(Class<T> clazz, JavaMethodReference<T> ref) {
+    return invokeMethodReferenceProxy(clazz, ref);
+  }
+  public static <T, A> Method getInterfaceMethod(Class<T> clazz, JavaMethodReference0<T, A> ref) {
+    return invokeMethodReferenceProxy(clazz, ref);
+  }
+  public static <T, A, B> Method getInterfaceMethod(Class<T> clazz, JavaMethodReference1<T, A, B> ref) {
+    return invokeMethodReferenceProxy(clazz, ref);
+  }
+  public static <T, A, B, C> Method getInterfaceMethod(Class<T> clazz, JavaMethodReference2<T, A, B, C> ref) {
+    return invokeMethodReferenceProxy(clazz, ref);
+  }
+  public static <T, A, B, C, D> Method getInterfaceMethod(Class<T> clazz, JavaMethodReference3<T, A, B, C, D> ref) {
+    return invokeMethodReferenceProxy(clazz, ref);
+  }
+  public static <T, A, B, C, D, E> Method getInterfaceMethod(Class<T> clazz, JavaMethodReference4<T, A, B, C, D, E> ref) {
+    return invokeMethodReferenceProxy(clazz, ref);
+  }
+
+  public static class MethodException extends Exception {
+    Method method;
+    MethodException(Method method) {
+      this.method = method;
+    }
+  }
+
+  private static Object throwInvokedMethod(Object proxy, Method method, Object[] args) throws MethodException {
+    throw new MethodException(method);
+  }
+
+  private static <T> T createMethodInterceptProxy(Class<T> clazz) {
+    return (T)Proxy.newProxyInstance(clazz.getClassLoader(), new Class[] { clazz }, Duktape::throwInvokedMethod);
+  }
+
+  private static <T> Method invokeMethodReferenceProxy(Class<T> clazz, Object ref) {
+    try {
+      Method method = ref.getClass().getDeclaredMethods()[0];
+      Object[] args = new Object[method.getParameterTypes().length];
+      // first arg is "this" for the lambda
+      args[0] = createMethodInterceptProxy(clazz);
+      method.invoke(ref, args);
+    }
+    catch (Exception e) {
+      if (e instanceof InvocationTargetException) {
+        InvocationTargetException invocationTargetException = (InvocationTargetException)e;
+        if (invocationTargetException.getTargetException() instanceof UndeclaredThrowableException) {
+          UndeclaredThrowableException undeclaredThrowableException = (UndeclaredThrowableException)invocationTargetException.getTargetException();
+          if (undeclaredThrowableException.getUndeclaredThrowable() instanceof MethodException) {
+
+            Method calledMethod = ((MethodException)undeclaredThrowableException.getUndeclaredThrowable()).method;
+            return calledMethod;
+          }
+        }
+      }
+    }
+    return null;
   }
 
   private static Object coerce(Map<Class, DuktapeCoercion> coerce, Object o, Class<?> clazz) {
@@ -179,81 +268,6 @@ public final class Duktape implements Closeable {
   }
 
   /**
-   * Provides {@code object} to JavaScript as a global object called {@code name}. {@code type}
-   * defines the interface implemented by {@code object} that will be accessible to JavaScript.
-   * {@code type} must be an interface that does not extend any other interfaces, and cannot define
-   * any overloaded methods.
-   * <p>Methods of the interface may return {@code void} or any of the following supported argument
-   * types: {@code boolean}, {@link Boolean}, {@code int}, {@link Integer}, {@code double},
-   * {@link Double}, {@link String}.
-   */
-  public synchronized <T> void set(String name, Class<T> type, T object) {
-    if (!type.isInterface()) {
-      throw new UnsupportedOperationException("Only interfaces can be bound. Received: " + type);
-    }
-    if (type.getInterfaces().length > 0) {
-      throw new UnsupportedOperationException(type + " must not extend other interfaces");
-    }
-    if (!type.isInstance(object)) {
-      throw new IllegalArgumentException(object.getClass() + " is not an instance of " + type);
-    }
-    LinkedHashMap<String, Method> methods = new LinkedHashMap<>();
-    for (Method method : type.getMethods()) {
-      if (methods.put(method.getName(), method) != null) {
-        throw new UnsupportedOperationException(method.getName() + " is overloaded in " + type);
-      }
-    }
-    set(context, name, object, methods.values().toArray());
-  }
-
-  /**
-   * Attaches to a global JavaScript object called {@code name} that implements {@code type}.
-   * {@code type} defines the interface implemented in JavaScript that will be accessible to Java.
-   * {@code type} must be an interface that does not extend any other interfaces, and cannot define
-   * any overloaded methods.
-   * <p>Methods of the interface may return {@code void} or any of the following supported argument
-   * types: {@code boolean}, {@link Boolean}, {@code int}, {@link Integer}, {@code double},
-   * {@link Double}, {@link String}.
-   */
-  public synchronized <T> T get(final String name, final Class<T> type) {
-    if (!type.isInterface()) {
-      throw new UnsupportedOperationException("Only interfaces can be proxied. Received: " + type);
-    }
-    if (type.getInterfaces().length > 0) {
-      throw new UnsupportedOperationException(type + " must not extend other interfaces");
-    }
-    LinkedHashMap<String, Method> methods = new LinkedHashMap<>();
-    for (Method method : type.getMethods()) {
-      if (methods.put(method.getName(), method) != null) {
-        throw new UnsupportedOperationException(method.getName() + " is overloaded in " + type);
-      }
-    }
-
-    final long instance = get(context, name, methods.values().toArray());
-    final Duktape duktape = this;
-
-    Object proxy = Proxy.newProxyInstance(type.getClassLoader(), new Class<?>[]{ type },
-        new InvocationHandler() {
-          @Override
-          public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
-            // If the method is a method from Object then defer to normal invocation.
-            if (method.getDeclaringClass() == Object.class) {
-              return method.invoke(this, args);
-            }
-            synchronized (duktape) {
-              return call(duktape.context, instance, method, args);
-            }
-          }
-
-          @Override
-          public String toString() {
-            return String.format("DuktapeProxy{name=%s, type=%s}", name, type.getName());
-          }
-        });
-    return (T) proxy;
-  }
-
-  /**
    * Release the native resources associated with this object. You <strong>must</strong> call this
    * method for each instance to avoid leaking native memory.
    */
@@ -314,9 +328,6 @@ public final class Duktape implements Closeable {
   private static native void destroyContext(long context);
   private static native Object evaluate(long context, String sourceCode, String fileName);
   private static native Object compile(long context, String sourceCode, String fileName);
-  private static native void set(long context, String name, Object object, Object[] methods);
-  private static native long get(long context, String name, Object[] methods);
-  private static native Object call(long context, long instance, Object method, Object[] args);
 
   private static native void cooperateDebugger(long context);
   private static native void waitForDebugger(long context);
