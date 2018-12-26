@@ -124,7 +124,7 @@ public final class Duktape implements Closeable {
   }
 
   public interface JavaMethodReference<T> {
-    Object invoke(T thiz);
+    void invoke(T thiz);
   }
   public interface JavaMethodReference0<T, A> {
     void invoke(T thiz, A arg0);
