@@ -21,7 +21,6 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.lang.reflect.UndeclaredThrowableException;
-import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.logging.Logger;
@@ -158,35 +157,6 @@ public final class Duktape implements Closeable {
   }
   public static <T, A, B, C, D, E> Method getInterfaceMethod(Class<T> clazz, JavaMethodReference4<T, A, B, C, D, E> ref) {
     return invokeMethodReferenceProxy(clazz, ref);
-  }
-
-  private interface MemoizeFunc<T> {
-    T process();
-  }
-
-  private static class Memoize<T> {
-    int hash(Object... objects) {
-      int ret = 0;
-      for (Object o: objects) {
-        ret ^= o == null ? 0 : o.hashCode();
-      }
-      return ret;
-    }
-
-    HashMap<Integer, T> store = new HashMap<>();
-    T memoize(MemoizeFunc<T> func, Object... args) {
-      int hash = hash(args);
-      if (store.containsKey(hash)) {
-        return store.get(hash);
-      }
-      T ret = func.process();
-      store.put(hash, ret);
-      return ret;
-    }
-
-    void clear() {
-      store.clear();
-    }
   }
 
   static Memoize<Method> interfaceMethods = new Memoize<>();
