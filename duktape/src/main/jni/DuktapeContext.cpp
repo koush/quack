@@ -109,6 +109,7 @@ DuktapeContext::DuktapeContext(JavaVM* javaVM, jobject javaDuktape)
   m_javaObjectClass = findClass(env, "com/squareup/duktape/JavaObject");
 
   m_duktapeObjectGetMethod = env->GetMethodID(m_duktapeObjectClass, "get", "(Ljava/lang/Object;)Ljava/lang/Object;");
+  m_duktapeObjectSetMethod = env->GetMethodID(m_duktapeObjectClass, "set", "(Ljava/lang/Object;Ljava/lang/Object;)V");
   m_duktapeObjectInvokeMethod = env->GetMethodID(m_duktapeObjectClass, "invoke", "(Ljava/lang/Object;[Ljava/lang/Object;)Ljava/lang/Object;");
   m_javaScriptObjectConstructor = env->GetMethodID(m_javaScriptObjectClass, "<init>", "(Lcom/squareup/duktape/Duktape;JJ)V");
   m_javaObjectConstructor = env->GetMethodID(m_javaObjectClass, "<init>", "(Ljava/lang/Object;)V");
@@ -204,6 +205,46 @@ jobject DuktapeContext::popObject2(JNIEnv *env) const {
   jobject ret = popObject(env);
   duk_pop(m_context);
   return ret;
+}
+
+duk_ret_t DuktapeContext::duktapeSet() {
+  JNIEnv *env = getJNIEnv(m_context);
+
+  // pop the receiver, useless
+  duk_pop(m_context);
+
+  jobject value = popObject(env);
+  jobject prop = popObject(env);
+
+  // get the java reference
+  duk_get_prop_string(m_context, -1, JAVA_THIS_PROP_NAME);
+  jobject object = static_cast<jobject>(duk_require_pointer(m_context, -1));
+  duk_pop(m_context);
+
+  if (object == nullptr) {
+    fatalErrorHandler(object, "DuktapeObject is null");
+    return DUK_RET_REFERENCE_ERROR;
+  }
+
+  jclass objectClass = env->GetObjectClass(object);
+  if (!env->IsAssignableFrom(objectClass, m_duktapeObjectClass)) {
+      fatalErrorHandler(object, "Object is not DuktapeObject");
+      return DUK_RET_REFERENCE_ERROR;
+  }
+
+  env->CallVoidMethod(object, m_duktapeObjectSetMethod, prop, value);
+  if (!checkRethrowDuktapeError(env, m_context)) {
+    return DUK_RET_ERROR;
+  }
+
+  // push the value that was just set.
+  pushObject(env, value);
+  return 1;
+}
+
+static duk_ret_t __duktape_set(duk_context *ctx) {
+    DuktapeContext *duktapeContext = getDuktapeContext(ctx);
+    return duktapeContext->duktapeSet();
 }
 
 duk_ret_t DuktapeContext::duktapeGet() {
@@ -380,6 +421,11 @@ void DuktapeContext::pushObject(JNIEnv *env, jobject object) {
   duk_push_c_function(m_context, __duktape_get, 3);
   duk_put_prop_string(m_context, objIndex, "__duktape_get");
 
+  // bind set
+  duk_push_c_function(m_context, __duktape_set, 4);
+  duk_put_prop_string(m_context, objIndex, "__duktape_set");
+
+
   // bind apply
   duk_push_c_function(m_context, __duktape_apply, 3);
   duk_put_prop_string(m_context, objIndex, "__duktape_apply");
@@ -449,21 +495,30 @@ void DuktapeContext::setGlobalProperty(JNIEnv *env, jobject property, jobject va
 }
 
 jobject DuktapeContext::getKeyInteger(JNIEnv *env, jlong object, jint index) {
-    pushObject(env, object);
-    duk_get_prop_index(m_context, -1, (duk_uarridx_t )index);
-    // pop twice since indexing does not pop the indexed object
-    return popObject2(env);
+  CHECK_STACK(m_context);
+
+  pushObject(env, object);
+  duk_get_prop_index(m_context, -1, (duk_uarridx_t )index);
+  // pop twice since indexing does not pop the indexed object
+  return popObject2(env);
 }
 
 jobject DuktapeContext::getKeyObject(JNIEnv *env, jlong object, jobject key) {
-    pushObject(env, object);
-    pushObject(env, key);
-    duk_get_prop(m_context, -2);
-    // pop twice since indexing does not pop the indexed object
-    return popObject2(env);
+  CHECK_STACK(m_context);
+
+  // tbh this doesn't work if object is an actual java object vs a javascript object.
+  // probably should throw.
+
+  pushObject(env, object);
+  pushObject(env, key);
+  duk_get_prop(m_context, -2);
+  // pop twice since indexing does not pop the indexed object
+  return popObject2(env);
 }
 
 jobject DuktapeContext::getKeyString(JNIEnv *env, jlong object, jstring key) {
+  CHECK_STACK(m_context);
+
   pushObject(env, object);
   const JString instanceKey(env, key);
   duk_get_prop_string(m_context, -1, instanceKey);
@@ -535,4 +590,42 @@ void DuktapeContext::debuggerAppNotify(JNIEnv *env, jobjectArray args) {
   }
 
   duk_debugger_notify(m_context, length);
+}
+
+void DuktapeContext::setKeyString(JNIEnv *env, jlong object, jstring key, jobject value) {
+  CHECK_STACK(m_context);
+
+  pushObject(env, object);
+  pushObject(env, value);
+  const JString instanceKey(env, key);
+  duk_put_prop_string(m_context, -2, instanceKey);
+
+  // pop indexed object
+  duk_pop(m_context);
+}
+
+void DuktapeContext::setKeyInteger(JNIEnv *env, jlong object, jint index, jobject value) {
+  CHECK_STACK(m_context);
+
+  pushObject(env, object);
+  pushObject(env, value);
+  duk_put_prop_index(m_context, -2, index);
+
+  // pop indexed object
+  duk_pop(m_context);
+}
+
+void DuktapeContext::setKeyObject(JNIEnv *env, jlong object, jobject key, jobject value) {
+  CHECK_STACK(m_context);
+
+  // tbh this doesn't work if object is an actual java object vs a javascript object.
+  // probably should throw.
+
+  pushObject(env, object);
+  pushObject(env, key);
+  pushObject(env, value);
+  duk_put_prop(m_context, -3);
+
+  // pop indexed object
+  duk_pop(m_context);
 }

@@ -60,6 +60,34 @@ public class JavaScriptObject implements DuktapeObject {
     }
 
     @Override
+    public void set(String key, Object value) {
+        duktape.setKeyString(pointer, key, value);
+    }
+
+    @Override
+    public void set(int index, Object value) {
+        duktape.setKeyInteger(pointer, index, value);
+    }
+
+    @Override
+    public void set(Object key, Object value) {
+        if (key instanceof String) {
+            set((String)key, value);
+            return;
+        }
+
+        if (key instanceof Number) {
+            Number number = (Number)key;
+            if (number.doubleValue() == number.intValue()) {
+                set(number.intValue(), value);
+                return;
+            }
+        }
+
+        duktape.setKeyObject(pointer, key, value);
+    }
+
+    @Override
     public String toString() {
         Object ret = invoke("toString");
         if (ret == null)

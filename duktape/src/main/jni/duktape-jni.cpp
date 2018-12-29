@@ -47,47 +47,6 @@ void initialize(JNIEnv* env, jclass type) {
 
 extern "C" {
 
-duk_int_t android__get_local_tzoffset(duk_double_t time) {
-  return getTimeZoneOffset(time);
-}
-
-/**
- * Overload the default Duktape parser (which only does "%c"/ISO8601) to handle other date formats
- * that tend to appear in JavaScript docs around parsing dates.
- */
-duk_bool_t android__date_parse_string(duk_context* ctx, const char* str) {
-  // Ordered by likelihood (ideally %c/ISO8601 is the format we're given).
-  static const char* dateFormats[] = {
-      "%c",             // 2015-03-25T23:45:12
-      "%Y/%m/%d %T",    // 2015/03/25 23:45:12
-      "%Y/%m/%d",
-      "%m/%d/%Y %T",    // 03/25/2015 23:45:12
-      "%m/%d/%Y",
-      "%b %d %Y %T",    // Mar[ch] 25 2015 23:45:12
-      "%b %d %Y",
-      "%d %b %Y %T",    // 25 Mar[ch] 2015 23:45:12
-      "%d %b %Y",
-      "%a %b %d %Y %T", // Wed[nesday] Mar[ch] 25 2015 23:45:12
-      "%a %b %d %Y",
-  };
-  tm tm;
-  int timezoneOffset = android__get_local_tzoffset(0);
-  for (const auto dateFormat : dateFormats) {
-    memset(&tm, 0, sizeof(tm));
-    if (!strptime(str, dateFormat, &tm)) {
-      // No dice.
-      continue;
-    }
-    tm.tm_isdst = -1; // Not set by strptime - unknown if DST.
-    const auto t = timegm(&tm);
-    if (t >= 0) {
-      duk_push_number(ctx, (t - timezoneOffset) * 1000.0);
-      return true;
-    }
-  }
-  return false;
-}
-
 JNIEXPORT jlong JNICALL
 Java_com_squareup_duktape_Duktape_createContext(JNIEnv* env, jclass type, jobject javaDuktape) {
   static std::once_flag initialized;
@@ -170,22 +129,53 @@ Java_com_squareup_duktape_Duktape_getKeyObject(JNIEnv *env, jclass type, jlong c
 
 JNIEXPORT jobject JNICALL
 Java_com_squareup_duktape_Duktape_getKeyInteger(JNIEnv *env, jclass type, jlong context, jlong object, jint index) {
-    DuktapeContext* duktape = reinterpret_cast<DuktapeContext*>(context);
-    if (duktape == nullptr) {
-        queueNullPointerException(env, "Null Duktape context - did you close your Duktape?");
-        return nullptr;
-    }
-    return duktape->getKeyInteger(env, object, index);
+  DuktapeContext* duktape = reinterpret_cast<DuktapeContext*>(context);
+  if (duktape == nullptr) {
+    queueNullPointerException(env, "Null Duktape context - did you close your Duktape?");
+    return nullptr;
+  }
+  return duktape->getKeyInteger(env, object, index);
 }
 
 JNIEXPORT jobject JNICALL
 Java_com_squareup_duktape_Duktape_getKeyString(JNIEnv *env, jclass type, jlong context, jlong object, jstring key) {
-    DuktapeContext* duktape = reinterpret_cast<DuktapeContext*>(context);
-    if (duktape == nullptr) {
-        queueNullPointerException(env, "Null Duktape context - did you close your Duktape?");
-        return nullptr;
-    }
-    return duktape->getKeyString(env, object, key);
+  DuktapeContext* duktape = reinterpret_cast<DuktapeContext*>(context);
+  if (duktape == nullptr) {
+    queueNullPointerException(env, "Null Duktape context - did you close your Duktape?");
+    return nullptr;
+  }
+  return duktape->getKeyString(env, object, key);
+}
+
+JNIEXPORT void JNICALL
+Java_com_squareup_duktape_Duktape_setKeyObject(JNIEnv *env, jclass type, jlong context,
+                                               jlong object, jobject key, jobject value) {
+  DuktapeContext* duktape = reinterpret_cast<DuktapeContext*>(context);
+  if (duktape == nullptr) {
+    queueNullPointerException(env, "Null Duktape context - did you close your Duktape?");
+    return;
+  }
+  return duktape->setKeyObject(env, object, key, value);
+}
+
+JNIEXPORT void JNICALL
+Java_com_squareup_duktape_Duktape_setKeyInteger(JNIEnv *env, jclass type, jlong context, jlong object, jint index, jobject value) {
+  DuktapeContext* duktape = reinterpret_cast<DuktapeContext*>(context);
+  if (duktape == nullptr) {
+    queueNullPointerException(env, "Null Duktape context - did you close your Duktape?");
+    return;
+  }
+  return duktape->setKeyInteger(env, object, index, value);
+}
+
+JNIEXPORT void JNICALL
+Java_com_squareup_duktape_Duktape_setKeyString(JNIEnv *env, jclass type, jlong context, jlong object, jstring key, jobject value) {
+  DuktapeContext* duktape = reinterpret_cast<DuktapeContext*>(context);
+  if (duktape == nullptr) {
+    queueNullPointerException(env, "Null Duktape context - did you close your Duktape?");
+    return;
+  }
+  return duktape->setKeyString(env, object, key, value);
 }
 
 JNIEXPORT jobject JNICALL

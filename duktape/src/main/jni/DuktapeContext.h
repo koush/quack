@@ -42,11 +42,15 @@ public:
   jobject getKeyString(JNIEnv* env, jlong object, jstring key);
   jobject getKeyInteger(JNIEnv* env, jlong object, jint index);
   jobject getKeyObject(JNIEnv* env, jlong object, jobject key);
+  void setKeyString(JNIEnv* env, jlong object, jstring key, jobject value);
+  void setKeyInteger(JNIEnv* env, jlong object, jint index, jobject value);
+  void setKeyObject(JNIEnv* env, jlong object, jobject key, jobject value);
   jobject call(JNIEnv* env, jlong object, jobjectArray args);
   jobject callProperty(JNIEnv* env, jlong object, jobject target, jobjectArray args);
   void setGlobalProperty(JNIEnv *env, jobject property, jobject value);
 
   duk_ret_t duktapeGet();
+  duk_ret_t duktapeSet();
   duk_ret_t duktapeApply();
 
 private:
@@ -55,6 +59,7 @@ private:
   jclass m_javaScriptObjectClass;
   jclass m_javaObjectClass;
   jmethodID m_duktapeObjectGetMethod;
+  jmethodID m_duktapeObjectSetMethod;
   jmethodID m_duktapeObjectInvokeMethod;
   jmethodID m_javaScriptObjectConstructor;
   jmethodID m_javaObjectConstructor;

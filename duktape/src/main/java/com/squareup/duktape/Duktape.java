@@ -277,6 +277,7 @@ public final class Duktape implements Closeable {
             "var __proxyHandler = {\n" +
                     "\thas: function(f, key){ return key == '__java_this' || !!get(key); },\n" +
                     "\tget: function(f, prop, receiver) { return f.target.__duktape_get(f.target, prop, receiver); },\n" +
+                    "\tset: function(f, prop, value, receiver) { return f.target.__duktape_set(f.target, prop, value, receiver); },\n" +
                     "\tapply: function(f, thisArg, argumentsList) { return f.target.__duktape_apply(f.target, thisArg, argumentsList); },\n" +
                     "};\n" +
                     "function __makeProxy(obj) {\n" +
@@ -406,6 +407,15 @@ public final class Duktape implements Closeable {
   synchronized Object getKeyInteger(long object, int index) {
     return getKeyInteger(context, object, index);
   }
+  synchronized void setKeyObject(long object, Object key, Object value) {
+    setKeyObject(context, object, key, value);
+  }
+  synchronized void setKeyString(long object, String key, Object value) {
+    setKeyString(context, object, key, value);
+  }
+  synchronized void setKeyInteger(long object, int index, Object value) {
+    setKeyInteger(context, object, index, value);
+  }
   synchronized Object callSelf(long object, Object... args) {
     return callSelf(context, object, args);
   }
@@ -425,6 +435,9 @@ public final class Duktape implements Closeable {
   private static native Object getKeyObject(long context, long object, Object key);
   private static native Object getKeyString(long context, long object, String key);
   private static native Object getKeyInteger(long context, long object, int index);
+  private static native void setKeyObject(long context, long object, Object key, Object value);
+  private static native void setKeyString(long context, long object, String key, Object value);
+  private static native void setKeyInteger(long context, long object, int index, Object value);
   private static native Object callSelf(long context, long object, Object... args);
   private static native Object callProperty(long context, long object, Object property, Object... args);
   private static native void setGlobalProperty(long context, Object property, Object value);

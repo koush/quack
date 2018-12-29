@@ -31,25 +31,24 @@ public final class JavaObject implements DuktapeJavaObject {
         if (clazz.isArray() && "length".equals(key))
             return Array.getLength(target);
 
-        try {
-            // try to get fields
-            for (Field field : clazz.getFields()) {
-                if (field.getName().equalsIgnoreCase(key))
+        // try to get fields
+        for (Field field : clazz.getFields()) {
+            if (field.getName().equalsIgnoreCase(key)) {
+                try {
                     return field.get(target);
+                }
+                catch (IllegalAccessException e) {
+                    throw new IllegalArgumentException(e);
+                }
             }
-        }
-        catch (Exception e) {
         }
 
-        try {
-            // try to get methods
-            for (Method method : clazz.getMethods()) {
-                if (method.getName().equalsIgnoreCase(key))
-                    return new JavaMethodObject(key);
-            }
+        // try to get methods
+        for (Method method : clazz.getMethods()) {
+            if (method.getName().equalsIgnoreCase(key))
+                return new JavaMethodObject(key);
         }
-        catch (Exception e) {
-        }
+
         return null;
     }
 
@@ -68,6 +67,7 @@ public final class JavaObject implements DuktapeJavaObject {
         return null;
     }
 
+    // duktape entry point
     @Override
     public Object get(Object key) {
         if (key instanceof String)
@@ -82,19 +82,82 @@ public final class JavaObject implements DuktapeJavaObject {
         return getMap(key);
     }
 
+    private void noSet() {
+        throw new UnsupportedOperationException("can not set value on this JavaObject");
+    }
+
+    @Override
+    public void set(int index, Object value) {
+        if (target instanceof Array) {
+            Array.set(target, index, value);
+            return;
+        }
+        if (target instanceof List) {
+            ((List)target).set(index, value);
+            return;
+        }
+
+        noSet();
+    }
+
+
+    private void putMap(Object key, Object value) {
+        if (target instanceof Map) {
+            ((Map)target).put(key, value);
+            return;
+        }
+        noSet();
+    }
+
+    @Override
+    public void set(String key, Object value) {
+        for (Field field: target.getClass().getFields()) {
+            if (field.getName().equals(key)) {
+                try {
+                    field.set(target, Duktape.coerceJavaScriptToJava(value, field.getType()));
+                }
+                catch (IllegalAccessException e) {
+                    throw new IllegalArgumentException(e);
+                }
+                return;
+            }
+        }
+
+        putMap(key, value);
+    }
+
+    // duktape entry point
+    @Override
+    public void set(Object key, Object value) {
+        if (key instanceof Number) {
+            Number number = (Number)key;
+            if (number.doubleValue() == number.intValue()) {
+                set(number.intValue(), value);
+                return;
+            }
+        }
+
+        if (key instanceof String) {
+            set((String)key, value);
+            return;
+        }
+
+        putMap(key, value);
+    }
+
     @Override
     public Object call(Object... args) {
         throw new UnsupportedOperationException("can not call " + target);
     }
 
     @Override
-    public Object invoke(Object thiz, Object... args) {
-        if (thiz == null)
+    public Object invoke(Object property, Object... args) {
+        if (property == null)
             return call(args);
-        if (thiz instanceof String) {
-            thiz = get((String)thiz);
-            if (thiz instanceof DuktapeObject)
-                return ((DuktapeObject)thiz).call(args);
+        if (property instanceof String) {
+            property = get((String)property);
+            if (property instanceof DuktapeObject)
+                return ((DuktapeObject)property).call(args);
         }
         throw new UnsupportedOperationException("can not call " + target);
     }

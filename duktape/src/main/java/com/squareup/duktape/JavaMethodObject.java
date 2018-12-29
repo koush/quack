@@ -6,10 +6,18 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 
-final class JavaMethodObject implements DuktapeObject {
+public class JavaMethodObject implements DuktapeReadonlyObject {
     String target;
     public JavaMethodObject(String method) {
         this.target = method;
+    }
+
+    protected Object getThis(Object thiz, Method method) {
+        return thiz;
+    }
+
+    protected Method[] getMethods(Object thiz) {
+        return thiz.getClass().getMethods();
     }
 
     @Override
@@ -19,7 +27,7 @@ final class JavaMethodObject implements DuktapeObject {
         thiz = Duktape.coerceJavaScriptToJava(thiz, Object.class);
         int bestScore = Integer.MAX_VALUE;
         Method best = null;
-        for (Method method: thiz.getClass().getMethods()) {
+        for (Method method: getMethods(thiz)) {
             if (method.getName().equals(target)) {
                 // parameter count is most important
                 int score = Math.abs(args.length - method.getParameterTypes().length) * 100;
@@ -37,6 +45,8 @@ final class JavaMethodObject implements DuktapeObject {
 
         if (best == null)
             throw new UnsupportedOperationException("can not call " + target);
+
+        thiz = getThis(thiz, best);
 
         try {
             Method interfaceMethod = Duktape.getInterfaceMethod(best);
