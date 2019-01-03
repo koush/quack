@@ -110,7 +110,7 @@ DuktapeContext::DuktapeContext(JavaVM* javaVM, jobject javaDuktape)
 
   m_duktapeObjectGetMethod = env->GetMethodID(m_duktapeObjectClass, "get", "(Ljava/lang/Object;)Ljava/lang/Object;");
   m_duktapeObjectSetMethod = env->GetMethodID(m_duktapeObjectClass, "set", "(Ljava/lang/Object;Ljava/lang/Object;)V");
-  m_duktapeObjectInvokeMethod = env->GetMethodID(m_duktapeObjectClass, "invoke", "(Ljava/lang/Object;[Ljava/lang/Object;)Ljava/lang/Object;");
+  m_duktapeObjectCallMethod = env->GetMethodID(m_duktapeObjectClass, "callMethod", "(Ljava/lang/Object;[Ljava/lang/Object;)Ljava/lang/Object;");
   m_javaScriptObjectConstructor = env->GetMethodID(m_javaScriptObjectClass, "<init>", "(Lcom/squareup/duktape/Duktape;JJ)V");
   m_javaObjectConstructor = env->GetMethodID(m_javaObjectClass, "<init>", "(Ljava/lang/Object;)V");
 
@@ -340,7 +340,7 @@ duk_ret_t DuktapeContext::duktapeApply() {
     return DUK_RET_REFERENCE_ERROR;
   }
 
-  jobject push = env->CallObjectMethod(object, m_duktapeObjectInvokeMethod, javaThis, javaArgs);
+  jobject push = env->CallObjectMethod(object, m_duktapeObjectCallMethod, javaThis, javaArgs);
   if (!checkRethrowDuktapeError(env, m_context)) {
     return DUK_RET_ERROR;
   }
@@ -452,6 +452,32 @@ jobject DuktapeContext::call(JNIEnv *env, jlong object, jobjectArray args) {
   if (duk_pcall(m_context, length) != DUK_EXEC_SUCCESS) {
       queueJavaExceptionForDuktapeError(env, m_context);
       return nullptr;
+  }
+
+  return popObject(env);
+}
+
+jobject DuktapeContext::callMethod(JNIEnv *env, jlong object, jobject thiz, jobjectArray args) {
+  CHECK_STACK(m_context);
+
+  // func
+  pushObject(env, object);
+
+  // this
+  pushObject(env, thiz);
+
+  jsize length = 0;
+  if (args != nullptr) {
+    length = env->GetArrayLength(args);
+    for (int i = 0; i < length; i++) {
+      jobject arg = env->GetObjectArrayElement(args, i);
+      pushObject(env, arg);
+    }
+  }
+
+  if (duk_pcall_method(m_context, length) != DUK_EXEC_SUCCESS) {
+    queueJavaExceptionForDuktapeError(env, m_context);
+    return nullptr;
   }
 
   return popObject(env);

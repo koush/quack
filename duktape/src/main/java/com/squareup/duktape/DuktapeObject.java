@@ -9,6 +9,29 @@ public interface DuktapeObject {
     void set(int index, Object value);
     void set(Object key, Object value);
 
+    /**
+     * Call this object with the expectation that it is a function. The this argument
+     * is implicit to the runtime.
+     * @param args
+     * @return
+     */
     Object call(Object... args);
-    Object invoke(Object property, Object... args);
+
+    /**
+     * Call this object with the expectation that it is a function. The this argument
+     * is provided.
+     * @param thiz
+     * @param args
+     * @return
+     */
+    Object callMethod(Object thiz, Object... args);
+
+    /**
+     * Call the property of this object with the expectation that it is a function.
+     * The this argument is the the instance holding the property.
+     * @param property
+     * @param args
+     * @return
+     */
+    Object callProperty(Object property, Object... args);
 }

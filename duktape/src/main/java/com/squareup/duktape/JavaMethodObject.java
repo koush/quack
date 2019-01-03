@@ -21,7 +21,32 @@ public class JavaMethodObject implements DuktapeReadonlyObject {
     }
 
     @Override
-    public Object invoke(Object thiz, Object... args) {
+    public Object callProperty(Object property, Object... args) {
+        throw new UnsupportedOperationException("can not call property of a JavaMethodObject");
+    }
+
+    @Override
+    public Object get(String key) {
+        return get((Object)key);
+    }
+
+    @Override
+    public Object get(int index) {
+        return get((Object)index);
+    }
+
+    @Override
+    public Object get(Object key) {
+        throw new UnsupportedOperationException("can not get + " + key + " on a JavaMethodObject");
+    }
+
+    @Override
+    public Object call(Object... args) {
+        throw new UnsupportedOperationException("can not call JavaMethodObject with no 'this'");
+    }
+
+    @Override
+    public Object callMethod(Object thiz, Object... args) {
         if (thiz == null)
             throw new UnsupportedOperationException("can not call " + target);
         thiz = Duktape.coerceJavaScriptToJava(thiz, Object.class);
@@ -84,25 +109,5 @@ public class JavaMethodObject implements DuktapeReadonlyObject {
         catch (InvocationTargetException e) {
             throw new IllegalArgumentException(e);
         }
-    }
-
-    @Override
-    public Object get(String key) {
-        return get((Object)key);
-    }
-
-    @Override
-    public Object get(int index) {
-        return get((Object)index);
-    }
-
-    @Override
-    public Object get(Object key) {
-        throw new UnsupportedOperationException("can not get + " + key + " on a JavaMethodObject");
-    }
-
-    @Override
-    public Object call(Object... args) {
-        throw new UnsupportedOperationException("no 'this' provided. can not call " + target);
     }
 }

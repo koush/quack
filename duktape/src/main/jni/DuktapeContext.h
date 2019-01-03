@@ -46,6 +46,7 @@ public:
   void setKeyInteger(JNIEnv* env, jlong object, jint index, jobject value);
   void setKeyObject(JNIEnv* env, jlong object, jobject key, jobject value);
   jobject call(JNIEnv* env, jlong object, jobjectArray args);
+  jobject callMethod(JNIEnv *env, jlong object, jobject thiz, jobjectArray args);
   jobject callProperty(JNIEnv* env, jlong object, jobject target, jobjectArray args);
   void setGlobalProperty(JNIEnv *env, jobject property, jobject value);
 
@@ -60,7 +61,7 @@ private:
   jclass m_javaObjectClass;
   jmethodID m_duktapeObjectGetMethod;
   jmethodID m_duktapeObjectSetMethod;
-  jmethodID m_duktapeObjectInvokeMethod;
+  jmethodID m_duktapeObjectCallMethod;
   jmethodID m_javaScriptObjectConstructor;
   jmethodID m_javaObjectConstructor;
   jobject popObject2(JNIEnv* env) const;

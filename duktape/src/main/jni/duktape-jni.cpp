@@ -100,11 +100,18 @@ Java_com_squareup_duktape_Duktape_setGlobalProperty(JNIEnv *env, jclass type, jl
 }
 
 JNIEXPORT jobject JNICALL
-Java_com_squareup_duktape_Duktape_callSelf(JNIEnv *env, jclass type,
+Java_com_squareup_duktape_Duktape_call(JNIEnv *env, jclass type,
                                            jlong context, jlong object,
                                            jobjectArray args) {
   DuktapeContext* duktape = reinterpret_cast<DuktapeContext*>(context);
   return duktape->call(env, object, args);
+}
+
+JNIEXPORT jobject JNICALL
+Java_com_squareup_duktape_Duktape_callMethod(
+        JNIEnv *env, jclass type, jlong context, jlong object, jobject thiz, jobjectArray args) {
+  DuktapeContext* duktape = reinterpret_cast<DuktapeContext*>(context);
+  return duktape->callMethod(env, object, thiz, args);
 }
 
 JNIEXPORT jobject JNICALL

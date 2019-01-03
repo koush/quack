@@ -100,7 +100,6 @@ public final class JavaObject implements DuktapeJavaObject {
         noSet();
     }
 
-
     private void putMap(Object key, Object value) {
         if (target instanceof Map) {
             ((Map)target).put(key, value);
@@ -151,14 +150,17 @@ public final class JavaObject implements DuktapeJavaObject {
     }
 
     @Override
-    public Object invoke(Object property, Object... args) {
+    public Object callMethod(Object thiz, Object... args) {
+        throw new UnsupportedOperationException("can not call " + target);
+    }
+
+    @Override
+    public Object callProperty(Object property, Object... args) {
         if (property == null)
-            return call(args);
-        if (property instanceof String) {
-            property = get((String)property);
-            if (property instanceof DuktapeObject)
-                return ((DuktapeObject)property).call(args);
-        }
+            throw new NullPointerException();
+        property = get(property);
+        if (property instanceof DuktapeObject)
+            return ((DuktapeObject)property).callMethod(this, args);
         throw new UnsupportedOperationException("can not call " + target);
     }
 }

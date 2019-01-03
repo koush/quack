@@ -416,8 +416,11 @@ public final class Duktape implements Closeable {
   synchronized void setKeyInteger(long object, int index, Object value) {
     setKeyInteger(context, object, index, value);
   }
-  synchronized Object callSelf(long object, Object... args) {
-    return callSelf(context, object, args);
+  synchronized Object call(long object, Object... args) {
+    return call(context, object, args);
+  }
+  synchronized Object callMethod(long object, Object thiz, Object... args) {
+    return callMethod(context, object, thiz, args);
   }
   synchronized Object callProperty(long object, Object property, Object... args) {
     return callProperty(context, object, property, args);
@@ -438,7 +441,8 @@ public final class Duktape implements Closeable {
   private static native void setKeyObject(long context, long object, Object key, Object value);
   private static native void setKeyString(long context, long object, String key, Object value);
   private static native void setKeyInteger(long context, long object, int index, Object value);
-  private static native Object callSelf(long context, long object, Object... args);
+  private static native Object call(long context, long object, Object... args);
+  private static native Object callMethod(long context, long object, Object thiz, Object... args);
   private static native Object callProperty(long context, long object, Object property, Object... args);
   private static native void setGlobalProperty(long context, Object property, Object value);
 }
