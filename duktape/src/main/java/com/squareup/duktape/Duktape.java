@@ -93,6 +93,8 @@ public final class Duktape implements Closeable {
       return o;
     if (clazz.isInstance(o))
       return o;
+
+    // unbox needs no coercion.
     if (clazz == boolean.class && o instanceof Boolean)
       return o;
     if (clazz == byte.class && o instanceof Byte)
@@ -107,6 +109,19 @@ public final class Duktape implements Closeable {
       return o;
     if (clazz == double.class && o instanceof Double)
       return o;
+
+    // javascript only uses doubles.
+    if ((clazz == byte.class || clazz == Byte.class) && o instanceof Double)
+      return ((Double)o).byteValue();
+    if ((clazz == short.class || clazz == Short.class) && o instanceof Double)
+      return ((Double)o).shortValue();
+    if ((clazz == int.class || clazz == Integer.class) && o instanceof Double)
+      return ((Double)o).intValue();
+    if ((clazz == float.class || clazz == Float.class) && o instanceof Double)
+      return ((Double)o).floatValue();
+    if ((clazz == long.class || clazz == Long.class) && o instanceof Double)
+      return ((Double)o).longValue();
+
     if (clazz.isArray() && o instanceof JavaScriptObject) {
       JavaScriptObject jo = (JavaScriptObject)o;
       int length = ((Number)jo.get("length")).intValue();
