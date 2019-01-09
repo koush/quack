@@ -8,8 +8,10 @@ import java.util.Map;
 
 public final class JavaObject implements DuktapeJavaObject {
     private final Object target;
+    private final Duktape duktape;
 
-    public JavaObject(Object target) {
+    public JavaObject(Duktape duktape, Object target) {
+        this.duktape = duktape;
         this.target = target;
     }
 
@@ -46,7 +48,7 @@ public final class JavaObject implements DuktapeJavaObject {
         // try to get methods
         for (Method method : clazz.getMethods()) {
             if (method.getName().equalsIgnoreCase(key))
-                return new JavaMethodObject(key);
+                return new JavaMethodObject(duktape, key);
         }
 
         return null;
@@ -113,7 +115,7 @@ public final class JavaObject implements DuktapeJavaObject {
         for (Field field: target.getClass().getFields()) {
             if (field.getName().equals(key)) {
                 try {
-                    field.set(target, Duktape.coerceJavaScriptToJava(value, field.getType()));
+                    field.set(target, duktape.coerceJavaScriptToJava(value, field.getType()));
                 }
                 catch (IllegalAccessException e) {
                     throw new IllegalArgumentException(e);

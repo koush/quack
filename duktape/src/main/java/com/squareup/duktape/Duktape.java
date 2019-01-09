@@ -27,36 +27,20 @@ import java.util.logging.Logger;
 
 /** A simple EMCAScript (Javascript) interpreter. */
 public final class Duktape implements Closeable {
-  private static final Map<Class, DuktapeCoercion> JavaScriptToJavaCoercions = new LinkedHashMap<>();
-  private static final Map<Class, DuktapeCoercion> JavaToJavascriptCoercions = new LinkedHashMap<>();
-  static final Map<Method, DuktapeMethodCoercion> JavaScriptToJavaMethodCoercions = new LinkedHashMap<>();
-  static final Map<Method, DuktapeMethodCoercion> JavaToJavascriptMethodCoercions = new LinkedHashMap<>();
+  private final Map<Class, DuktapeCoercion> JavaScriptToJavaCoercions = new LinkedHashMap<>();
+  private final Map<Class, DuktapeCoercion> JavaToJavascriptCoercions = new LinkedHashMap<>();
+  final Map<Method, DuktapeMethodCoercion> JavaScriptToJavaMethodCoercions = new LinkedHashMap<>();
+  final Map<Method, DuktapeMethodCoercion> JavaToJavascriptMethodCoercions = new LinkedHashMap<>();
 
   static {
     System.loadLibrary("duktape");
-
-    // coercing javascript string into an enum for java
-    JavaScriptToJavaCoercions.put(Enum.class, (DuktapeCoercion<Enum, Object>) (o, clazz) -> {
-      if (o == null)
-        return null;
-      return Enum.valueOf(clazz, o.toString());
-    });
-
-    // coerce JavaScript Numbers into Integers and Longs
-    JavaScriptToJavaCoercions.put(Integer.class, (o, clazz) -> o instanceof Number ? ((Number)o).intValue() : o);
-    JavaScriptToJavaCoercions.put(int.class, (o, clazz) -> o instanceof Number ? ((Number)o).intValue() : o);
-    JavaScriptToJavaCoercions.put(Long.class, (o, clazz) -> o instanceof Number ? ((Number)o).longValue() : o);
-    JavaScriptToJavaCoercions.put(long.class, (o, clazz) -> o instanceof Number ? ((Number)o).longValue() : o);
-
-    // coercing a java enum into javascript string
-    JavaToJavascriptCoercions.put(Enum.class, (DuktapeCoercion<Object, Enum>) (o, clazz) -> o.toString());
   }
 
   /**
    * Register a function that coerces values JavaScript values into an object of type
    * {@code clazz} before being passed along to Java.
    */
-  public static synchronized <T>  void putJavaScriptToJavaCoercion(Class<T> clazz, DuktapeCoercion<T, Object> coercion) {
+  public synchronized <T> void putJavaScriptToJavaCoercion(Class<T> clazz, DuktapeCoercion<T, Object> coercion) {
     JavaScriptToJavaCoercions.put(clazz, coercion);
   }
 
@@ -67,14 +51,14 @@ public final class Duktape implements Closeable {
    * @param coercion
    * @param <F>
    */
-  public static synchronized <F> void putJavaToJavascriptCoercion(Class<F> clazz, DuktapeCoercion<Object, F> coercion) {
+  public synchronized <F> void putJavaToJavascriptCoercion(Class<F> clazz, DuktapeCoercion<Object, F> coercion) {
     JavaToJavascriptCoercions.put(clazz, coercion);
   }
 
   /**
    * Coerce a Java value into an equivalent JavaScript object.
    */
-  public static Object coerceJavaToJavascript(Object o) {
+  public Object coerceJavaToJavascript(Object o) {
     if (o == null)
       return null;
     return coerce(JavaToJavascriptCoercions, o, o.getClass());
@@ -83,7 +67,7 @@ public final class Duktape implements Closeable {
   /**
    * Coerce a JavaScript value into an equivalent Java object.
    */
-  public static Object coerceJavaScriptToJava(Object o, Class<?> clazz) {
+  public Object coerceJavaScriptToJava(Object o, Class<?> clazz) {
     if (o == null)
       return null;
     while (o instanceof DuktapeJavaObject) {
@@ -207,7 +191,7 @@ public final class Duktape implements Closeable {
     }, method);
   }
 
-  public static synchronized  void putJavaScriptToJavaMethodCoercion(Method method, DuktapeMethodCoercion coercion) {
+  public synchronized void putJavaScriptToJavaMethodCoercion(Method method, DuktapeMethodCoercion coercion) {
     JavaScriptToJavaMethodCoercions.put(method, coercion);
     interfaceMethods.clear();
   }
@@ -258,19 +242,19 @@ public final class Duktape implements Closeable {
   private static Object coerce(Map<Class, DuktapeCoercion> coerce, Object o, Class<?> clazz) {
     DuktapeCoercion coercion = coerce.get(clazz);
     if (coercion != null) {
-      return coercion.coerce(o, clazz);
+      return coercion.coerce(clazz, o);
     }
 
     // check to see if there exists a superclass converter.
     for (Map.Entry<Class, DuktapeCoercion> check: coerce.entrySet()) {
       if (clazz.isAssignableFrom(check.getKey()))
-        return check.getValue().coerce(o, clazz);
+        return check.getValue().coerce(clazz, o);
     }
 
     // check to see if there is a subclass converter (ie, Enum.class as a catch all).
     for (Map.Entry<Class, DuktapeCoercion> check: coerce.entrySet()) {
       if (check.getKey().isAssignableFrom(clazz))
-        return check.getValue().coerce(o, clazz);
+        return check.getValue().coerce(clazz, o);
     }
 
     return o;
@@ -306,6 +290,21 @@ public final class Duktape implements Closeable {
   private long context;
 
   private Duktape() {
+    // coercing javascript string into an enum for java
+    JavaScriptToJavaCoercions.put(Enum.class, (DuktapeCoercion<Enum, Object>) (clazz, o) -> {
+      if (o == null)
+        return null;
+      return Enum.valueOf(clazz, o.toString());
+    });
+
+    // coerce JavaScript Numbers into Integers and Longs
+    JavaScriptToJavaCoercions.put(Integer.class, (clazz, o) -> o instanceof Number ? ((Number)o).intValue() : o);
+    JavaScriptToJavaCoercions.put(int.class, (clazz, o) -> o instanceof Number ? ((Number)o).intValue() : o);
+    JavaScriptToJavaCoercions.put(Long.class, (clazz, o) -> o instanceof Number ? ((Number)o).longValue() : o);
+    JavaScriptToJavaCoercions.put(long.class, (clazz, o) -> o instanceof Number ? ((Number)o).longValue() : o);
+
+    // coercing a java enum into javascript string
+    JavaToJavascriptCoercions.put(Enum.class, (DuktapeCoercion<Object, Enum>) (clazz, o) -> o.toString());
   }
 
   /**

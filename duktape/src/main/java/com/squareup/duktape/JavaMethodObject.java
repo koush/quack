@@ -8,7 +8,9 @@ import java.util.ArrayList;
 
 public class JavaMethodObject implements DuktapeReadonlyObject {
     String target;
-    public JavaMethodObject(String method) {
+    Duktape duktape;
+    public JavaMethodObject(Duktape duktape, String method) {
+        this.duktape = duktape;
         this.target = method;
     }
 
@@ -49,7 +51,7 @@ public class JavaMethodObject implements DuktapeReadonlyObject {
     public Object callMethod(Object thiz, Object... args) {
         if (thiz == null)
             throw new UnsupportedOperationException("can not call " + target);
-        thiz = Duktape.coerceJavaScriptToJava(thiz, Object.class);
+        thiz = duktape.coerceJavaScriptToJava(thiz, Object.class);
         int bestScore = Integer.MAX_VALUE;
         Method best = null;
         for (Method method: getMethods(thiz)) {
@@ -75,7 +77,7 @@ public class JavaMethodObject implements DuktapeReadonlyObject {
 
         try {
             Method interfaceMethod = Duktape.getInterfaceMethod(best);
-            DuktapeMethodCoercion methodCoercion = Duktape.JavaScriptToJavaMethodCoercions.get(interfaceMethod);
+            DuktapeMethodCoercion methodCoercion = duktape.JavaScriptToJavaMethodCoercions.get(interfaceMethod);
             if (methodCoercion != null)
                 return methodCoercion.invoke(interfaceMethod, thiz, args);
 
@@ -86,7 +88,7 @@ public class JavaMethodObject implements DuktapeReadonlyObject {
             int i = 0;
             for (; i < numParameters; i++) {
                 if (i < args.length)
-                    coerced.add(Duktape.coerceJavaScriptToJava(args[i], best.getParameterTypes()[i]));
+                    coerced.add(duktape.coerceJavaScriptToJava(args[i], best.getParameterTypes()[i]));
                 else
                     coerced.add(null);
             }
@@ -94,14 +96,14 @@ public class JavaMethodObject implements DuktapeReadonlyObject {
                 Class varargType = best.getParameterTypes()[numParameters].getComponentType();
                 ArrayList<Object> varargs = new ArrayList<>();
                 for (; i < args.length; i++) {
-                    varargs.add(Duktape.coerceJavaScriptToJava(args[i], varargType));
+                    varargs.add(duktape.coerceJavaScriptToJava(args[i], varargType));
                 }
                 coerced.add(varargs.toArray());
             }
             else if (i < args.length) {
                 Log.w("Duktape", "dropping javascript to java arguments on the floor: " + (args.length - i));
             }
-            return Duktape.coerceJavaToJavascript(best.invoke(thiz, coerced.toArray()));
+            return duktape.coerceJavaToJavascript(best.invoke(thiz, coerced.toArray()));
         }
         catch (IllegalAccessException e) {
             throw new IllegalArgumentException(e);

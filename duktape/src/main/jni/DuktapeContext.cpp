@@ -112,7 +112,7 @@ DuktapeContext::DuktapeContext(JavaVM* javaVM, jobject javaDuktape)
   m_duktapeObjectSetMethod = env->GetMethodID(m_duktapeObjectClass, "set", "(Ljava/lang/Object;Ljava/lang/Object;)V");
   m_duktapeObjectCallMethod = env->GetMethodID(m_duktapeObjectClass, "callMethod", "(Ljava/lang/Object;[Ljava/lang/Object;)Ljava/lang/Object;");
   m_javaScriptObjectConstructor = env->GetMethodID(m_javaScriptObjectClass, "<init>", "(Lcom/squareup/duktape/Duktape;JJ)V");
-  m_javaObjectConstructor = env->GetMethodID(m_javaObjectClass, "<init>", "(Ljava/lang/Object;)V");
+  m_javaObjectConstructor = env->GetMethodID(m_javaObjectClass, "<init>", "(Lcom/squareup/duktape/Duktape;Ljava/lang/Object;)V");
 
   m_DebuggerSocket.client_sock = -1;
 
@@ -399,7 +399,7 @@ void DuktapeContext::pushObject(JNIEnv *env, jobject object) {
   }
   else if (!env->IsAssignableFrom(objectClass, m_duktapeObjectClass)) {
     // this is a normal Java object, so create a proxy for it to access fields and methods
-    object = env->NewObject(m_javaObjectClass, m_javaObjectConstructor, object);
+    object = env->NewObject(m_javaObjectClass, m_javaObjectConstructor, reinterpret_cast<jlong>(m_javaDuktape), object);
   }
 
   // at this point, the object is guaranteed to be a JavaScriptObject from another DuktapeContext
