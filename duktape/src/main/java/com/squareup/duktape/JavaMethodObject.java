@@ -51,7 +51,7 @@ public class JavaMethodObject implements DuktapeReadonlyObject {
     public Object callMethod(Object thiz, Object... args) {
         if (thiz == null)
             throw new UnsupportedOperationException("can not call " + target);
-        thiz = duktape.coerceJavaScriptToJava(thiz, Object.class);
+        thiz = duktape.coerceJavaScriptToJava(Object.class, thiz);
         int bestScore = Integer.MAX_VALUE;
         Method best = null;
         for (Method method: getMethods(thiz)) {
@@ -88,7 +88,7 @@ public class JavaMethodObject implements DuktapeReadonlyObject {
             int i = 0;
             for (; i < numParameters; i++) {
                 if (i < args.length)
-                    coerced.add(duktape.coerceJavaScriptToJava(args[i], best.getParameterTypes()[i]));
+                    coerced.add(duktape.coerceJavaScriptToJava(best.getParameterTypes()[i], args[i]));
                 else
                     coerced.add(null);
             }
@@ -96,7 +96,7 @@ public class JavaMethodObject implements DuktapeReadonlyObject {
                 Class varargType = best.getParameterTypes()[numParameters].getComponentType();
                 ArrayList<Object> varargs = new ArrayList<>();
                 for (; i < args.length; i++) {
-                    varargs.add(duktape.coerceJavaScriptToJava(args[i], varargType));
+                    varargs.add(duktape.coerceJavaScriptToJava(varargType, args[i]));
                 }
                 coerced.add(varargs.toArray());
             }

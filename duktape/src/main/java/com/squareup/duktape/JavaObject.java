@@ -115,7 +115,7 @@ public final class JavaObject implements DuktapeJavaObject {
         for (Field field: target.getClass().getFields()) {
             if (field.getName().equals(key)) {
                 try {
-                    field.set(target, duktape.coerceJavaScriptToJava(value, field.getType()));
+                    field.set(target, duktape.coerceJavaScriptToJava(field.getType(), value));
                 }
                 catch (IllegalAccessException e) {
                     throw new IllegalArgumentException(e);

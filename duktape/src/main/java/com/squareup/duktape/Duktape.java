@@ -67,7 +67,7 @@ public final class Duktape implements Closeable {
   /**
    * Coerce a JavaScript value into an equivalent Java object.
    */
-  public Object coerceJavaScriptToJava(Object o, Class<?> clazz) {
+  public Object coerceJavaScriptToJava(Class<?> clazz, Object o) {
     if (o == null)
       return null;
     while (o instanceof DuktapeJavaObject) {
@@ -112,7 +112,7 @@ public final class Duktape implements Closeable {
       Class componentType = clazz.getComponentType();
       Object ret = Array.newInstance(componentType, length);
       for (int i = 0; i < length; i++) {
-        Array.set(ret, i, coerceJavaScriptToJava(jo.get(i), componentType));
+        Array.set(ret, i, coerceJavaScriptToJava(componentType, jo.get(i)));
       }
       return ret;
     }

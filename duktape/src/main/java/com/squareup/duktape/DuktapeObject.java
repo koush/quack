@@ -1,13 +1,22 @@
 package com.squareup.duktape;
 
 public interface DuktapeObject {
-    Object get(String key);
-    Object get(int index);
-    Object get(Object key);
+    default Object get(String key) {
+        return null;
+    };
+    default Object get(int index) {
+        return null;
+    }
+    default Object get(Object key) {
+        return null;
+    }
 
-    void set(String key, Object value);
-    void set(int index, Object value);
-    void set(Object key, Object value);
+    default void set(String key, Object value) {
+    }
+    default void set(int index, Object value) {
+    }
+    default void set(Object key, Object value) {
+    }
 
     /**
      * Call this object with the expectation that it is a function. The this argument
@@ -15,7 +24,9 @@ public interface DuktapeObject {
      * @param args
      * @return
      */
-    Object call(Object... args);
+    default Object call(Object... args) {
+        throw new UnsupportedOperationException();
+    }
 
     /**
      * Call this object with the expectation that it is a function. The this argument
@@ -24,7 +35,9 @@ public interface DuktapeObject {
      * @param args
      * @return
      */
-    Object callMethod(Object thiz, Object... args);
+    default Object callMethod(Object thiz, Object... args) {
+        throw new UnsupportedOperationException();
+    }
 
     /**
      * Call the property of this object with the expectation that it is a function.
@@ -33,5 +46,7 @@ public interface DuktapeObject {
      * @param args
      * @return
      */
-    Object callProperty(Object property, Object... args);
+    default Object callProperty(Object property, Object... args) {
+        throw new UnsupportedOperationException();
+    }
 }
