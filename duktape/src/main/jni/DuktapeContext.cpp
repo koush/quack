@@ -173,8 +173,23 @@ jobject DuktapeContext::popObject(JNIEnv *env) const {
     // hold a reference to this JavaScript object in the stash by mapping the JavaScript object pointer to
     // object itself.
     duk_push_global_stash(m_context);
-    duk_push_heapptr(m_context, ptr);
-    duk_put_prop_heapptr(m_context, -2, ptr);
+    duk_dup(m_context, -2);
+    // use the pointer as an index for uniqueness. might be risky due to precision loss, but probably not.
+    // can't use use duk_put_prop_heapptr since Objects as keys clobber each other:
+    //      > f[{}] = 0
+    //      0
+    //      > f
+    //              { '[object Object]': 0 }
+    //      > f[{}] = 2
+    //      2
+    //      > f
+    //              { '[object Object]': 2 }
+    //      > f[{2:3}] = 4
+    //      4
+    //      > f
+    //              { '[object Object]': 4 }
+    duk_uarridx_t heapIndex = (duk_uarridx_t)reinterpret_cast<long>(ptr);
+    duk_put_prop_index(m_context, -2, heapIndex);
     // pop the stash containing the hard reference
     duk_pop(m_context);
 
@@ -654,4 +669,21 @@ void DuktapeContext::setKeyObject(JNIEnv *env, jlong object, jobject key, jobjec
 
   // pop indexed object
   duk_pop(m_context);
+}
+
+jstring DuktapeContext::stringify(JNIEnv *env, jlong object) {
+  CHECK_STACK(m_context);
+  duk_get_global_string(m_context, "JSON");
+  duk_idx_t objectIndex = duk_normalize_index(m_context, -1);
+
+  duk_push_string(m_context, "stringify");
+  pushObject(env, object);
+  if (duk_pcall_prop(m_context, objectIndex, 1) != DUK_EXEC_SUCCESS) {
+    queueJavaExceptionForDuktapeError(env, m_context);
+    // pop off indexed object before rethrowing error
+    duk_pop(m_context);
+    return nullptr;
+  }
+
+  return (jstring)popObject2(env);
 }

@@ -92,6 +92,12 @@ Java_com_squareup_duktape_Duktape_debuggerAppNotify(JNIEnv *env, jclass type,
   return duktape->debuggerAppNotify(env, args);
 }
 
+JNIEXPORT jstring JNICALL
+Java_com_squareup_duktape_Duktape_stringify(JNIEnv *env, jclass type, jlong context, jlong object) {
+  DuktapeContext* duktape = reinterpret_cast<DuktapeContext*>(context);
+  return duktape->stringify(env, object);
+}
+
 JNIEXPORT void JNICALL
 Java_com_squareup_duktape_Duktape_setGlobalProperty(JNIEnv *env, jclass type, jlong context,
                                                     jobject property, jobject value) {

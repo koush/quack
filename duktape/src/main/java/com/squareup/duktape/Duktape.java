@@ -439,6 +439,9 @@ public final class Duktape implements Closeable {
   synchronized Object callProperty(long object, Object property, Object... args) {
     return callProperty(context, object, property, args);
   }
+  synchronized String stringify(long object) {
+      return stringify(context, object);
+  }
 
   private static native long createContext(Duktape duktape);
   private static native void destroyContext(long context);
@@ -459,4 +462,5 @@ public final class Duktape implements Closeable {
   private static native Object callMethod(long context, long object, Object thiz, Object... args);
   private static native Object callProperty(long context, long object, Object property, Object... args);
   private static native void setGlobalProperty(long context, Object property, Object value);
+  private static native String stringify(long context, long object);
 }

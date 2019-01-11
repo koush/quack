@@ -49,6 +49,7 @@ public:
   jobject callMethod(JNIEnv *env, jlong object, jobject thiz, jobjectArray args);
   jobject callProperty(JNIEnv* env, jlong object, jobject target, jobjectArray args);
   void setGlobalProperty(JNIEnv *env, jobject property, jobject value);
+  jstring stringify(JNIEnv *env, jlong object);
 
   duk_ret_t duktapeGet();
   duk_ret_t duktapeSet();

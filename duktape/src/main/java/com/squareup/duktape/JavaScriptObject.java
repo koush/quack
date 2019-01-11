@@ -15,6 +15,10 @@ public class JavaScriptObject implements DuktapeObject {
         this.pointer = pointer;
     }
 
+    public String stringify() {
+        return duktape.stringify(pointer);
+    }
+
     @Override
     public Object get(String key) {
         return duktape.getKeyString(pointer, key);
