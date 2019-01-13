@@ -6,7 +6,7 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 
-public class JavaMethodObject implements DuktapeReadonlyObject {
+public class JavaMethodObject implements DuktapeMethodObject {
     String target;
     Duktape duktape;
     public JavaMethodObject(Duktape duktape, String method) {
@@ -25,21 +25,6 @@ public class JavaMethodObject implements DuktapeReadonlyObject {
     @Override
     public Object callProperty(Object property, Object... args) {
         throw new UnsupportedOperationException("can not call property of a JavaMethodObject");
-    }
-
-    @Override
-    public Object get(String key) {
-        return get((Object)key);
-    }
-
-    @Override
-    public Object get(int index) {
-        return get((Object)index);
-    }
-
-    @Override
-    public Object get(Object key) {
-        throw new UnsupportedOperationException("can not get + " + key + " on a JavaMethodObject");
     }
 
     @Override
