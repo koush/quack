@@ -107,12 +107,14 @@ DuktapeContext::DuktapeContext(JavaVM* javaVM, jobject javaDuktape)
   m_duktapeObjectClass = findClass(env, "com/squareup/duktape/DuktapeObject");
   m_javaScriptObjectClass = findClass(env, "com/squareup/duktape/JavaScriptObject");
   m_javaObjectClass = findClass(env, "com/squareup/duktape/JavaObject");
+  m_byteBufferClass = findClass(env, "java/nio/ByteBuffer");
 
   m_duktapeObjectGetMethod = env->GetMethodID(m_duktapeObjectClass, "get", "(Ljava/lang/Object;)Ljava/lang/Object;");
   m_duktapeObjectSetMethod = env->GetMethodID(m_duktapeObjectClass, "set", "(Ljava/lang/Object;Ljava/lang/Object;)V");
   m_duktapeObjectCallMethod = env->GetMethodID(m_duktapeObjectClass, "callMethod", "(Ljava/lang/Object;[Ljava/lang/Object;)Ljava/lang/Object;");
   m_javaScriptObjectConstructor = env->GetMethodID(m_javaScriptObjectClass, "<init>", "(Lcom/squareup/duktape/Duktape;JJ)V");
   m_javaObjectConstructor = env->GetMethodID(m_javaObjectClass, "<init>", "(Lcom/squareup/duktape/Duktape;Ljava/lang/Object;)V");
+  m_byteBufferAllocateDirect = env->GetStaticMethodID(m_byteBufferClass, "allocateDirect", "(I)Ljava/nio/ByteBuffer;");
 
   m_DebuggerSocket.client_sock = -1;
 
@@ -139,6 +141,14 @@ jobject DuktapeContext::popObject(JNIEnv *env) const {
   if (duk_check_type_mask(m_context, -1, supportedTypeMask)) {
     // The result is a supported scalar type - return it.
     return m_objectType->pop(m_context, env, false).l;
+  }
+  else if (duk_is_buffer_data(m_context, -1)) {
+      duk_size_t size;
+      void* p = duk_get_buffer_data(m_context, -1, &size);
+      jobject byteBuffer = env->CallStaticObjectMethod(m_byteBufferClass, m_byteBufferAllocateDirect, (jint)size);
+      memcpy(env->GetDirectBufferAddress(byteBuffer), p, size);
+      duk_pop(m_context);
+      return byteBuffer;
   }
   else if (duk_get_type(m_context, -1) == DUK_TYPE_OBJECT) {
     jobject javaThis = nullptr;
@@ -411,6 +421,12 @@ void DuktapeContext::pushObject(JNIEnv *env, jobject object) {
 
     // a proxy already exists, but not for the correct DuktapeContext, so native javascript heap
     // pointer can't be used.
+  }
+  else if (env->IsAssignableFrom(objectClass, m_byteBufferClass)) {
+    jlong capacity = env->GetDirectBufferCapacity(object);
+    void *p = duk_push_fixed_buffer(m_context, (duk_size_t)capacity);
+    memcpy(p, env->GetDirectBufferAddress(object), (size_t)capacity);
+    return;
   }
   else if (!env->IsAssignableFrom(objectClass, m_duktapeObjectClass)) {
     // this is a normal Java object, so create a proxy for it to access fields and methods

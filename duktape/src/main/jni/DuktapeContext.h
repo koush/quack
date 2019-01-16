@@ -60,11 +60,13 @@ private:
   jclass m_duktapeObjectClass;
   jclass m_javaScriptObjectClass;
   jclass m_javaObjectClass;
+  jclass m_byteBufferClass;
   jmethodID m_duktapeObjectGetMethod;
   jmethodID m_duktapeObjectSetMethod;
   jmethodID m_duktapeObjectCallMethod;
   jmethodID m_javaScriptObjectConstructor;
   jmethodID m_javaObjectConstructor;
+  jmethodID m_byteBufferAllocateDirect;
   jobject popObject2(JNIEnv* env) const;
   void pushObject(JNIEnv* env, jlong object);
 
