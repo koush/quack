@@ -703,3 +703,17 @@ jstring DuktapeContext::stringify(JNIEnv *env, jlong object) {
 
   return (jstring)popObject2(env);
 }
+
+void DuktapeContext::finalizeJavaScriptObject(JNIEnv *env, jlong object) {
+  CHECK_STACK(m_context);
+
+  void* ptr = reinterpret_cast<void*>(object);
+  duk_push_heapptr(m_context, ptr);
+  duk_del_prop_string(m_context, -1, "__java_this");
+  duk_pop(m_context);
+
+  duk_push_global_stash(m_context);
+  duk_uarridx_t heapIndex = (duk_uarridx_t)reinterpret_cast<long>(ptr);
+  duk_del_prop_index(m_context, -1, heapIndex);
+  duk_pop(m_context);
+}

@@ -442,6 +442,9 @@ public final class Duktape implements Closeable {
   synchronized String stringify(long object) {
       return stringify(context, object);
   }
+  synchronized void finalizeJavaScriptObject(long object) {
+    finalizeJavaScriptObject(context, object);
+  }
 
   private static native long createContext(Duktape duktape);
   private static native void destroyContext(long context);
@@ -463,4 +466,5 @@ public final class Duktape implements Closeable {
   private static native Object callProperty(long context, long object, Object property, Object... args);
   private static native void setGlobalProperty(long context, Object property, Object value);
   private static native String stringify(long context, long object);
+  private static native void finalizeJavaScriptObject(long context, long object);
 }

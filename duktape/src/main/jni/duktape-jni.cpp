@@ -105,6 +105,13 @@ Java_com_squareup_duktape_Duktape_setGlobalProperty(JNIEnv *env, jclass type, jl
   duktape->setGlobalProperty(env, property, value);
 }
 
+JNIEXPORT void JNICALL
+Java_com_squareup_duktape_Duktape_finalizeJavaScriptObject__JJ(JNIEnv *env, jclass type,
+                                                               jlong context, jlong object) {
+  DuktapeContext* duktape = reinterpret_cast<DuktapeContext*>(context);
+  duktape->finalizeJavaScriptObject(env, object);
+}
+
 JNIEXPORT jobject JNICALL
 Java_com_squareup_duktape_Duktape_call(JNIEnv *env, jclass type,
                                            jlong context, jlong object,

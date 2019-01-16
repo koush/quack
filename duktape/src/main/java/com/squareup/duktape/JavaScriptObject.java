@@ -121,4 +121,10 @@ public class JavaScriptObject implements DuktapeObject {
 
         return (T)Proxy.newProxyInstance(clazz.getClassLoader(), classes.toArray(new Class[0]), createInvocationHandler());
     }
+
+    @Override
+    protected void finalize() throws Throwable {
+        super.finalize();
+        duktape.finalizeJavaScriptObject(pointer);
+    }
 }
