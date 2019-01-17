@@ -274,13 +274,14 @@ public final class Duktape implements Closeable {
     duktape.context = context;
     duktape.evaluate(
             "var __proxyHandler = {\n" +
-                    "\thas: function(f, key){ return key == '__java_this' || !!get(key); },\n" +
+                    "\thas: function(f, prop) { return prop == '__java_this' || f.target.__duktape_has(f.target, prop); },\n" +
                     "\tget: function(f, prop, receiver) { return f.target.__duktape_get(f.target, prop, receiver); },\n" +
                     "\tset: function(f, prop, value, receiver) { return f.target.__duktape_set(f.target, prop, value, receiver); },\n" +
                     "\tapply: function(f, thisArg, argumentsList) { return f.target.__duktape_apply(f.target, thisArg, argumentsList); },\n" +
                     "};\n" +
                     "function __makeProxy(obj) {\n" +
-                    "\tfunction f() {}; f.target = obj;\n" +
+                    "\tfunction f() {};\n" +
+                    "\tf.target = obj;\n" +
                     "\treturn new Proxy(f, __proxyHandler);\n" +
                     "};\n"
     );

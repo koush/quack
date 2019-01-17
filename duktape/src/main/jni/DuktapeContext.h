@@ -52,12 +52,22 @@ public:
   jstring stringify(JNIEnv *env, jlong object);
   void finalizeJavaScriptObject(JNIEnv *env, jlong object);
 
+  duk_ret_t duktapeHas();
   duk_ret_t duktapeGet();
   duk_ret_t duktapeSet();
   duk_ret_t duktapeApply();
 
 private:
+  jclass m_booleanClass;
+  jclass m_byteClass;
+  jclass m_shortClass;
+  jclass m_integerClass;
+  jclass m_longClass;
+  jclass m_floatClass;
+  jclass m_doubleClass;
+  jclass m_stringClass;
   jclass m_objectClass;
+
   jclass m_duktapeObjectClass;
   jclass m_javaScriptObjectClass;
   jclass m_javaObjectClass;

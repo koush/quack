@@ -670,15 +670,5 @@ const JavaType* JavaTypeMap::find(JNIEnv* env, const std::string& name) {
     return I->second;
   }
 
-  if (!name.empty() && name[0] == '[') {
-    const auto elementType = find(env, dropLandSemicolon(name.substr(name.find('[') + 1)));
-
-    const auto arrayClass = elementType->getArrayClass(env);
-    std::unique_ptr<JavaType> arrayType;
-    arrayType.reset(new Array(GlobalRef(env, arrayClass), *elementType));
-    m_types.emplace(std::make_pair(getName(env, arrayClass), arrayType.get()));
-    return arrayType.release();
-  }
-
   throw std::invalid_argument("Unsupported Java type " + name);
 }

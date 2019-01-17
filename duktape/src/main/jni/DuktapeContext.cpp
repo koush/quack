@@ -103,7 +103,16 @@ DuktapeContext::DuktapeContext(JavaVM* javaVM, jobject javaDuktape)
   JNIEnv *env = getEnvFromJavaVM(javaVM);
   m_javaDuktape = env->NewWeakGlobalRef(javaDuktape);
 
+  m_booleanClass = findClass(env, "java/lang/Boolean");
+  m_byteClass = findClass(env, "java/lang/Byte");
+  m_shortClass = findClass(env, "java/lang/Short");
+  m_integerClass = findClass(env, "java/lang/Integer");
+  m_longClass = findClass(env, "java/lang/Long");
+  m_floatClass = findClass(env, "java/lang/Float");
+  m_doubleClass = findClass(env, "java/lang/Double");
+  m_stringClass = findClass(env, "java/lang/String");
   m_objectClass = findClass(env, "java/lang/Object");
+
   m_duktapeObjectClass = findClass(env, "com/squareup/duktape/DuktapeObject");
   m_javaScriptObjectClass = findClass(env, "com/squareup/duktape/JavaScriptObject");
   m_javaObjectClass = findClass(env, "com/squareup/duktape/JavaObject");
@@ -338,6 +347,36 @@ static duk_ret_t __duktape_get(duk_context *ctx) {
   return duktapeContext->duktapeGet();
 }
 
+duk_ret_t DuktapeContext::duktapeHas() {
+    JNIEnv *env = getJNIEnv(m_context);
+
+    jobject prop = popObject(env);
+    jobject object = static_cast<jobject>(duk_require_pointer(m_context, -1));
+    duk_pop(m_context);
+
+    jclass objectClass = env->GetObjectClass(object);
+    if (!env->IsAssignableFrom(objectClass, m_duktapeObjectClass)) {
+        fatalErrorHandler(object, "Object is not DuktapeObject");
+        return DUK_RET_REFERENCE_ERROR;
+    }
+
+    // todo: actually implement has on the java side.
+
+    jobject push = env->CallObjectMethod(object, m_duktapeObjectGetMethod, prop);
+    if (!checkRethrowDuktapeError(env, m_context)) {
+        return DUK_RET_ERROR;
+    }
+
+    duk_push_boolean(m_context, (duk_bool_t )(push != nullptr));
+
+    return 1;
+}
+
+static duk_ret_t __duktape_has(duk_context *ctx) {
+  DuktapeContext *duktapeContext = getDuktapeContext(ctx);
+  return duktapeContext->duktapeHas();
+}
+
 duk_ret_t DuktapeContext::duktapeApply() {
   JNIEnv *env = getJNIEnv(m_context);
 
@@ -392,6 +431,7 @@ void DuktapeContext::pushObject(JNIEnv *env, jobject object) {
   {
     // try to push a native object first.
     jclass clazz = env->GetObjectClass(object);
+
     try {
       const JavaType* type = m_javaValues.get(env, clazz);
       jvalue value;
@@ -449,6 +489,10 @@ void DuktapeContext::pushObject(JNIEnv *env, jobject object) {
   duk_set_finalizer(m_context, objIndex);
 
   // bind get
+  duk_push_c_function(m_context, __duktape_has, 2);
+  duk_put_prop_string(m_context, objIndex, "__duktape_has");
+
+  // bind get
   duk_push_c_function(m_context, __duktape_get, 3);
   duk_put_prop_string(m_context, objIndex, "__duktape_get");
 
@@ -485,6 +529,7 @@ jobject DuktapeContext::call(JNIEnv *env, jlong object, jobjectArray args) {
       return nullptr;
   }
 
+  duk_gc(m_context, 0);
   return popObject(env);
 }
 
@@ -511,6 +556,7 @@ jobject DuktapeContext::callMethod(JNIEnv *env, jlong object, jobject thiz, jobj
     return nullptr;
   }
 
+  duk_gc(m_context, 0);
   return popObject(env);
 }
 
@@ -537,6 +583,7 @@ jobject DuktapeContext::callProperty(JNIEnv *env, jlong object, jobject property
       return nullptr;
   }
 
+  duk_gc(m_context, 0);
   // pop twice since property call does not pop the indexed object
   return popObject2(env);
 }
