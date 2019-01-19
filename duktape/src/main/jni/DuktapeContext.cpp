@@ -485,7 +485,7 @@ void DuktapeContext::pushObject(JNIEnv *env, jobject object) {
   duk_put_prop_string(m_context, objIndex, JAVA_THIS_PROP_NAME);
 
   // set a finalizer for the ref
-  duk_push_c_function(m_context, javaObjectFinalizer, 1);
+  duk_push_c_function(m_context, javaObjectFinalizer, 2);
   duk_set_finalizer(m_context, objIndex);
 
   // bind get
