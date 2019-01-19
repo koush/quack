@@ -66,7 +66,7 @@ duk_int_t eval_string_with_filename(duk_context *ctx, const char *src, const cha
                                    DUK_COMPILE_NOSOURCE | DUK_COMPILE_STRLEN);
 }
 
-// Called by Duktape to handle finalization of bound Java objects.
+// Called by Duktape to handle finalization of bound JavaObjects.
 duk_ret_t javaObjectFinalizer(duk_context *ctx) {
   if (duk_get_prop_string(ctx, -1, JAVA_THIS_PROP_NAME)) {
     // Remove the global reference from the bound Java object.
@@ -74,6 +74,28 @@ duk_ret_t javaObjectFinalizer(duk_context *ctx) {
     duk_pop(ctx);
     duk_del_prop_string(ctx, -1, JAVA_METHOD_PROP_NAME);
   }
+
+  // Pop the enum and the object passed in as an argument.
+  duk_pop_2(ctx);
+  return 0;
+}
+
+// Called by Duktape to handle finalization of bound JavaScriptObjects.
+void javascriptObjectFinalizerInternal(duk_context *ctx) {
+  // get the pointer or undefined
+  if (duk_get_prop_string(ctx, -1, "__java_this")) {
+    // Remove the global reference from the bound Java object.
+    getJNIEnv(ctx)->DeleteWeakGlobalRef(static_cast<jobject>(duk_require_pointer(ctx, -1)));
+    // delete the pointer prop
+    duk_del_prop_string(ctx, -2, "__java_this");
+  }
+  // pop the pointer or undefined
+  duk_pop(ctx);
+}
+
+// Called by Duktape to handle finalization of bound JavaScriptObjects.
+duk_ret_t javascriptObjectFinalizer(duk_context *ctx) {
+  javascriptObjectFinalizerInternal(ctx);
 
   // Pop the enum and the object passed in as an argument.
   duk_pop_2(ctx);
@@ -174,6 +196,9 @@ jobject DuktapeContext::popObject(JNIEnv *env) const {
       // weak references are used by JavaScript objects marshalled to Java.
       // strong references are used by Java objects marshalled to JavaScript.
       if (javaThis && env->IsSameObject(javaThis, nullptr)) {
+        // todo: is this code still called with JavaScriptObject.finalize being implemented?
+        // todo: finalize is called on GC, but is finalize run immediately after an object is deemed
+        // todo: to be unreachable, or sometime afterwards?
         env->DeleteWeakGlobalRef(javaThis);
         javaThis = nullptr;
         duk_del_prop_string(m_context, -1, "__java_this");
@@ -219,6 +244,10 @@ jobject DuktapeContext::popObject(JNIEnv *env) const {
     // no need for a finalizer. if the Java object gets garbage collected, can always just spin
     // up a new instance.
     jweak weakRef = env->NewWeakGlobalRef(javaThis);
+
+    // set a finalizer for the weak ref
+    duk_push_c_function(m_context, javascriptObjectFinalizer, 2);
+    duk_set_finalizer(m_context, -2);
 
     // attach the Java object's weak reference to the JavaScript object
     duk_push_pointer(m_context, weakRef);
@@ -488,7 +517,7 @@ void DuktapeContext::pushObject(JNIEnv *env, jobject object) {
   duk_push_c_function(m_context, javaObjectFinalizer, 2);
   duk_set_finalizer(m_context, objIndex);
 
-  // bind get
+  // bind has
   duk_push_c_function(m_context, __duktape_has, 2);
   duk_put_prop_string(m_context, objIndex, "__duktape_has");
 
@@ -499,7 +528,6 @@ void DuktapeContext::pushObject(JNIEnv *env, jobject object) {
   // bind set
   duk_push_c_function(m_context, __duktape_set, 4);
   duk_put_prop_string(m_context, objIndex, "__duktape_set");
-
 
   // bind apply
   duk_push_c_function(m_context, __duktape_apply, 3);
@@ -754,11 +782,16 @@ jstring DuktapeContext::stringify(JNIEnv *env, jlong object) {
 void DuktapeContext::finalizeJavaScriptObject(JNIEnv *env, jlong object) {
   CHECK_STACK(m_context);
 
+  // the JavaScriptObject (java representation) was collected.
+
+  // clean up the ref to the duktape heap object
   void* ptr = reinterpret_cast<void*>(object);
   duk_push_heapptr(m_context, ptr);
-  duk_del_prop_string(m_context, -1, "__java_this");
+  javascriptObjectFinalizerInternal(m_context);
   duk_pop(m_context);
 
+  // the Java side kept this duktape heap object alive with a reference in the global stash.
+  // can delete that now.
   duk_push_global_stash(m_context);
   duk_uarridx_t heapIndex = (duk_uarridx_t)reinterpret_cast<long>(ptr);
   duk_del_prop_index(m_context, -1, heapIndex);
