@@ -75,8 +75,8 @@ duk_ret_t javaObjectFinalizer(duk_context *ctx) {
     duk_del_prop_string(ctx, -1, JAVA_METHOD_PROP_NAME);
   }
 
-  // Pop the enum and the object passed in as an argument.
-  duk_pop_2(ctx);
+  // Pop the object passed in as an argument.
+  duk_pop(ctx);
   return 0;
 }
 
@@ -97,8 +97,8 @@ void javascriptObjectFinalizerInternal(duk_context *ctx) {
 duk_ret_t javascriptObjectFinalizer(duk_context *ctx) {
   javascriptObjectFinalizerInternal(ctx);
 
-  // Pop the enum and the object passed in as an argument.
-  duk_pop_2(ctx);
+  // Pop the object passed in as an argument.
+  duk_pop(ctx);
   return 0;
 }
 
@@ -240,13 +240,9 @@ jobject DuktapeContext::popObject(JNIEnv *env) const {
     // create a new holder for this JavaScript object
     javaThis = env->NewObject(m_javaScriptObjectClass, m_javaScriptObjectConstructor, reinterpret_cast<jlong>(m_javaDuktape), reinterpret_cast<jlong>(this), reinterpret_cast<jlong>(ptr));
 
-    // since this is a Javascript object, put a weak reference to the Java object in the JavaScript object
-    // no need for a finalizer. if the Java object gets garbage collected, can always just spin
-    // up a new instance.
     jweak weakRef = env->NewWeakGlobalRef(javaThis);
-
     // set a finalizer for the weak ref
-    duk_push_c_function(m_context, javascriptObjectFinalizer, 2);
+    duk_push_c_function(m_context, javascriptObjectFinalizer, 1);
     duk_set_finalizer(m_context, -2);
 
     // attach the Java object's weak reference to the JavaScript object
@@ -514,7 +510,7 @@ void DuktapeContext::pushObject(JNIEnv *env, jobject object) {
   duk_put_prop_string(m_context, objIndex, JAVA_THIS_PROP_NAME);
 
   // set a finalizer for the ref
-  duk_push_c_function(m_context, javaObjectFinalizer, 2);
+  duk_push_c_function(m_context, javaObjectFinalizer, 1);
   duk_set_finalizer(m_context, objIndex);
 
   // bind has
@@ -787,6 +783,10 @@ void DuktapeContext::finalizeJavaScriptObject(JNIEnv *env, jlong object) {
   // clean up the ref to the duktape heap object
   void* ptr = reinterpret_cast<void*>(object);
   duk_push_heapptr(m_context, ptr);
+  // unset the finalizer, no longer necessary
+  duk_push_undefined(m_context);
+  duk_set_finalizer(m_context, -2);
+  // release the ref to the javascript object
   javascriptObjectFinalizerInternal(m_context);
   duk_pop(m_context);
 
