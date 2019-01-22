@@ -84,8 +84,11 @@ duk_ret_t javaObjectFinalizer(duk_context *ctx) {
 void javascriptObjectFinalizerInternal(duk_context *ctx) {
   // get the pointer or undefined
   if (duk_get_prop_string(ctx, -1, "__java_this")) {
-    // Remove the global reference from the bound Java object.
-    getJNIEnv(ctx)->DeleteWeakGlobalRef(static_cast<jobject>(duk_require_pointer(ctx, -1)));
+    void* ptr = duk_require_pointer(ctx, -1);
+    if (ptr) {
+        // Remove the global reference from the bound Java object.
+        getJNIEnv(ctx)->DeleteWeakGlobalRef(static_cast<jobject>(duk_require_pointer(ctx, -1)));
+    }
     // delete the pointer prop
     duk_del_prop_string(ctx, -2, "__java_this");
   }
