@@ -16,7 +16,7 @@ public final class JavaObject implements DuktapeJavaObject {
     }
 
     @Override
-    public Object getObject() {
+    public Object getObject(Class clazz) {
         return target;
     }
 

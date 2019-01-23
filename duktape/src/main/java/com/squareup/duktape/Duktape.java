@@ -71,7 +71,10 @@ public final class Duktape implements Closeable {
     if (o == null)
       return null;
     while (o instanceof DuktapeJavaObject) {
-      o = ((DuktapeJavaObject)o).getObject();
+      Object coerced = ((DuktapeJavaObject)o).getObject(clazz);;
+      if (o == coerced)
+        break;
+      o = coerced;
     }
     if (clazz == null)
       return o;
