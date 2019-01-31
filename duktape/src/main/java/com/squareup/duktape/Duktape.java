@@ -15,8 +15,12 @@
  */
 package com.squareup.duktape;
 
+import org.json.JSONException;
+import org.json.JSONObject;
+
 import java.io.Closeable;
 import java.lang.reflect.Array;
+import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
@@ -61,7 +65,43 @@ public final class Duktape implements Closeable {
   public Object coerceJavaToJavascript(Object o) {
     if (o == null)
       return null;
-    return coerce(JavaToJavascriptCoercions, o, o.getClass());
+    return coerceJavaToJavascript(o.getClass(), o);
+  }
+
+  /**
+   * Coerce a Java value into an equivalent JavaScript object.
+   */
+  public Object coerceJavaToJavascript(Class clazz, Object o) {
+    if (o == null)
+      return null;
+    Object ret = coerce(JavaToJavascriptCoercions, o, clazz);
+    if (ret != null)
+      return ret;
+
+
+    if (clazz.isInterface() && clazz.getMethods().length == 1) {
+      // automatically coerce functional interfaces into functions
+      Method method = clazz.getMethods()[0];
+      return new DuktapeMethodObject() {
+        @Override
+        public Object callMethod(Object thiz, Object... args) {
+          try {
+            if (args != null) {
+              Class[] parameters = method.getParameterTypes();
+              for (int i = 0; i < args.length; i++) {
+                args[i] = coerceJavaScriptToJava(parameters[i], args[i]);
+              }
+            }
+            return coerceJavaToJavascript(method.invoke(o, args));
+          }
+          catch (Exception e) {
+            throw new IllegalArgumentException(e);
+          }
+        }
+      };
+    }
+
+    return o;
   }
 
   /**
@@ -120,7 +160,33 @@ public final class Duktape implements Closeable {
       return ret;
     }
 
-    return coerce(JavaScriptToJavaCoercions, o, clazz);
+    Object ret = coerce(JavaScriptToJavaCoercions, o, clazz);
+    if (ret != null)
+      return ret;
+
+    // convert javascript objects proxy objects that implement interfaces
+    if (clazz.isInterface() && o instanceof JavaScriptObject) {
+      JavaScriptObject jo = (JavaScriptObject)o;
+
+      if (clazz.getMethods().length == 1) {
+        return Proxy.newProxyInstance(clazz.getClassLoader(), new Class[]{clazz}, (proxy, method, args) -> jo.call(args));
+      }
+      else {
+        InvocationHandler handler = jo.createInvocationHandler();
+        return Proxy.newProxyInstance(clazz.getClassLoader(), new Class[] { clazz }, handler);
+      }
+    }
+
+    if (clazz == JSONObject.class && o instanceof JavaScriptObject) {
+      try {
+        return new JSONObject(((JavaScriptObject)o).stringify());
+      }
+      catch (JSONException e) {
+        throw new IllegalArgumentException(e);
+      }
+    }
+
+    return o;
   }
 
   public interface JavaMethodReference<T> {
@@ -260,7 +326,7 @@ public final class Duktape implements Closeable {
         return check.getValue().coerce(clazz, o);
     }
 
-    return o;
+    return null;
   }
 
   /**
