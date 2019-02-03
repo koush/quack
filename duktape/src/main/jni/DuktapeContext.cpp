@@ -241,7 +241,7 @@ jobject DuktapeContext::popObject(JNIEnv *env) const {
     duk_pop(m_context);
 
     // create a new holder for this JavaScript object
-    javaThis = env->NewObject(m_javaScriptObjectClass, m_javaScriptObjectConstructor, reinterpret_cast<jlong>(m_javaDuktape), reinterpret_cast<jlong>(this), reinterpret_cast<jlong>(ptr));
+    javaThis = env->NewObject(m_javaScriptObjectClass, m_javaScriptObjectConstructor, m_javaDuktape, reinterpret_cast<jlong>(this), reinterpret_cast<jlong>(ptr));
 
     jweak weakRef = env->NewWeakGlobalRef(javaThis);
     // set a finalizer for the weak ref
@@ -498,7 +498,7 @@ void DuktapeContext::pushObject(JNIEnv *env, jobject object) {
   }
   else if (!env->IsAssignableFrom(objectClass, m_duktapeObjectClass)) {
     // this is a normal Java object, so create a proxy for it to access fields and methods
-    object = env->NewObject(m_javaObjectClass, m_javaObjectConstructor, reinterpret_cast<jlong>(m_javaDuktape), object);
+    object = env->NewObject(m_javaObjectClass, m_javaObjectConstructor, m_javaDuktape, object);
   }
 
   // at this point, the object is guaranteed to be a JavaScriptObject from another DuktapeContext
