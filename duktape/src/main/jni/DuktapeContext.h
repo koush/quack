@@ -78,6 +78,9 @@ private:
   jmethodID m_javaScriptObjectConstructor;
   jmethodID m_javaObjectConstructor;
   jmethodID m_byteBufferAllocateDirect;
+  jfieldID m_contextField;
+  jfieldID m_pointerField;
+
   jobject popObject2(JNIEnv* env) const;
   void pushObject(JNIEnv* env, jlong object);
 

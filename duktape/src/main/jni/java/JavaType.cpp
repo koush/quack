@@ -90,9 +90,12 @@ jvalue JavaType::callMethod(duk_context* ctx, JNIEnv *env, jmethodID methodId, j
 }
 
 std::string getName(JNIEnv *env, jclass javaClass) {
-  const jmethodID method =
-      env->GetMethodID(env->GetObjectClass(javaClass), "getName", "()Ljava/lang/String;");
-  const JString methodName(env, static_cast<jstring>(env->CallObjectMethod(javaClass, method)));
+  const jclass classClass = env->GetObjectClass(javaClass);
+  const jmethodID method = env->GetMethodID(classClass, "getName", "()Ljava/lang/String;");
+  const jobject jMethodName = env->CallObjectMethod(javaClass, method);
+  const JString methodName(env, static_cast<jstring>(jMethodName));
+  env->DeleteLocalRef(classClass);
+  env->DeleteLocalRef(jMethodName);
   return methodName.str();
 }
 

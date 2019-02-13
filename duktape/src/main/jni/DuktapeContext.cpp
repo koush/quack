@@ -150,6 +150,9 @@ DuktapeContext::DuktapeContext(JavaVM* javaVM, jobject javaDuktape)
   m_javaObjectConstructor = env->GetMethodID(m_javaObjectClass, "<init>", "(Lcom/squareup/duktape/Duktape;Ljava/lang/Object;)V");
   m_byteBufferAllocateDirect = env->GetStaticMethodID(m_byteBufferClass, "allocateDirect", "(I)Ljava/nio/ByteBuffer;");
 
+  m_contextField = env->GetFieldID(m_javaScriptObjectClass, "context", "J");
+  m_pointerField = env->GetFieldID(m_javaScriptObjectClass, "pointer", "J");
+
   m_DebuggerSocket.client_sock = -1;
 
   // Stash the JVM object in the context, so we can find our way back from a Duktape C callback.
@@ -289,7 +292,9 @@ duk_ret_t DuktapeContext::duktapeSet() {
   }
 
   jclass objectClass = env->GetObjectClass(object);
-  if (!env->IsAssignableFrom(objectClass, m_duktapeObjectClass)) {
+  jboolean assignable = env->IsAssignableFrom(objectClass, m_duktapeObjectClass);
+  env->DeleteLocalRef(objectClass);
+  if (!assignable) {
       fatalErrorHandler(object, "Object is not DuktapeObject");
       return DUK_RET_REFERENCE_ERROR;
   }
@@ -355,12 +360,15 @@ duk_ret_t DuktapeContext::duktapeGet() {
   }
 
   jclass objectClass = env->GetObjectClass(object);
-  if (!env->IsAssignableFrom(objectClass, m_duktapeObjectClass)) {
+  jboolean assignable = env->IsAssignableFrom(objectClass, m_duktapeObjectClass);
+  env->DeleteLocalRef(objectClass);
+  if (!assignable) {
     fatalErrorHandler(object, "Object is not DuktapeObject");
     return DUK_RET_REFERENCE_ERROR;
   }
 
   jobject push = env->CallObjectMethod(object, m_duktapeObjectGetMethod, jprop);
+  env->DeleteLocalRef(jprop);
   if (!checkRethrowDuktapeError(env, m_context)) {
     return DUK_RET_ERROR;
   }
@@ -383,9 +391,11 @@ duk_ret_t DuktapeContext::duktapeHas() {
     duk_pop(m_context);
 
     jclass objectClass = env->GetObjectClass(object);
-    if (!env->IsAssignableFrom(objectClass, m_duktapeObjectClass)) {
-        fatalErrorHandler(object, "Object is not DuktapeObject");
-        return DUK_RET_REFERENCE_ERROR;
+    jboolean assignable = env->IsAssignableFrom(objectClass, m_duktapeObjectClass);
+    env->DeleteLocalRef(objectClass);
+    if (!assignable) {
+      fatalErrorHandler(object, "Object is not DuktapeObject");
+      return DUK_RET_REFERENCE_ERROR;
     }
 
     // todo: actually implement has on the java side.
@@ -427,12 +437,16 @@ duk_ret_t DuktapeContext::duktapeApply() {
   duk_pop(m_context);
 
   jclass objectClass = env->GetObjectClass(object);
-  if (!env->IsAssignableFrom(objectClass, m_duktapeObjectClass)) {
+  jboolean assignable = env->IsAssignableFrom(objectClass, m_duktapeObjectClass);
+  env->DeleteLocalRef(objectClass);
+  if (!assignable) {
+    env->DeleteLocalRef(javaArgs);
     fatalErrorHandler(object, "Object is not DuktapeObject");
     return DUK_RET_REFERENCE_ERROR;
   }
 
   jobject push = env->CallObjectMethod(object, m_duktapeObjectCallMethod, javaThis, javaArgs);
+  env->DeleteLocalRef(javaArgs);
   if (!checkRethrowDuktapeError(env, m_context)) {
     return DUK_RET_ERROR;
   }
@@ -456,16 +470,18 @@ void DuktapeContext::pushObject(JNIEnv *env, jobject object) {
     return;
   }
 
-  {
-    // try to push a native object first.
-    jclass clazz = env->GetObjectClass(object);
+  jclass objectClass = env->GetObjectClass(object);
 
+  // try to push a native object first.
+  {
     try {
-      const JavaType* type = m_javaValues.get(env, clazz);
+      const JavaType* type = m_javaValues.get(env, objectClass);
       jvalue value;
       value.l = object;
       type->push(m_context, env, value);
-
+      // safe to delete the local refs now
+      env->DeleteLocalRef(object);
+      env->DeleteLocalRef(objectClass);
       return;
     }
     catch (...) {
@@ -475,15 +491,14 @@ void DuktapeContext::pushObject(JNIEnv *env, jobject object) {
 
   // a JavaScriptObject can be unpacked back into a native duktape heap pointer/object
   // a DuktapeObject can support a duktape Proxy, and does not need any further boxing
-  jclass objectClass = env->GetObjectClass(object);
   if (env->IsAssignableFrom(objectClass, m_javaScriptObjectClass)) {
-    jfieldID contextField = env->GetFieldID(m_javaScriptObjectClass, "context", "J");
-    jfieldID pointerField = env->GetFieldID(m_javaScriptObjectClass, "pointer", "J");
-
-    DuktapeContext* context = reinterpret_cast<DuktapeContext*>(env->GetLongField(object, contextField));
+    DuktapeContext* context = reinterpret_cast<DuktapeContext*>(env->GetLongField(object, m_contextField));
     if (context == this) {
-      void* ptr = reinterpret_cast<void*>(env->GetLongField(object, pointerField));
+      void* ptr = reinterpret_cast<void*>(env->GetLongField(object, m_pointerField));
       duk_push_heapptr(m_context, ptr);
+
+      env->DeleteLocalRef(object);
+      env->DeleteLocalRef(objectClass);
       return;
     }
 
@@ -494,14 +509,22 @@ void DuktapeContext::pushObject(JNIEnv *env, jobject object) {
     jlong capacity = env->GetDirectBufferCapacity(object);
     void *p = duk_push_fixed_buffer(m_context, (duk_size_t)capacity);
     memcpy(p, env->GetDirectBufferAddress(object), (size_t)capacity);
+
+    env->DeleteLocalRef(object);
+    env->DeleteLocalRef(objectClass);
     return;
   }
   else if (!env->IsAssignableFrom(objectClass, m_duktapeObjectClass)) {
     // this is a normal Java object, so create a proxy for it to access fields and methods
-    object = env->NewObject(m_javaObjectClass, m_javaObjectConstructor, m_javaDuktape, object);
+    jobject wrappedObject = env->NewObject(m_javaObjectClass, m_javaObjectConstructor, m_javaDuktape, object);
+    // safe to delete the local ref now
+    env->DeleteLocalRef(object);
+    object = wrappedObject;
   }
 
-  // at this point, the object is guaranteed to be a JavaScriptObject from another DuktapeContext
+  env->DeleteLocalRef(objectClass);
+
+    // at this point, the object is guaranteed to be a JavaScriptObject from another DuktapeContext
   // or a DuktapeObject (java proxy of some sort). JavaScriptObject implements DuktapeObject,
   // so, it works without any further coercion.
 
@@ -510,6 +533,8 @@ void DuktapeContext::pushObject(JNIEnv *env, jobject object) {
   const duk_idx_t objIndex = duk_require_normalize_index(m_context, duk_push_object(m_context));
 
   duk_push_pointer(m_context, env->NewGlobalRef(object));
+  // safe to delete the local ref now
+  env->DeleteLocalRef(object);
   duk_put_prop_string(m_context, objIndex, JAVA_THIS_PROP_NAME);
 
   // set a finalizer for the ref

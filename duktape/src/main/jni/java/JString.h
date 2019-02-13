@@ -23,16 +23,14 @@ class JString {
 public:
   JString(JNIEnv* env, jstring s)
       : m_env(*env)
-      , m_jstring(s)
-      , m_str(m_env.GetStringUTFChars(m_jstring, 0)) {
+      , m_str(m_env.GetStringUTFChars(s, 0)) {
   }
 
   ~JString() {
-    m_env.ReleaseStringUTFChars(m_jstring, m_str);
   }
 
   operator const char* () const {
-    return m_str;
+    return m_str.c_str();
   }
 
   std::string str() const {
@@ -41,8 +39,7 @@ public:
 
 private:
   JNIEnv& m_env;
-  const jstring m_jstring;
-  const char* m_str;
+  const std::string m_str;
 };
 
 #endif //DUKTAPE_ANDROID_JSTRING_H
