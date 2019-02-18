@@ -367,9 +367,20 @@ public final class Duktape implements Closeable {
       return Enum.valueOf(clazz, o.toString());
     });
 
-    // coerce JavaScript Numbers into Integers and Longs
+    // coerce JavaScript Numbers. duktape supports ints and doubles natively.
+    JavaScriptToJavaCoercions.put(Byte.class, (clazz, o) -> o instanceof Number ? ((Number)o).byteValue() : o);
+    JavaScriptToJavaCoercions.put(byte.class, (clazz, o) -> o instanceof Number ? ((Number)o).byteValue() : o);
+    JavaToJavascriptCoercions.put(byte.class, (DuktapeCoercion<Integer, Byte>) (clazz, o) -> o.intValue());
+    JavaToJavascriptCoercions.put(Byte.class, (DuktapeCoercion<Integer, Byte>) (clazz, o) -> o.intValue());
+
+    JavaScriptToJavaCoercions.put(Short.class, (clazz, o) -> o instanceof Number ? ((Number)o).shortValue() : o);
+    JavaScriptToJavaCoercions.put(short.class, (clazz, o) -> o instanceof Number ? ((Number)o).shortValue() : o);
+    JavaToJavascriptCoercions.put(short.class, (DuktapeCoercion<Integer, Short>) (clazz, o) -> o.intValue());
+    JavaToJavascriptCoercions.put(Short.class, (DuktapeCoercion<Integer, Short>) (clazz, o) -> o.intValue());
+
     JavaScriptToJavaCoercions.put(Integer.class, (clazz, o) -> o instanceof Number ? ((Number)o).intValue() : o);
     JavaScriptToJavaCoercions.put(int.class, (clazz, o) -> o instanceof Number ? ((Number)o).intValue() : o);
+
     JavaScriptToJavaCoercions.put(Long.class, (clazz, o) -> o instanceof Number ? ((Number)o).longValue() : o);
     JavaScriptToJavaCoercions.put(long.class, (clazz, o) -> o instanceof Number ? ((Number)o).longValue() : o);
 
