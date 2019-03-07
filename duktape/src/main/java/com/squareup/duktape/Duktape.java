@@ -265,6 +265,11 @@ public final class Duktape implements Closeable {
     interfaceMethods.clear();
   }
 
+  public synchronized void putJavaToJavaScriptMethodCercion(Method method, DuktapeMethodCoercion coercion) {
+    JavaToJavascriptMethodCoercions.put(method, coercion);
+    interfaceMethods.clear();
+  }
+
   private static class MethodException extends Exception {
     Method method;
     MethodException(Method method) {
@@ -524,7 +529,8 @@ public final class Duktape implements Closeable {
       return stringify(context, object);
   }
   synchronized void finalizeJavaScriptObject(long object) {
-    finalizeJavaScriptObject(context, object);
+    if (context != 0)
+      finalizeJavaScriptObject(context, object);
   }
 
   private static native long createContext(Duktape duktape);

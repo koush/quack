@@ -1,6 +1,7 @@
 package com.squareup.duktape;
 
 import java.lang.reflect.InvocationHandler;
+import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -109,6 +110,12 @@ public class JavaScriptObject implements DuktapeObject {
         return (proxy, method, args) -> {
             if (method.getDeclaringClass() == Object.class)
                 return method.invoke(JavaScriptObject.this, args);
+
+            Method interfaceMethod = Duktape.getInterfaceMethod(method);
+            DuktapeMethodCoercion methodCoercion = duktape.JavaToJavascriptMethodCoercions.get(interfaceMethod);
+            if (methodCoercion != null)
+                return methodCoercion.invoke(interfaceMethod, this, args);
+
             return duktape.coerceJavaScriptToJava(method.getReturnType(), JavaScriptObject.this.callProperty(method.getName(), args));
         };
     }
