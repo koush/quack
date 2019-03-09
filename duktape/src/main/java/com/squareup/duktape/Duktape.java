@@ -15,6 +15,8 @@
  */
 package com.squareup.duktape;
 
+import android.os.SystemClock;
+
 import org.json.JSONException;
 import org.json.JSONObject;
 
@@ -393,6 +395,24 @@ public final class Duktape implements Closeable {
     JavaToJavascriptCoercions.put(Enum.class, (DuktapeCoercion<Object, Enum>) (clazz, o) -> o.toString());
   }
 
+  private long totalElapsedScriptExecutionMs;
+
+  /**
+   * Profiling tool. Get the total time spent evaluating JavaScript. This iincludes
+   * calls back out to Java.
+   * @return
+   */
+  public long getTotalScriptExecutionTime() {
+    return totalElapsedScriptExecutionMs;
+  }
+
+  /**
+   * Profiling tool. Reset the total time spent evaluating JavaScript.
+   */
+  public void resetTotalScriptExecutionTime() {
+    totalElapsedScriptExecutionMs = 0;
+  }
+
   /**
    * Evaluate {@code script} and return a result. {@code fileName} will be used in error
    * reporting.
@@ -400,7 +420,13 @@ public final class Duktape implements Closeable {
    * @throws DuktapeException if there is an error evaluating the script.
    */
   public synchronized <T> T evaluate(String script, String fileName) {
-    return evaluate(context, script, fileName);
+    long start = SystemClock.elapsedRealtime();
+    try {
+      return evaluate(context, script, fileName);
+    }
+    finally {
+      totalElapsedScriptExecutionMs += SystemClock.elapsedRealtime() - start;
+    }
   }
 
   /**
@@ -419,7 +445,7 @@ public final class Duktape implements Closeable {
    * @throws DuktapeException if there is an error evaluating the script.
    */
   public synchronized JavaScriptObject evaluateForJavaScriptObject(String script, String fileName) {
-    return evaluate(context, script, fileName);
+    return evaluate(script, fileName);
   }
 
   /**
@@ -517,13 +543,31 @@ public final class Duktape implements Closeable {
     setKeyInteger(context, object, index, value);
   }
   synchronized Object call(long object, Object... args) {
-    return call(context, object, args);
+    long start = SystemClock.elapsedRealtime();
+    try {
+      return call(context, object, args);
+    }
+    finally {
+      totalElapsedScriptExecutionMs += SystemClock.elapsedRealtime() - start;
+    }
   }
   synchronized Object callMethod(long object, Object thiz, Object... args) {
-    return callMethod(context, object, thiz, args);
+    long start = SystemClock.elapsedRealtime();
+    try {
+      return callMethod(context, object, thiz, args);
+    }
+    finally {
+      totalElapsedScriptExecutionMs += SystemClock.elapsedRealtime() - start;
+    }
   }
   synchronized Object callProperty(long object, Object property, Object... args) {
-    return callProperty(context, object, property, args);
+    long start = SystemClock.elapsedRealtime();
+    try {
+      return callProperty(context, object, property, args);
+    }
+    finally {
+      totalElapsedScriptExecutionMs += SystemClock.elapsedRealtime() - start;
+    }
   }
   synchronized String stringify(long object) {
       return stringify(context, object);
