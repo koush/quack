@@ -70,6 +70,20 @@ public final class Duktape implements Closeable {
     return coerceJavaToJavascript(o.getClass(), o);
   }
 
+
+  /**
+   * Coerce Java args to Javascript object args.
+   * @param args
+   */
+  public Object[] coerceJavaArgsToJavascript(Object... args) {
+    if (args != null) {
+      for (int i = 0; i < args.length; i++) {
+         args[i] = coerceJavaToJavascript(args[i]);
+      }
+    }
+    return args;
+  }
+
   /**
    * Coerce a Java value into an equivalent JavaScript object.
    */
