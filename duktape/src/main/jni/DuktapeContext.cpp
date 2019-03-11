@@ -464,7 +464,7 @@ void DuktapeContext::pushObject(JNIEnv *env, jlong object) {
     duk_push_heapptr(m_context, reinterpret_cast<void*>(object));
 }
 
-void DuktapeContext::pushObject(JNIEnv *env, jobject object) {
+void DuktapeContext::pushObject(JNIEnv *env, jobject object, bool deleteLocalRef) {
   if (object == nullptr) {
     duk_push_null(m_context);
     return;
@@ -480,7 +480,8 @@ void DuktapeContext::pushObject(JNIEnv *env, jobject object) {
       value.l = object;
       type->push(m_context, env, value);
       // safe to delete the local refs now
-      env->DeleteLocalRef(object);
+      if (deleteLocalRef)
+        env->DeleteLocalRef(object);
       env->DeleteLocalRef(objectClass);
       return;
     }
@@ -497,7 +498,8 @@ void DuktapeContext::pushObject(JNIEnv *env, jobject object) {
       void* ptr = reinterpret_cast<void*>(env->GetLongField(object, m_pointerField));
       duk_push_heapptr(m_context, ptr);
 
-      env->DeleteLocalRef(object);
+      if (deleteLocalRef)
+        env->DeleteLocalRef(object);
       env->DeleteLocalRef(objectClass);
       return;
     }
@@ -510,7 +512,8 @@ void DuktapeContext::pushObject(JNIEnv *env, jobject object) {
     void *p = duk_push_fixed_buffer(m_context, (duk_size_t)capacity);
     memcpy(p, env->GetDirectBufferAddress(object), (size_t)capacity);
 
-    env->DeleteLocalRef(object);
+    if (deleteLocalRef)
+      env->DeleteLocalRef(object);
     env->DeleteLocalRef(objectClass);
     return;
   }
@@ -518,7 +521,9 @@ void DuktapeContext::pushObject(JNIEnv *env, jobject object) {
     // this is a normal Java object, so create a proxy for it to access fields and methods
     jobject wrappedObject = env->NewObject(m_javaObjectClass, m_javaObjectConstructor, m_javaDuktape, object);
     // safe to delete the local ref now
-    env->DeleteLocalRef(object);
+    if (deleteLocalRef)
+      env->DeleteLocalRef(object);
+    deleteLocalRef = true;
     object = wrappedObject;
   }
 
@@ -534,7 +539,8 @@ void DuktapeContext::pushObject(JNIEnv *env, jobject object) {
 
   duk_push_pointer(m_context, env->NewGlobalRef(object));
   // safe to delete the local ref now
-  env->DeleteLocalRef(object);
+  if (deleteLocalRef)
+    env->DeleteLocalRef(object);
   duk_put_prop_string(m_context, objIndex, JAVA_THIS_PROP_NAME);
 
   // set a finalizer for the ref
@@ -559,7 +565,7 @@ void DuktapeContext::pushObject(JNIEnv *env, jobject object) {
 
   // make the proxy
   if (duk_pcall(m_context, 1) != DUK_EXEC_SUCCESS)
-      queueJavaExceptionForDuktapeError(env, m_context);
+    queueJavaExceptionForDuktapeError(env, m_context);
 }
 
 jobject DuktapeContext::call(JNIEnv *env, jlong object, jobjectArray args) {
@@ -592,7 +598,7 @@ jobject DuktapeContext::callMethod(JNIEnv *env, jlong object, jobject thiz, jobj
   pushObject(env, object);
 
   // this
-  pushObject(env, thiz);
+  pushObject(env, thiz, false);
 
   jsize length = 0;
   if (args != nullptr) {
@@ -617,7 +623,7 @@ jobject DuktapeContext::callProperty(JNIEnv *env, jlong object, jobject property
 
   pushObject(env, object);
   duk_idx_t objectIndex = duk_normalize_index(m_context, -1);
-  pushObject(env, property);
+  pushObject(env, property, false);
 
   jsize length = 0;
   if (args != nullptr) {
@@ -644,8 +650,8 @@ void DuktapeContext::setGlobalProperty(JNIEnv *env, jobject property, jobject va
   CHECK_STACK(m_context);
 
   duk_push_global_object(m_context);
-  pushObject(env, property);
-  pushObject(env, value);
+  pushObject(env, property, false);
+  pushObject(env, value, false);
   duk_put_prop(m_context, -3);
   duk_pop(m_context);
 }
@@ -666,7 +672,7 @@ jobject DuktapeContext::getKeyObject(JNIEnv *env, jlong object, jobject key) {
   // probably should throw.
 
   pushObject(env, object);
-  pushObject(env, key);
+  pushObject(env, key, false);
   duk_get_prop(m_context, -2);
   // pop twice since indexing does not pop the indexed object
   return popObject2(env);
@@ -752,7 +758,7 @@ void DuktapeContext::setKeyString(JNIEnv *env, jlong object, jstring key, jobjec
   CHECK_STACK(m_context);
 
   pushObject(env, object);
-  pushObject(env, value);
+  pushObject(env, value, false);
   const JString instanceKey(env, key);
   duk_put_prop_string(m_context, -2, instanceKey);
 
@@ -764,7 +770,7 @@ void DuktapeContext::setKeyInteger(JNIEnv *env, jlong object, jint index, jobjec
   CHECK_STACK(m_context);
 
   pushObject(env, object);
-  pushObject(env, value);
+  pushObject(env, value, false);
   duk_put_prop_index(m_context, -2, index);
 
   // pop indexed object
@@ -778,8 +784,8 @@ void DuktapeContext::setKeyObject(JNIEnv *env, jlong object, jobject key, jobjec
   // probably should throw.
 
   pushObject(env, object);
-  pushObject(env, key);
-  pushObject(env, value);
+  pushObject(env, key, false);
+  pushObject(env, value, false);
   duk_put_prop(m_context, -3);
 
   // pop indexed object

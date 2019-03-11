@@ -37,7 +37,7 @@ public:
   bool isDebugging();
   void debuggerAppNotify(JNIEnv* env, jobjectArray args);
 
-  void pushObject(JNIEnv* env, jobject object);
+  void pushObject(JNIEnv* env, jobject object, bool deleteLocalRef = true);
   jobject popObject(JNIEnv* env) const;
   jobject getKeyString(JNIEnv* env, jlong object, jstring key);
   jobject getKeyInteger(JNIEnv* env, jlong object, jint index);
