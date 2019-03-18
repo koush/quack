@@ -32,6 +32,7 @@ const char* JAVA_VM_PROP_NAME = "\xff\xffjavaVM";
 const char* JAVA_THIS_PROP_NAME = "\xff\xffjava_this";
 const char* JAVA_METHOD_PROP_NAME = "\xff\xffjava_method";
 const char* DUKTAPE_CONTEXT_PROP_NAME = "\xff\xffjava_duktapecontext";
+const char* JAVA_EXCEPTION_PROP_NAME = "\xff\xffjava_exception";
 
 JNIEnv* getJNIEnv(duk_context *ctx) {
   duk_push_global_stash(ctx);
@@ -138,6 +139,8 @@ DuktapeContext::DuktapeContext(JavaVM* javaVM, jobject javaDuktape)
   m_stringClass = findClass(env, "java/lang/String");
   m_objectClass = findClass(env, "java/lang/Object");
 
+  jclass duktapeJavaObject = findClass(env, "com/squareup/duktape/DuktapeJavaObject");
+
   m_duktapeObjectClass = findClass(env, "com/squareup/duktape/DuktapeObject");
   m_javaScriptObjectClass = findClass(env, "com/squareup/duktape/JavaScriptObject");
   m_javaObjectClass = findClass(env, "com/squareup/duktape/JavaObject");
@@ -148,6 +151,7 @@ DuktapeContext::DuktapeContext(JavaVM* javaVM, jobject javaDuktape)
   m_duktapeObjectCallMethod = env->GetMethodID(m_duktapeObjectClass, "callMethod", "(Ljava/lang/Object;[Ljava/lang/Object;)Ljava/lang/Object;");
   m_javaScriptObjectConstructor = env->GetMethodID(m_javaScriptObjectClass, "<init>", "(Lcom/squareup/duktape/Duktape;JJ)V");
   m_javaObjectConstructor = env->GetMethodID(m_javaObjectClass, "<init>", "(Lcom/squareup/duktape/Duktape;Ljava/lang/Object;)V");
+  m_javaObjectGetObject = env->GetMethodID(duktapeJavaObject, "getObject", "(Ljava/lang/Class;)Ljava/lang/Object;");
   m_byteBufferAllocateDirect = env->GetStaticMethodID(m_byteBufferClass, "allocateDirect", "(I)Ljava/nio/ByteBuffer;");
 
   m_contextField = env->GetFieldID(m_javaScriptObjectClass, "context", "J");
@@ -537,7 +541,8 @@ void DuktapeContext::pushObject(JNIEnv *env, jobject object, bool deleteLocalRef
 
   const duk_idx_t objIndex = duk_require_normalize_index(m_context, duk_push_object(m_context));
 
-  duk_push_pointer(m_context, env->NewGlobalRef(object));
+  jobject ptr = env->NewGlobalRef(object);
+  duk_push_pointer(m_context, ptr);
   // safe to delete the local ref now
   if (deleteLocalRef)
     env->DeleteLocalRef(object);
@@ -830,4 +835,88 @@ void DuktapeContext::finalizeJavaScriptObject(JNIEnv *env, jlong object) {
   duk_uarridx_t heapIndex = (duk_uarridx_t)reinterpret_cast<long>(ptr);
   duk_del_prop_index(m_context, -1, heapIndex);
   duk_pop(m_context);
+}
+
+
+void queueIllegalArgumentException(JNIEnv* env, const std::string& message) {
+  const jclass illegalArgumentException = env->FindClass("java/lang/IllegalArgumentException");
+  env->ThrowNew(illegalArgumentException, message.c_str());
+}
+
+void queueDuktapeException(JNIEnv* env, const std::string& message) {
+  const jclass exceptionClass = env->FindClass("com/squareup/duktape/DuktapeException");
+  env->ThrowNew(exceptionClass, message.c_str());
+}
+
+void queueNullPointerException(JNIEnv* env, const std::string& message) {
+  jclass exceptionClass = env->FindClass("java/lang/NullPointerException");
+  env->ThrowNew(exceptionClass, message.c_str());
+}
+
+bool checkRethrowDuktapeError(JNIEnv* env, duk_context* ctx) {
+  if (!env->ExceptionCheck()) {
+    return true;
+  }
+
+  // The Java call threw an exception - it should be propagated back through JavaScript.
+  // first push the object and grab the message if applicable
+  jthrowable e = env->ExceptionOccurred();
+  env->ExceptionClear();
+  DuktapeContext* duktapeContext = getDuktapeContext(ctx);
+  duktapeContext->pushObject(env, e, false);
+  jclass clazz = env->GetObjectClass(e);
+  jmethodID getMessage = env->GetMethodID(clazz, "getMessage", "()Ljava/lang/String;");
+  auto jmessage = (jstring)env->CallObjectMethod(e, getMessage);
+  std::string msg;
+  if (jmessage == nullptr) {
+    msg = "Java Exception";
+  }
+  else {
+    msg = std::string("Java Exception ") + JString(env, jmessage).str();
+  }
+
+  // create a duktape error and set the exception on a property of that error
+  duk_push_error_object(ctx, DUK_ERR_EVAL_ERROR, msg.c_str());
+  duk_swap_top(ctx, -2);
+  duk_put_prop_string(ctx, -2, JAVA_EXCEPTION_PROP_NAME);
+
+  duk_throw(ctx);
+  return false;
+}
+
+void queueJavaExceptionForDuktapeError(JNIEnv *env, duk_context *ctx) {
+  jclass exceptionClass = env->FindClass("com/squareup/duktape/DuktapeException");
+
+  // If it's a Duktape error object, try to pull out the full stacktrace.
+  if (duk_is_error(ctx, -1) && duk_has_prop_string(ctx, -1, "stack")) {
+    duk_get_prop_string(ctx, -1, "stack");
+    const char* stack = duk_safe_to_string(ctx, -1);
+
+    // Is there an exception thrown from a Java method?
+    if (duk_has_prop_string(ctx, -2, JAVA_EXCEPTION_PROP_NAME)) {
+      duk_get_prop_string(ctx, -2, JAVA_EXCEPTION_PROP_NAME);
+      DuktapeContext* duktapeContext = getDuktapeContext(ctx);
+      jobject wrappedEx = duktapeContext->popObject(env);
+      jthrowable ex = (jthrowable)env->CallObjectMethod(wrappedEx, duktapeContext->m_javaObjectGetObject, nullptr);
+
+      // add the Duktape JavaScript stack to this exception.
+      const jmethodID addDuktapeStack =
+              env->GetStaticMethodID(exceptionClass,
+                                     "addDuktapeStack",
+                                     "(Ljava/lang/Throwable;Ljava/lang/String;)V");
+      env->CallStaticVoidMethod(exceptionClass, addDuktapeStack, ex, env->NewStringUTF(stack));
+
+      // Rethrow the Java exception.
+      env->Throw(ex);
+    } else {
+      env->ThrowNew(exceptionClass, stack);
+    }
+    // Pop the stack text.
+    duk_pop(ctx);
+  } else {
+    // Not an error or no stacktrace, just convert to a string.
+    env->ThrowNew(exceptionClass, duk_safe_to_string(ctx, -1));
+  }
+
+  duk_pop(ctx);
 }

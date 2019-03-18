@@ -57,6 +57,8 @@ public:
   duk_ret_t duktapeSet();
   duk_ret_t duktapeApply();
 
+  jmethodID m_javaObjectGetObject;
+
 private:
   jclass m_booleanClass;
   jclass m_byteClass;
