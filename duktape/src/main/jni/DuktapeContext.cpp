@@ -108,7 +108,8 @@ duk_ret_t javascriptObjectFinalizer(duk_context *ctx) {
 
 void fatalErrorHandler(void* udata, const char* msg) {
 #ifndef NDEBUG
-  duk_context* ctx = *reinterpret_cast<duk_context**>(udata);
+  DuktapeContext* context = reinterpret_cast<DuktapeContext*>(udata);
+  duk_context* ctx = context->m_context;
   duk_push_context_dump(ctx);
   const char* debugContext = duk_get_string(ctx, -1);
   throw std::runtime_error(std::string(msg) + " - " + debugContext);
@@ -119,8 +120,26 @@ void fatalErrorHandler(void* udata, const char* msg) {
 
 } // anonymous namespace
 
+static void* tracked_alloc(void *udata, duk_size_t size) {
+  DuktapeContext* context = reinterpret_cast<DuktapeContext*>(udata);
+  context->m_heapSize += size;
+  return malloc(size);
+}
+static void *tracked_realloc(void *udata, void *ptr, duk_size_t size) {
+  DuktapeContext* context = reinterpret_cast<DuktapeContext*>(udata);
+  context->m_heapSize -= malloc_usable_size(ptr);
+  context->m_heapSize += size;
+  return realloc(ptr, size);
+}
+static void tracked_free(void *udata, void *ptr) {
+  DuktapeContext* context = reinterpret_cast<DuktapeContext*>(udata);
+  context->m_heapSize -= malloc_usable_size(ptr);
+  free(ptr);
+}
+
 DuktapeContext::DuktapeContext(JavaVM* javaVM, jobject javaDuktape)
-    : m_context(duk_create_heap(nullptr, nullptr, nullptr, &m_context, fatalErrorHandler))
+    : m_context(duk_create_heap(tracked_alloc, tracked_realloc, tracked_free, this, fatalErrorHandler))
+    , m_heapSize(0)
     , m_objectType(m_javaValues.getObjectType(getEnvFromJavaVM(javaVM))) {
   if (!m_context) {
     throw std::bad_alloc();
@@ -166,6 +185,10 @@ DuktapeContext::DuktapeContext(JavaVM* javaVM, jobject javaDuktape)
   duk_push_pointer(m_context, this);
   duk_put_prop_string(m_context, -2, DUKTAPE_CONTEXT_PROP_NAME);
   duk_pop(m_context);
+}
+
+jlong DuktapeContext::getHeapSize() {
+  return m_heapSize;
 }
 
 jclass DuktapeContext::findClass(JNIEnv *env, const char *className) {

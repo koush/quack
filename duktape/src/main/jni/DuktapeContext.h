@@ -51,6 +51,7 @@ public:
   void setGlobalProperty(JNIEnv *env, jobject property, jobject value);
   jstring stringify(JNIEnv *env, jlong object);
   void finalizeJavaScriptObject(JNIEnv *env, jlong object);
+  jlong getHeapSize();
 
   duk_ret_t duktapeHas();
   duk_ret_t duktapeGet();
@@ -58,6 +59,8 @@ public:
   duk_ret_t duktapeApply();
 
   jmethodID m_javaObjectGetObject;
+  long m_heapSize;
+  duk_context* m_context;
 
 private:
   jclass m_booleanClass;
@@ -88,7 +91,6 @@ private:
 
   jclass findClass(JNIEnv* env, const char* className);
 
-  duk_context* m_context;
   jobject m_javaDuktape;
   JavaTypeMap m_javaValues;
   const JavaType* m_objectType;

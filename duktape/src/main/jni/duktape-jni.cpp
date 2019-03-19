@@ -234,4 +234,10 @@ Java_com_squareup_duktape_Duktape_evaluate__JLjava_lang_String_2Ljava_lang_Strin
   return nullptr;
 }
 
+JNIEXPORT jlong JNICALL
+Java_com_squareup_duktape_Duktape_getHeapSize__J(JNIEnv *env, jclass type, jlong context) {
+  DuktapeContext* duktape = reinterpret_cast<DuktapeContext*>(context);
+  return duktape->getHeapSize();
+}
+
 } // extern "C"

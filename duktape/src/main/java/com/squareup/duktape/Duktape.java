@@ -596,6 +596,14 @@ public final class Duktape implements Closeable {
       finalizeJavaScriptObject(context, object);
   }
 
+  public synchronized long getHeapSize() {
+    if (context == 0)
+      return 0;
+    return getHeapSize(context);
+  }
+
+  private static native long getHeapSize(long context);
+
   private static native long createContext(Duktape duktape);
   private static native void destroyContext(long context);
   private static native <T> T evaluate(long context, String sourceCode, String fileName);
