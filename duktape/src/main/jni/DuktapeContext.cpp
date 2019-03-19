@@ -127,9 +127,13 @@ static void* tracked_alloc(void *udata, duk_size_t size) {
 }
 static void *tracked_realloc(void *udata, void *ptr, duk_size_t size) {
   DuktapeContext* context = reinterpret_cast<DuktapeContext*>(udata);
-  context->m_heapSize -= malloc_usable_size(ptr);
-  context->m_heapSize += size;
-  return realloc(ptr, size);
+  size_t allocated = malloc_usable_size(ptr);
+  void* ret = realloc(ptr, size);
+  if (ret != nullptr) {
+      context->m_heapSize -= allocated;
+      context->m_heapSize += size;
+  }
+  return ret;
 }
 static void tracked_free(void *udata, void *ptr) {
   DuktapeContext* context = reinterpret_cast<DuktapeContext*>(udata);
