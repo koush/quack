@@ -122,22 +122,34 @@ void fatalErrorHandler(void* udata, const char* msg) {
 
 static void* tracked_alloc(void *udata, duk_size_t size) {
   DuktapeContext* context = reinterpret_cast<DuktapeContext*>(udata);
-  context->m_heapSize += size;
-  return malloc(size);
+  void* ret = malloc(size);
+  if (ret != nullptr) {
+      context->pointers[ret] = size;
+      context->m_heapSize += size;
+  }
+  return ret;
 }
 static void *tracked_realloc(void *udata, void *ptr, duk_size_t size) {
   DuktapeContext* context = reinterpret_cast<DuktapeContext*>(udata);
-  size_t allocated = malloc_usable_size(ptr);
   void* ret = realloc(ptr, size);
   if (ret != nullptr) {
-      context->m_heapSize -= allocated;
+      if (context->pointers.find(ptr) != context->pointers.end()) {
+          size_t allocated = context->pointers[ptr];
+          context->pointers.erase(ptr);
+          context->m_heapSize -= allocated;
+      }
+      context->pointers[ret] = size;
       context->m_heapSize += size;
   }
   return ret;
 }
 static void tracked_free(void *udata, void *ptr) {
   DuktapeContext* context = reinterpret_cast<DuktapeContext*>(udata);
-  context->m_heapSize -= malloc_usable_size(ptr);
+  if (context->pointers.find(ptr) != context->pointers.end()) {
+    size_t allocated = context->pointers[ptr];
+    context->pointers.erase(ptr);
+    context->m_heapSize -= allocated;
+  }
   free(ptr);
 }
 
@@ -152,26 +164,21 @@ DuktapeContext::DuktapeContext(JavaVM* javaVM, jobject javaDuktape)
   JNIEnv *env = getEnvFromJavaVM(javaVM);
   m_javaDuktape = env->NewWeakGlobalRef(javaDuktape);
 
-  m_booleanClass = findClass(env, "java/lang/Boolean");
-  m_byteClass = findClass(env, "java/lang/Byte");
-  m_shortClass = findClass(env, "java/lang/Short");
-  m_integerClass = findClass(env, "java/lang/Integer");
-  m_longClass = findClass(env, "java/lang/Long");
-  m_floatClass = findClass(env, "java/lang/Float");
-  m_doubleClass = findClass(env, "java/lang/Double");
-  m_stringClass = findClass(env, "java/lang/String");
   m_objectClass = findClass(env, "java/lang/Object");
 
   jclass duktapeJavaObject = findClass(env, "com/squareup/duktape/DuktapeJavaObject");
 
+  m_duktapeClass = findClass(env, "com/squareup/duktape/Duktape");
   m_duktapeObjectClass = findClass(env, "com/squareup/duktape/DuktapeObject");
   m_javaScriptObjectClass = findClass(env, "com/squareup/duktape/JavaScriptObject");
   m_javaObjectClass = findClass(env, "com/squareup/duktape/JavaObject");
   m_byteBufferClass = findClass(env, "java/nio/ByteBuffer");
 
-  m_duktapeObjectGetMethod = env->GetMethodID(m_duktapeObjectClass, "get", "(Ljava/lang/Object;)Ljava/lang/Object;");
-  m_duktapeObjectSetMethod = env->GetMethodID(m_duktapeObjectClass, "set", "(Ljava/lang/Object;Ljava/lang/Object;)V");
-  m_duktapeObjectCallMethod = env->GetMethodID(m_duktapeObjectClass, "callMethod", "(Ljava/lang/Object;[Ljava/lang/Object;)Ljava/lang/Object;");
+  m_duktapeHasMethod = env->GetMethodID(m_duktapeClass, "duktapeHas", "(Lcom/squareup/duktape/DuktapeObject;Ljava/lang/Object;)Z");
+  m_duktapeGetMethod = env->GetMethodID(m_duktapeClass, "duktapeGet", "(Lcom/squareup/duktape/DuktapeObject;Ljava/lang/Object;)Ljava/lang/Object;");
+  m_duktapeSetMethod = env->GetMethodID(m_duktapeClass, "duktapeSet", "(Lcom/squareup/duktape/DuktapeObject;Ljava/lang/Object;Ljava/lang/Object;)V");
+  m_duktapeCallMethodMethod = env->GetMethodID(m_duktapeClass, "duktapeCallMethod", "(Lcom/squareup/duktape/DuktapeObject;Ljava/lang/Object;[Ljava/lang/Object;)Ljava/lang/Object;");
+
   m_javaScriptObjectConstructor = env->GetMethodID(m_javaScriptObjectClass, "<init>", "(Lcom/squareup/duktape/Duktape;JJ)V");
   m_javaObjectConstructor = env->GetMethodID(m_javaObjectClass, "<init>", "(Lcom/squareup/duktape/Duktape;Ljava/lang/Object;)V");
   m_javaObjectGetObject = env->GetMethodID(duktapeJavaObject, "getObject", "(Ljava/lang/Class;)Ljava/lang/Object;");
@@ -330,7 +337,7 @@ duk_ret_t DuktapeContext::duktapeSet() {
       return DUK_RET_REFERENCE_ERROR;
   }
 
-  env->CallVoidMethod(object, m_duktapeObjectSetMethod, prop, value);
+  env->CallVoidMethod(m_javaDuktape, m_duktapeSetMethod, object, prop, value);
   if (!checkRethrowDuktapeError(env, m_context)) {
     return DUK_RET_ERROR;
   }
@@ -398,7 +405,8 @@ duk_ret_t DuktapeContext::duktapeGet() {
     return DUK_RET_REFERENCE_ERROR;
   }
 
-  jobject push = env->CallObjectMethod(object, m_duktapeObjectGetMethod, jprop);
+//  jobject push = env->CallObjectMethod(object, m_duktapeObjectGetMethod, jprop);
+  jobject push = env->CallObjectMethod(m_javaDuktape, m_duktapeGetMethod, object, jprop);
   env->DeleteLocalRef(jprop);
   if (!checkRethrowDuktapeError(env, m_context)) {
     return DUK_RET_ERROR;
@@ -431,12 +439,12 @@ duk_ret_t DuktapeContext::duktapeHas() {
 
     // todo: actually implement has on the java side.
 
-    jobject push = env->CallObjectMethod(object, m_duktapeObjectGetMethod, prop);
+    jboolean has = env->CallBooleanMethod(m_javaDuktape, m_duktapeHasMethod, object, prop);
     if (!checkRethrowDuktapeError(env, m_context)) {
         return DUK_RET_ERROR;
     }
 
-    duk_push_boolean(m_context, (duk_bool_t )(push != nullptr));
+    duk_push_boolean(m_context, (duk_bool_t )has);
 
     return 1;
 }
@@ -476,7 +484,7 @@ duk_ret_t DuktapeContext::duktapeApply() {
     return DUK_RET_REFERENCE_ERROR;
   }
 
-  jobject push = env->CallObjectMethod(object, m_duktapeObjectCallMethod, javaThis, javaArgs);
+  jobject push = env->CallObjectMethod(m_javaDuktape, m_duktapeCallMethodMethod, object, javaThis, javaArgs);
   env->DeleteLocalRef(javaArgs);
   if (!checkRethrowDuktapeError(env, m_context)) {
     return DUK_RET_ERROR;

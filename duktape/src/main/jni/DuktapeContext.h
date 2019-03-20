@@ -60,26 +60,21 @@ public:
 
   jmethodID m_javaObjectGetObject;
   long m_heapSize;
+  std::map<void*, size_t> pointers;
   duk_context* m_context;
 
 private:
-  jclass m_booleanClass;
-  jclass m_byteClass;
-  jclass m_shortClass;
-  jclass m_integerClass;
-  jclass m_longClass;
-  jclass m_floatClass;
-  jclass m_doubleClass;
-  jclass m_stringClass;
   jclass m_objectClass;
 
+  jclass m_duktapeClass;
   jclass m_duktapeObjectClass;
   jclass m_javaScriptObjectClass;
   jclass m_javaObjectClass;
   jclass m_byteBufferClass;
-  jmethodID m_duktapeObjectGetMethod;
-  jmethodID m_duktapeObjectSetMethod;
-  jmethodID m_duktapeObjectCallMethod;
+  jmethodID m_duktapeHasMethod;
+  jmethodID m_duktapeGetMethod;
+  jmethodID m_duktapeSetMethod;
+  jmethodID m_duktapeCallMethodMethod;
   jmethodID m_javaScriptObjectConstructor;
   jmethodID m_javaObjectConstructor;
   jmethodID m_byteBufferAllocateDirect;

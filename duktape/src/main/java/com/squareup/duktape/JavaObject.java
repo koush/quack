@@ -3,6 +3,7 @@ package com.squareup.duktape;
 import java.lang.reflect.Array;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.lang.reflect.Proxy;
 import java.util.List;
 import java.util.Map;
 
@@ -20,6 +21,27 @@ public final class JavaObject implements DuktapeJavaObject {
         return target;
     }
 
+    public static Method getGetterMethod(String key, Method[] methods) {
+        // disabled, tbd.
+        if (false && !key.isEmpty()) {
+            // try getters, preferred over methods
+            // foo -> getFoo()
+            // foo -> foo()
+            return Duktape.javaObjectGetter.memoize(() -> {
+                String getterName = "get" + key.substring(0, 1).toUpperCase() + key.substring(1);
+                for (Method method : methods) {
+                    // name, no args, and a return type
+                    if ((method.getName().equals(key) || method.getName().equals(getterName))
+                            && method.getParameterTypes().length == 0
+                            && method.getReturnType() != void.class && method.getReturnType() != Void.class)
+                        return method;
+                }
+                return null;
+            }, key, methods);
+        }
+        return null;
+    }
+
     @Override
     public Object get(String key) {
         Object ret = getMap(key);
@@ -27,29 +49,51 @@ public final class JavaObject implements DuktapeJavaObject {
             return ret;
 
         Class clazz = target.getClass();
+        if (!Proxy.isProxyClass(clazz)) {
+            // length is not a field of the array class. it's a language property.
+            // Nor can arrays be cast to Array.
+            if (clazz.isArray() && "length".equals(key))
+                return Array.getLength(target);
 
-        // length is not a field of the array class. it's a language property.
-        // Nor can arrays be cast to Array.
-        if (clazz.isArray() && "length".equals(key))
-            return Array.getLength(target);
-
-        // try to get fields
-        for (Field field : clazz.getFields()) {
-            if (field.getName().equalsIgnoreCase(key)) {
-                try {
-                    return field.get(target);
+            Field f = Duktape.javaObjectFields.memoize(() -> {
+                // try to get fields
+                for (Field field : clazz.getFields()) {
+                    if (field.getName().equals(key))
+                        return field;
                 }
-                catch (IllegalAccessException e) {
+                return null;
+            }, key, clazz.getFields());
+
+            if (f != null) {
+                try {
+                    return f.get(target);
+                } catch (IllegalAccessException e) {
                     throw new IllegalArgumentException(e);
                 }
             }
         }
 
-        // try to get methods
-        for (Method method : clazz.getMethods()) {
-            if (method.getName().equalsIgnoreCase(key))
-                return new JavaMethodObject(duktape, key);
+        Method g = getGetterMethod(key, clazz.getMethods());
+        if (g != null) {
+            try {
+                return g.invoke(target);
+            }
+            catch (Exception e) {
+                throw new IllegalArgumentException(e);
+            }
         }
+
+        Boolean m = Duktape.javaObjectMethods.memoize(() -> {
+            // try to get methods
+            for (Method method : clazz.getMethods()) {
+                if (method.getName().equals(key))
+                    return true;
+            }
+            return false;
+        }, key, clazz.getMethods());
+
+        if (m)
+            return new JavaMethodObject(duktape, key);
 
         return null;
     }

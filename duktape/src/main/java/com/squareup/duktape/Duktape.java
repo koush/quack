@@ -22,6 +22,7 @@ import org.json.JSONObject;
 
 import java.io.Closeable;
 import java.lang.reflect.Array;
+import java.lang.reflect.Field;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
@@ -243,9 +244,13 @@ public final class Duktape implements Closeable {
     return invokeMethodReferenceProxy(clazz, ref);
   }
 
+  static Memoize<Field> javaObjectFields = new Memoize<>();
+  static Memoize<Boolean> javaObjectMethods = new Memoize<>();
+  static Memoize<Method> javaObjectGetter = new Memoize<>();
+  static Memoize<Method> javaObjectMethodCandidates = new Memoize<>();
   static Memoize<Method> interfaceMethods = new Memoize<>();
   static Method getInterfaceMethod(Method method) {
-    return interfaceMethods.memoize((MemoizeFunc<Method>) () -> {
+    return interfaceMethods.memoize(() -> {
       if (method.getDeclaringClass().isInterface())
         return method;
 
@@ -600,6 +605,22 @@ public final class Duktape implements Closeable {
     if (context == 0)
       return 0;
     return getHeapSize(context);
+  }
+
+  private Object duktapeGet(DuktapeObject duktapeObject, Object key) {
+    return duktapeObject.get(key);
+  }
+
+  private boolean duktapeHas(DuktapeObject duktapeObject, Object key) {
+    return duktapeObject.get(key) != null;
+  }
+
+  private void duktapeSet(DuktapeObject duktapeObject, Object key, Object value) {
+    duktapeObject.set(key, value);
+  }
+
+  private Object duktapeCallMethod(DuktapeObject duktapeObject, Object thiz, Object... args) {
+    return duktapeObject.callMethod(thiz, args);
   }
 
   private static native long getHeapSize(long context);

@@ -27,18 +27,35 @@ public class Memoize<T> {
     return ret;
   }
 
-  MemoizeMap<T> store = new MemoizeMapImpl<>();
+  MemoizeMap<T> store;
   public T memoize(MemoizeFunc<T> func, Object... args) {
     int hash = hash(args);
+    return memoize(func, hash);
+  }
+
+  void clear() {
+    store.clear();
+  }
+
+  public T memoize(MemoizeFunc<T> func, Object arg0, Object[] args) {
+    int hash = hash(args);
+    hash ^= arg0 == null ? 0 : arg0.hashCode();
+    return memoize(func, hash);
+  }
+
+  public T memoize(MemoizeFunc<T> func, Object arg0, Object[] args0, Object[] args1) {
+    int hash = hash(args0);
+    hash ^= hash(args1);
+    hash ^= arg0 == null ? 0 : arg0.hashCode();
+    return memoize(func, hash);
+  }
+
+  private T memoize(MemoizeFunc<T> func, int hash) {
     if (store.containsKey(hash)) {
       return store.get(hash);
     }
     T ret = func.process();
     store.put(hash, ret);
     return ret;
-  }
-
-  void clear() {
-    store.clear();
   }
 }

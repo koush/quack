@@ -5,6 +5,7 @@ import android.util.Log;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
+import java.util.Collection;
 
 public class JavaMethodObject implements DuktapeMethodObject {
     String target;
@@ -37,23 +38,35 @@ public class JavaMethodObject implements DuktapeMethodObject {
         if (thiz == null)
             throw new UnsupportedOperationException("can not call " + target);
         thiz = duktape.coerceJavaScriptToJava(Object.class, thiz);
-        int bestScore = Integer.MAX_VALUE;
-        Method best = null;
-        for (Method method: getMethods(thiz)) {
-            if (method.getName().equals(target)) {
-                // parameter count is most important
-                int score = Math.abs(args.length - method.getParameterTypes().length) * 100;
-                // tiebreak by checking parameter types
-                for (int i = 0; i < Math.min(method.getParameterTypes().length, args.length); i++) {
-                    if (method.getParameterTypes()[i].isInstance(args[i]))
-                        score--;
-                }
-                if (score < bestScore) {
-                    bestScore = score;
-                    best = method;
+
+        Method[] thisMethods = getMethods(thiz);
+        ArrayList<Class> argTypes = new ArrayList<>();
+        for (Object arg: args) {
+            if (arg == null)
+                argTypes.add(null);
+            else
+                argTypes.add(arg.getClass());
+        }
+        Method best = Duktape.javaObjectMethodCandidates.memoize(() -> {
+            Method ret = null;
+            int bestScore = Integer.MAX_VALUE;
+            for (Method method: thisMethods) {
+                if (method.getName().equals(target)) {
+                    // parameter count is most important
+                    int score = Math.abs(argTypes.size() - method.getParameterTypes().length) * 100;
+                    // tiebreak by checking parameter types
+                    for (int i = 0; i < Math.min(method.getParameterTypes().length, argTypes.size()); i++) {
+                        if (argTypes.get(i) == null || method.getParameterTypes()[i].isAssignableFrom(argTypes.get(i)))
+                            score--;
+                    }
+                    if (score < bestScore) {
+                        bestScore = score;
+                        ret = method;
+                    }
                 }
             }
-        }
+            return ret;
+        }, target, thisMethods, argTypes.toArray());
 
         if (best == null)
             throw new UnsupportedOperationException("can not call " + target);
