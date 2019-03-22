@@ -185,6 +185,7 @@ public final class Duktape implements Closeable {
     if (clazz.isInterface() && o instanceof JavaScriptObject) {
       JavaScriptObject jo = (JavaScriptObject)o;
 
+      // single method arguments are simply callbacks
       if (clazz.getMethods().length == 1) {
         return Proxy.newProxyInstance(clazz.getClassLoader(), new Class[]{clazz}, (proxy, method, args) -> jo.call(args));
       }
@@ -194,6 +195,7 @@ public final class Duktape implements Closeable {
       }
     }
 
+    // JSONObject is a one way deserialization
     if (clazz == JSONObject.class && o instanceof JavaScriptObject) {
       try {
         return new JSONObject(((JavaScriptObject)o).stringify());
@@ -340,13 +342,13 @@ public final class Duktape implements Closeable {
       return coercion.coerce(clazz, o);
     }
 
-    // check to see if there exists a superclass converter.
+    // check to see if there exists a more specific subclass converter.
     for (Map.Entry<Class, DuktapeCoercion> check: coerce.entrySet()) {
       if (clazz.isAssignableFrom(check.getKey()))
         return check.getValue().coerce(clazz, o);
     }
 
-    // check to see if there is a subclass converter (ie, Enum.class as a catch all).
+    // check to see if there is a superclass converter (ie, Enum.class as a catch all).
     for (Map.Entry<Class, DuktapeCoercion> check: coerce.entrySet()) {
       if (check.getKey().isAssignableFrom(clazz))
         return check.getValue().coerce(clazz, o);
