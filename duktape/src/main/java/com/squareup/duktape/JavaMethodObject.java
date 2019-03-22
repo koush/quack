@@ -51,18 +51,21 @@ public class JavaMethodObject implements DuktapeMethodObject {
             Method ret = null;
             int bestScore = Integer.MAX_VALUE;
             for (Method method: thisMethods) {
-                if (method.getName().equals(target)) {
-                    // parameter count is most important
-                    int score = Math.abs(argTypes.size() - method.getParameterTypes().length) * 100;
-                    // tiebreak by checking parameter types
-                    for (int i = 0; i < Math.min(method.getParameterTypes().length, argTypes.size()); i++) {
-                        if (argTypes.get(i) == null || method.getParameterTypes()[i].isAssignableFrom(argTypes.get(i)))
-                            score--;
-                    }
-                    if (score < bestScore) {
-                        bestScore = score;
-                        ret = method;
-                    }
+                if (!method.getName().equals(target)) {
+                    DuktapeMethodName annotation = method.getAnnotation(DuktapeMethodName.class);
+                    if (annotation == null || !annotation.name().equals(target))
+                        continue;
+                }
+                // parameter count is most important
+                int score = Math.abs(argTypes.size() - method.getParameterTypes().length) * 100;
+                // tiebreak by checking parameter types
+                for (int i = 0; i < Math.min(method.getParameterTypes().length, argTypes.size()); i++) {
+                    if (argTypes.get(i) == null || method.getParameterTypes()[i].isAssignableFrom(argTypes.get(i)))
+                        score--;
+                }
+                if (score < bestScore) {
+                    bestScore = score;
+                    ret = method;
                 }
             }
             return ret;

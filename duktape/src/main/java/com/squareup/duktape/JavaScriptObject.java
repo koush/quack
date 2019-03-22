@@ -108,7 +108,12 @@ public class JavaScriptObject implements DuktapeObject {
             if (methodCoercion != null)
                 return methodCoercion.invoke(interfaceMethod, this, args);
 
-            return duktape.coerceJavaScriptToJava(method.getReturnType(), JavaScriptObject.this.callProperty(method.getName(), args));
+            String methodName = method.getName();
+            DuktapeMethodName annotation = method.getAnnotation(DuktapeMethodName.class);
+            if (annotation != null)
+                methodName = annotation.name();
+
+            return duktape.coerceJavaScriptToJava(method.getReturnType(), JavaScriptObject.this.callProperty(methodName, args));
         };
     }
 

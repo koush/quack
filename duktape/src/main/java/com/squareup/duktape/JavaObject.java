@@ -88,6 +88,9 @@ public final class JavaObject implements DuktapeJavaObject {
             for (Method method : clazz.getMethods()) {
                 if (method.getName().equals(key))
                     return true;
+                DuktapeMethodName annotation = method.getAnnotation(DuktapeMethodName.class);
+                if (annotation != null && annotation.name().equals(key))
+                    return true;
             }
             return false;
         }, key, clazz.getMethods());
