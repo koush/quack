@@ -1,5 +1,7 @@
 package com.squareup.duktape;
 
+import android.util.Log;
+
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
@@ -32,19 +34,19 @@ public class JavaScriptObject implements DuktapeObject {
 
     @Override
     public Object call(Object... args) {
-        duktape.coerceJavaArgsToJavascript(args);
+        duktape.coerceJavaArgsToJavaScript(args);
         return duktape.coerceJavaScriptToJava(null, duktape.call(pointer, args));
     }
 
     @Override
     public Object callMethod(Object thiz, Object... args) {
-        duktape.coerceJavaArgsToJavascript(args);
+        duktape.coerceJavaArgsToJavaScript(args);
         return duktape.coerceJavaScriptToJava(null, duktape.callMethod(pointer, thiz, args));
     }
 
     @Override
     public Object callProperty(Object property, Object... args) {
-        duktape.coerceJavaArgsToJavascript(args);
+        duktape.coerceJavaArgsToJavaScript(args);
         return duktape.coerceJavaScriptToJava(null, duktape.callProperty(pointer, property, args));
     }
 
@@ -112,6 +114,13 @@ public class JavaScriptObject implements DuktapeObject {
             DuktapeMethodName annotation = method.getAnnotation(DuktapeMethodName.class);
             if (annotation != null)
                 methodName = annotation.name();
+
+            if (args != null) {
+                Class[] types = method.getParameterTypes();
+                for (int i = 0; i < Math.min(args.length, types.length); i++) {
+                    args[i] = duktape.coerceJavaToJavaScript(types[i], args[i]);
+                }
+            }
 
             return duktape.coerceJavaScriptToJava(method.getReturnType(), JavaScriptObject.this.callProperty(methodName, args));
         };

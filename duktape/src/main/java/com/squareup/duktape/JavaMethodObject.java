@@ -5,7 +5,6 @@ import android.util.Log;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
-import java.util.Collection;
 
 public class JavaMethodObject implements DuktapeMethodObject {
     String target;
@@ -104,7 +103,7 @@ public class JavaMethodObject implements DuktapeMethodObject {
             else if (i < args.length) {
                 Log.w("Duktape", "dropping javascript to java arguments on the floor: " + (args.length - i));
             }
-            return duktape.coerceJavaToJavascript(best.invoke(thiz, coerced.toArray()));
+            return duktape.coerceJavaToJavaScript(best.invoke(thiz, coerced.toArray()));
         }
         catch (IllegalArgumentException e) {
             throw new IllegalArgumentException(best.toString(), e);

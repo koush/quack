@@ -58,17 +58,17 @@ public final class Duktape implements Closeable {
    * @param coercion
    * @param <F>
    */
-  public synchronized <F> void putJavaToJavascriptCoercion(Class<F> clazz, DuktapeCoercion<Object, F> coercion) {
+  public synchronized <F> void putJavaToJavaScriptCoercion(Class<F> clazz, DuktapeCoercion<Object, F> coercion) {
     JavaToJavascriptCoercions.put(clazz, coercion);
   }
 
   /**
    * Coerce a Java value into an equivalent JavaScript object.
    */
-  public Object coerceJavaToJavascript(Object o) {
+  public Object coerceJavaToJavaScript(Object o) {
     if (o == null)
       return null;
-    return coerceJavaToJavascript(o.getClass(), o);
+    return coerceJavaToJavaScript(o.getClass(), o);
   }
 
 
@@ -76,10 +76,10 @@ public final class Duktape implements Closeable {
    * Coerce Java args to Javascript object args.
    * @param args
    */
-  public Object[] coerceJavaArgsToJavascript(Object... args) {
+  public Object[] coerceJavaArgsToJavaScript(Object... args) {
     if (args != null) {
       for (int i = 0; i < args.length; i++) {
-         args[i] = coerceJavaToJavascript(args[i]);
+         args[i] = coerceJavaToJavaScript(args[i]);
       }
     }
     return args;
@@ -88,10 +88,10 @@ public final class Duktape implements Closeable {
   /**
    * Coerce a Java value into an equivalent JavaScript object.
    */
-  public Object coerceJavaToJavascript(Class clazz, Object o) {
+  public Object coerceJavaToJavaScript(Class clazz, Object o) {
     if (o == null)
       return null;
-    Object ret = coerce(JavaToJavascriptCoercions, o, clazz);
+    Object ret = coerceJavaToJavaScript(JavaToJavascriptCoercions, o, clazz);
     if (ret != null)
       return ret;
 
@@ -109,7 +109,7 @@ public final class Duktape implements Closeable {
                 args[i] = coerceJavaScriptToJava(parameters[i], args[i]);
               }
             }
-            return coerceJavaToJavascript(method.invoke(o, args));
+            return coerceJavaToJavaScript(method.invoke(o, args));
           }
           catch (Exception e) {
             throw new IllegalArgumentException(e);
@@ -177,7 +177,7 @@ public final class Duktape implements Closeable {
       return ret;
     }
 
-    Object ret = coerce(JavaScriptToJavaCoercions, o, clazz);
+    Object ret = coerceJavaScriptToJava(JavaScriptToJavaCoercions, o, clazz);
     if (ret != null)
       return ret;
 
@@ -187,7 +187,9 @@ public final class Duktape implements Closeable {
 
       // single method arguments are simply callbacks
       if (clazz.getMethods().length == 1) {
-        return Proxy.newProxyInstance(clazz.getClassLoader(), new Class[]{clazz}, (proxy, method, args) -> jo.call(args));
+        return Proxy.newProxyInstance(clazz.getClassLoader(), new Class[]{clazz},
+                (proxy, method, args) ->
+                        coerceJavaScriptToJava(method.getReturnType(), jo.call(args)));
       }
       else {
         InvocationHandler handler = jo.createInvocationHandler();
@@ -288,7 +290,7 @@ public final class Duktape implements Closeable {
     interfaceMethods.clear();
   }
 
-  public synchronized void putJavaToJavaScriptMethodCercion(Method method, DuktapeMethodCoercion coercion) {
+  public synchronized void putJavaToJavaScriptMethodCoercion(Method method, DuktapeMethodCoercion coercion) {
     JavaToJavascriptMethodCoercions.put(method, coercion);
     interfaceMethods.clear();
   }
@@ -336,19 +338,36 @@ public final class Duktape implements Closeable {
     throw new IllegalArgumentException("interface method was not called by lambda.");
   }
 
-  private static Object coerce(Map<Class, DuktapeCoercion> coerce, Object o, Class<?> clazz) {
+  private static Object coerceJavaToJavaScript(Map<Class, DuktapeCoercion> coerce, Object o, Class<?> clazz) {
     DuktapeCoercion coercion = coerce.get(clazz);
     if (coercion != null) {
       return coercion.coerce(clazz, o);
     }
 
-    // check to see if there exists a more specific subclass converter.
+    // check to see if there is a superclass converter (ie, Enum.class as a catch all).
     for (Map.Entry<Class, DuktapeCoercion> check: coerce.entrySet()) {
-      if (clazz.isAssignableFrom(check.getKey()))
+      if (check.getKey().isAssignableFrom(clazz))
         return check.getValue().coerce(clazz, o);
     }
 
-    // check to see if there is a superclass converter (ie, Enum.class as a catch all).
+    return null;
+  }
+
+  private static Object coerceJavaScriptToJava(Map<Class, DuktapeCoercion> coerce, Object o, Class<?> clazz) {
+    DuktapeCoercion coercion = coerce.get(clazz);
+    if (coercion != null) {
+      return coercion.coerce(clazz, o);
+    }
+
+    // check to see if there exists a more specific superclass converter.
+    for (Map.Entry<Class, DuktapeCoercion> check: coerce.entrySet()) {
+      if (clazz.isAssignableFrom(check.getKey())) {
+        // TODO: this might just be dead code? delete? 3/19/2019
+        throw new AssertionError("Superclass converter not implemented.");
+      }
+    }
+
+    // check to see if there is a subclass converter (ie, Enum.class as a catch all).
     for (Map.Entry<Class, DuktapeCoercion> check: coerce.entrySet()) {
       if (check.getKey().isAssignableFrom(clazz))
         return check.getValue().coerce(clazz, o);
