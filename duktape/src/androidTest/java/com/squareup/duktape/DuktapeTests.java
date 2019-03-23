@@ -2,8 +2,6 @@ package com.squareup.duktape;
 
 import junit.framework.TestCase;
 
-import org.junit.Assert;
-
 import java.util.Arrays;
 import java.util.List;
 
@@ -21,7 +19,7 @@ public class DuktapeTests extends TestCase  {
         List<Object> values = Arrays.asList((byte)0, (short)0, 0, 0l, 0f, 0d);
         for (Object value: values) {
             Object ret = func.call(value);
-            Assert.assertTrue(ret instanceof Double);
+            assertTrue(ret instanceof Double);
         }
     }
 
@@ -39,7 +37,7 @@ public class DuktapeTests extends TestCase  {
 
         func.call(cb);
 
-        Assert.assertTrue(resultHolder.result);
+        assertTrue(resultHolder.result);
     }
 
     public void testCallback() {
@@ -52,9 +50,8 @@ public class DuktapeTests extends TestCase  {
 
         func.call(duktape.coerceJavaToJavaScript(Callback.class, cb));
 
-        Assert.assertTrue(resultHolder.result);
+        assertTrue(resultHolder.result);
     }
-
 
     interface RoundtripCallback {
         Object callback(Object o);
@@ -77,10 +74,9 @@ public class DuktapeTests extends TestCase  {
         List<Object> values = Arrays.asList((byte)0, (short)0, 0, 0l, 0f, 0d);
         for (Object value: values) {
             Object ret = cb.callback(value);
-            Assert.assertTrue(ret instanceof Double);
+            assertTrue(ret instanceof Double);
         }
     }
-
 
     interface InterfaceCallback {
         void callback(Callback o);
@@ -103,20 +99,19 @@ public class DuktapeTests extends TestCase  {
         InterfaceCallback iface = ((JavaScriptObject)func.call()).proxyInterface(InterfaceCallback.class);
         iface.callback(cb);
 
-        Assert.assertTrue(resultHolder.result);
+        assertTrue(resultHolder.result);
     }
 
     interface RoundtripInterfaceCallback {
         Object callback(Object val, RoundtripCallback o);
     }
 
-
     public void testRoundtripInterfaceCallback() {
         ResultHolder<Integer> resultHolder = new ResultHolder<>();
         resultHolder.result = 0;
         RoundtripCallback cb = o -> {
             resultHolder.result++;
-            Assert.assertTrue(o instanceof Double);
+            assertTrue(o instanceof Double);
             return o;
         };
 
@@ -136,9 +131,9 @@ public class DuktapeTests extends TestCase  {
         List<Object> values = Arrays.asList((byte)0, (short)0, 0, 0l, 0f, 0d);
         for (Object value: values) {
             Object ret = iface.callback(value, cb);
-            Assert.assertTrue(ret instanceof Double);
+            assertTrue(ret instanceof Double);
         }
-        Assert.assertTrue(resultHolder.result == 6);
+        assertTrue(resultHolder.result == 6);
     }
 
     enum Foo {
@@ -155,8 +150,8 @@ public class DuktapeTests extends TestCase  {
         List<Object> values = Arrays.asList(Foo.values());
         for (Object value: values) {
             Object ret = func.call(value);
-            Assert.assertTrue(ret instanceof String);
-            Assert.assertTrue(duktape.coerceJavaScriptToJava(Foo.class, ret) instanceof Foo);
+            assertTrue(ret instanceof String);
+            assertTrue(duktape.coerceJavaScriptToJava(Foo.class, ret) instanceof Foo);
         }
     }
 
@@ -177,11 +172,45 @@ public class DuktapeTests extends TestCase  {
         JavaScriptObject func = duktape.compileFunction(script, "?");
         EnumInterface cb = ((JavaScriptObject)func.call()).proxyInterface(EnumInterface.class);
 
-        // should all come back as doubles.
+        // should all come back as Foos.
         List<Foo> values = Arrays.asList(Foo.values());
         for (Foo value: values) {
             Object ret = cb.callback(value);
-            Assert.assertTrue(ret instanceof Foo);
+            assertNotNull(ret);
         }
+    }
+
+    interface RoundtripEnumInterfaceCallback {
+        Foo callback(Foo val, EnumInterface o);
+    }
+
+
+    public void testRoundtripEnumInterfaceCallback() {
+        ResultHolder<Integer> resultHolder = new ResultHolder<>();
+        resultHolder.result = 0;
+        EnumInterface cb = o -> {
+            resultHolder.result++;
+            return o;
+        };
+
+        Duktape duktape = Duktape.create();
+        String script = "function() {" +
+                "function RoundtripCallback() {" +
+                "}" +
+                "RoundtripCallback.prototype.callback = function(o, cb) {" +
+                "return cb(o);" +
+                "};" +
+                "return new RoundtripCallback();" +
+                "}";
+        JavaScriptObject func = duktape.compileFunction(script, "?");
+        RoundtripEnumInterfaceCallback iface = ((JavaScriptObject)func.call()).proxyInterface(RoundtripEnumInterfaceCallback.class);
+
+        // should all come back as Foos.
+        List<Foo> values = Arrays.asList(Foo.values());
+        for (Foo value: values) {
+            Foo ret = iface.callback(value, cb);
+            assertNotNull(ret);
+        }
+        assertTrue(resultHolder.result == 2);
     }
 }
