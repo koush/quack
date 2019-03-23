@@ -436,6 +436,12 @@ public final class Duktape implements Closeable {
     JavaToJavascriptCoercions.put(long.class, (DuktapeCoercion<Double, Long>) (clazz, o) -> o.doubleValue());
     JavaToJavascriptCoercions.put(Long.class, (DuktapeCoercion<Double, Long>) (clazz, o) -> o.doubleValue());
 
+    JavaScriptToJavaCoercions.put(Float.class, (clazz, o) -> o instanceof Number ? ((Number)o).floatValue() : o);
+    JavaScriptToJavaCoercions.put(float.class, (clazz, o) -> o instanceof Number ? ((Number)o).floatValue() : o);
+    // floats become doubles
+    JavaToJavascriptCoercions.put(float.class, (DuktapeCoercion<Double, Float>) (clazz, o) -> o.doubleValue());
+    JavaToJavascriptCoercions.put(Float.class, (DuktapeCoercion<Double, Float>) (clazz, o) -> o.doubleValue());
+
     // coercing a java enum into javascript string
     JavaToJavascriptCoercions.put(Enum.class, (DuktapeCoercion<Object, Enum>) (clazz, o) -> o.toString());
   }
