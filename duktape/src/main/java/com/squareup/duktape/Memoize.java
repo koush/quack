@@ -24,6 +24,7 @@ public class Memoize<T> {
     for (Object o: objects) {
       ret ^= o == null ? 0 : o.hashCode();
     }
+    ret ^= objects.length;
     return ret;
   }
 
