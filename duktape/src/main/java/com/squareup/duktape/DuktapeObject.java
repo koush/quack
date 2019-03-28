@@ -11,11 +11,14 @@ public interface DuktapeObject {
         return null;
     }
 
-    default void set(String key, Object value) {
+    default boolean set(String key, Object value) {
+        return false;
     }
-    default void set(int index, Object value) {
+    default boolean set(int index, Object value) {
+        return false;
     }
-    default void set(Object key, Object value) {
+    default boolean set(Object key, Object value) {
+        return false;
     }
 
     /**

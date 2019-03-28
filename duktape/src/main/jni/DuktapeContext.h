@@ -42,9 +42,9 @@ public:
   jobject getKeyString(JNIEnv* env, jlong object, jstring key);
   jobject getKeyInteger(JNIEnv* env, jlong object, jint index);
   jobject getKeyObject(JNIEnv* env, jlong object, jobject key);
-  void setKeyString(JNIEnv* env, jlong object, jstring key, jobject value);
-  void setKeyInteger(JNIEnv* env, jlong object, jint index, jobject value);
-  void setKeyObject(JNIEnv* env, jlong object, jobject key, jobject value);
+  jboolean setKeyString(JNIEnv* env, jlong object, jstring key, jobject value);
+  jboolean setKeyInteger(JNIEnv* env, jlong object, jint index, jobject value);
+  jboolean setKeyObject(JNIEnv* env, jlong object, jobject key, jobject value);
   jobject call(JNIEnv* env, jlong object, jobjectArray args);
   jobject callMethod(JNIEnv *env, jlong object, jobject thiz, jobjectArray args);
   jobject callProperty(JNIEnv* env, jlong object, jobject target, jobjectArray args);

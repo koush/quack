@@ -584,14 +584,14 @@ public final class Duktape implements Closeable {
   synchronized Object getKeyInteger(long object, int index) {
     return getKeyInteger(context, object, index);
   }
-  synchronized void setKeyObject(long object, Object key, Object value) {
-    setKeyObject(context, object, key, value);
+  synchronized boolean setKeyObject(long object, Object key, Object value) {
+    return setKeyObject(context, object, key, value);
   }
-  synchronized void setKeyString(long object, String key, Object value) {
-    setKeyString(context, object, key, value);
+  synchronized boolean setKeyString(long object, String key, Object value) {
+    return setKeyString(context, object, key, value);
   }
-  synchronized void setKeyInteger(long object, int index, Object value) {
-    setKeyInteger(context, object, index, value);
+  synchronized boolean setKeyInteger(long object, int index, Object value) {
+    return setKeyInteger(context, object, index, value);
   }
   synchronized Object call(long object, Object... args) {
     long start = SystemClock.elapsedRealtime();
@@ -642,8 +642,8 @@ public final class Duktape implements Closeable {
     return duktapeObject.get(key) != null;
   }
 
-  private void duktapeSet(DuktapeObject duktapeObject, Object key, Object value) {
-    duktapeObject.set(key, value);
+  private boolean duktapeSet(DuktapeObject duktapeObject, Object key, Object value) {
+    return duktapeObject.set(key, value);
   }
 
   private Object duktapeCallMethod(DuktapeObject duktapeObject, Object thiz, Object... args) {
@@ -664,9 +664,9 @@ public final class Duktape implements Closeable {
   private static native Object getKeyObject(long context, long object, Object key);
   private static native Object getKeyString(long context, long object, String key);
   private static native Object getKeyInteger(long context, long object, int index);
-  private static native void setKeyObject(long context, long object, Object key, Object value);
-  private static native void setKeyString(long context, long object, String key, Object value);
-  private static native void setKeyInteger(long context, long object, int index, Object value);
+  private static native boolean setKeyObject(long context, long object, Object key, Object value);
+  private static native boolean setKeyString(long context, long object, String key, Object value);
+  private static native boolean setKeyInteger(long context, long object, int index, Object value);
   private static native Object call(long context, long object, Object... args);
   private static native Object callMethod(long context, long object, Object thiz, Object... args);
   private static native Object callProperty(long context, long object, Object property, Object... args);

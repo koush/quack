@@ -105,13 +105,12 @@ public class JavaMethodObject implements DuktapeMethodObject {
             }
             return duktape.coerceJavaToJavaScript(best.invoke(thiz, coerced.toArray()));
         }
-        catch (IllegalArgumentException e) {
-            throw new IllegalArgumentException(best.toString(), e);
-        }
         catch (IllegalAccessException e) {
             throw new IllegalArgumentException(best.toString(), e);
         }
         catch (InvocationTargetException e) {
+            if (e.getTargetException() instanceof RuntimeException)
+                throw (RuntimeException)e.getTargetException();
             throw new IllegalArgumentException(best.toString(), e);
         }
     }

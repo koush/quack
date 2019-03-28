@@ -112,7 +112,7 @@ public final class JavaObject implements DuktapeJavaObject {
 
     private Object getMap(Object key) {
         if (target instanceof Map)
-            return ((Map)target).get(key);
+            return duktape.coerceJavaToJavaScript(((Map)target).get(key));
         return null;
     }
 
@@ -136,29 +136,31 @@ public final class JavaObject implements DuktapeJavaObject {
     }
 
     @Override
-    public void set(int index, Object value) {
+    public boolean set(int index, Object value) {
         if (target instanceof Array) {
             Array.set(target, index, value);
-            return;
+            return true;
         }
         if (target instanceof List) {
             ((List)target).set(index, value);
-            return;
+            return true;
         }
 
         noSet();
+        return false;
     }
 
-    private void putMap(Object key, Object value) {
+    private boolean putMap(Object key, Object value) {
         if (target instanceof Map) {
             ((Map)target).put(key, value);
-            return;
+            return true;
         }
         noSet();
+        return false;
     }
 
     @Override
-    public void set(String key, Object value) {
+    public boolean set(String key, Object value) {
         for (Field field: target.getClass().getFields()) {
             if (field.getName().equals(key)) {
                 try {
@@ -167,30 +169,28 @@ public final class JavaObject implements DuktapeJavaObject {
                 catch (IllegalAccessException e) {
                     throw new IllegalArgumentException(e);
                 }
-                return;
+                return true;
             }
         }
 
-        putMap(key, value);
+        return putMap(key, value);
     }
 
     // duktape entry point
     @Override
-    public void set(Object key, Object value) {
+    public boolean set(Object key, Object value) {
         if (key instanceof Number) {
             Number number = (Number)key;
             if (number.doubleValue() == number.intValue()) {
-                set(number.intValue(), value);
-                return;
+                return set(number.intValue(), value);
             }
         }
 
         if (key instanceof String) {
-            set((String)key, value);
-            return;
+            return set((String)key, value);
         }
 
-        putMap(key, value);
+        return putMap(key, value);
     }
 
     @Override

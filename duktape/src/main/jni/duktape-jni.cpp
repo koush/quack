@@ -167,33 +167,33 @@ Java_com_squareup_duktape_Duktape_getKeyString(JNIEnv *env, jclass type, jlong c
   return duktape->getKeyString(env, object, key);
 }
 
-JNIEXPORT void JNICALL
+JNIEXPORT jboolean JNICALL
 Java_com_squareup_duktape_Duktape_setKeyObject(JNIEnv *env, jclass type, jlong context,
                                                jlong object, jobject key, jobject value) {
   DuktapeContext* duktape = reinterpret_cast<DuktapeContext*>(context);
   if (duktape == nullptr) {
     queueNullPointerException(env, "Null Duktape context - did you close your Duktape?");
-    return;
+    return (jboolean)false;
   }
   return duktape->setKeyObject(env, object, key, value);
 }
 
-JNIEXPORT void JNICALL
+JNIEXPORT jboolean JNICALL
 Java_com_squareup_duktape_Duktape_setKeyInteger(JNIEnv *env, jclass type, jlong context, jlong object, jint index, jobject value) {
   DuktapeContext* duktape = reinterpret_cast<DuktapeContext*>(context);
   if (duktape == nullptr) {
     queueNullPointerException(env, "Null Duktape context - did you close your Duktape?");
-    return;
+    return (jboolean)false;
   }
   return duktape->setKeyInteger(env, object, index, value);
 }
 
-JNIEXPORT void JNICALL
+JNIEXPORT jboolean JNICALL
 Java_com_squareup_duktape_Duktape_setKeyString(JNIEnv *env, jclass type, jlong context, jlong object, jstring key, jobject value) {
   DuktapeContext* duktape = reinterpret_cast<DuktapeContext*>(context);
   if (duktape == nullptr) {
     queueNullPointerException(env, "Null Duktape context - did you close your Duktape?");
-    return;
+    return (jboolean)false;
   }
   return duktape->setKeyString(env, object, key, value);
 }

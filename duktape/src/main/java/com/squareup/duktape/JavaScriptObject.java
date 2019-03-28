@@ -1,7 +1,5 @@
 package com.squareup.duktape;
 
-import android.util.Log;
-
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
@@ -65,31 +63,29 @@ public class JavaScriptObject implements DuktapeObject {
     }
 
     @Override
-    public void set(String key, Object value) {
-        duktape.setKeyString(pointer, key, value);
+    public boolean set(String key, Object value) {
+        return duktape.setKeyString(pointer, key, value);
     }
 
     @Override
-    public void set(int index, Object value) {
-        duktape.setKeyInteger(pointer, index, value);
+    public boolean set(int index, Object value) {
+        return duktape.setKeyInteger(pointer, index, value);
     }
 
     @Override
-    public void set(Object key, Object value) {
+    public boolean set(Object key, Object value) {
         if (key instanceof String) {
-            set((String)key, value);
-            return;
+            return set((String)key, value);
         }
 
         if (key instanceof Number) {
             Number number = (Number)key;
             if (number.doubleValue() == number.intValue()) {
-                set(number.intValue(), value);
-                return;
+                return set(number.intValue(), value);
             }
         }
 
-        duktape.setKeyObject(pointer, key, value);
+        return duktape.setKeyObject(pointer, key, value);
     }
 
     @Override

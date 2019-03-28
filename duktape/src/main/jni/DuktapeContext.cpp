@@ -176,7 +176,7 @@ DuktapeContext::DuktapeContext(JavaVM* javaVM, jobject javaDuktape)
 
   m_duktapeHasMethod = env->GetMethodID(m_duktapeClass, "duktapeHas", "(Lcom/squareup/duktape/DuktapeObject;Ljava/lang/Object;)Z");
   m_duktapeGetMethod = env->GetMethodID(m_duktapeClass, "duktapeGet", "(Lcom/squareup/duktape/DuktapeObject;Ljava/lang/Object;)Ljava/lang/Object;");
-  m_duktapeSetMethod = env->GetMethodID(m_duktapeClass, "duktapeSet", "(Lcom/squareup/duktape/DuktapeObject;Ljava/lang/Object;Ljava/lang/Object;)V");
+  m_duktapeSetMethod = env->GetMethodID(m_duktapeClass, "duktapeSet", "(Lcom/squareup/duktape/DuktapeObject;Ljava/lang/Object;Ljava/lang/Object;)Z");
   m_duktapeCallMethodMethod = env->GetMethodID(m_duktapeClass, "duktapeCallMethod", "(Lcom/squareup/duktape/DuktapeObject;Ljava/lang/Object;[Ljava/lang/Object;)Ljava/lang/Object;");
 
   m_javaScriptObjectConstructor = env->GetMethodID(m_javaScriptObjectClass, "<init>", "(Lcom/squareup/duktape/Duktape;JJ)V");
@@ -337,13 +337,13 @@ duk_ret_t DuktapeContext::duktapeSet() {
       return DUK_RET_REFERENCE_ERROR;
   }
 
-  env->CallVoidMethod(m_javaDuktape, m_duktapeSetMethod, object, prop, value);
+  jboolean ret = env->CallBooleanMethod(m_javaDuktape, m_duktapeSetMethod, object, prop, value);
   if (!checkRethrowDuktapeError(env, m_context)) {
     return DUK_RET_ERROR;
   }
 
-  // push the value that was just set.
-  pushObject(env, value);
+  // push the boolean result to indicate whether the set was successful.
+  duk_push_boolean(m_context, ret);
   return 1;
 }
 
@@ -794,30 +794,34 @@ void DuktapeContext::debuggerAppNotify(JNIEnv *env, jobjectArray args) {
   duk_debugger_notify(m_context, length);
 }
 
-void DuktapeContext::setKeyString(JNIEnv *env, jlong object, jstring key, jobject value) {
+jboolean DuktapeContext::setKeyString(JNIEnv *env, jlong object, jstring key, jobject value) {
   CHECK_STACK(m_context);
 
   pushObject(env, object);
   pushObject(env, value, false);
   const JString instanceKey(env, key);
-  duk_put_prop_string(m_context, -2, instanceKey);
+  duk_bool_t ret = duk_put_prop_string(m_context, -2, instanceKey);
 
   // pop indexed object
   duk_pop(m_context);
+
+  return (jboolean)(ret == 1);
 }
 
-void DuktapeContext::setKeyInteger(JNIEnv *env, jlong object, jint index, jobject value) {
+jboolean DuktapeContext::setKeyInteger(JNIEnv *env, jlong object, jint index, jobject value) {
   CHECK_STACK(m_context);
 
   pushObject(env, object);
   pushObject(env, value, false);
-  duk_put_prop_index(m_context, -2, index);
+  duk_bool_t ret = duk_put_prop_index(m_context, -2, index);
 
   // pop indexed object
   duk_pop(m_context);
+
+  return (jboolean)(ret == 1);
 }
 
-void DuktapeContext::setKeyObject(JNIEnv *env, jlong object, jobject key, jobject value) {
+jboolean DuktapeContext::setKeyObject(JNIEnv *env, jlong object, jobject key, jobject value) {
   CHECK_STACK(m_context);
 
   // tbh this doesn't work if object is an actual java object vs a javascript object.
@@ -826,10 +830,12 @@ void DuktapeContext::setKeyObject(JNIEnv *env, jlong object, jobject key, jobjec
   pushObject(env, object);
   pushObject(env, key, false);
   pushObject(env, value, false);
-  duk_put_prop(m_context, -3);
+  duk_bool_t ret = duk_put_prop(m_context, -3);
 
   // pop indexed object
   duk_pop(m_context);
+
+  return (jboolean)(ret == 1);
 }
 
 jstring DuktapeContext::stringify(JNIEnv *env, jlong object) {
