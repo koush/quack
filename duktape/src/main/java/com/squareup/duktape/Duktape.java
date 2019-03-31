@@ -564,6 +564,8 @@ public final class Duktape implements Closeable {
    * Check if a debugger is currently attached.
    */
   public boolean isDebugging() {
+    if (context == 0)
+      return false;
     return isDebugging(context);
   }
 

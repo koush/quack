@@ -207,6 +207,7 @@ jclass DuktapeContext::findClass(JNIEnv *env, const char *className) {
 }
 
 DuktapeContext::~DuktapeContext() {
+  duk_trans_socket_finish(&m_DebuggerSocket);
   // Delete the proxies before destroying the heap.
   duk_destroy_heap(m_context);
 }
