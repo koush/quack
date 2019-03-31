@@ -2,6 +2,9 @@ package com.squareup.duktape;
 
 import junit.framework.TestCase;
 
+import org.junit.Assert;
+
+import java.lang.reflect.Parameter;
 import java.util.Arrays;
 import java.util.List;
 
@@ -212,5 +215,66 @@ public class DuktapeTests extends TestCase  {
             assertNotNull(ret);
         }
         assertTrue(resultHolder.result == 2);
+    }
+
+    public void testDuktapeException() {
+        Duktape duktape = Duktape.create();
+        String script = "function() {" +
+                "function func1() {" +
+                "throw new Error('duktape!')" +
+                "}" +
+                "function func2() {" +
+                "func1();" +
+                "}" +
+                "function func3() {" +
+                "func2();" +
+                "}" +
+                "func3();" +
+                "}";
+        try {
+            JavaScriptObject func = duktape.compileFunction(script, "?");
+            func.call();
+        }
+        catch (Exception e) {
+            Assert.assertTrue(e.getMessage().contains("duktape!"));
+            Assert.assertTrue(e.getStackTrace()[0].getMethodName().contains("func1"));
+            Assert.assertTrue(e.getStackTrace()[1].getMethodName().contains("func2"));
+            Assert.assertTrue(e.getStackTrace()[2].getMethodName().contains("func3"));
+        }
+    }
+
+
+    public void testDuktapeExceptionFromJava() {
+        Duktape duktape = Duktape.create();
+        String script = "function(cb) {" +
+                "function func1() {" +
+                "cb.callback();" +
+                "}" +
+                "function func2() {" +
+                "func1();" +
+                "}" +
+                "function func3() {" +
+                "func2();" +
+                "}" +
+                "func3();" +
+                "}";
+        try {
+            Callback cb = new Callback() {
+                @Override
+                public void callback() {
+                    throw new IllegalArgumentException("java!");
+                }
+            };
+
+            JavaScriptObject func = duktape.compileFunction(script, "?");
+            func.call(cb);
+        }
+        catch (Exception e) {
+            Assert.assertTrue(e.getMessage().contains("java!"));
+            Assert.assertTrue(e.getStackTrace()[0].getMethodName().contains("callback"));
+            Assert.assertTrue(e.getStackTrace()[4].getMethodName().contains("func1"));
+            Assert.assertTrue(e.getStackTrace()[5].getMethodName().contains("func2"));
+            Assert.assertTrue(e.getStackTrace()[6].getMethodName().contains("func3"));
+        }
     }
 }

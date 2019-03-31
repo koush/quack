@@ -53,12 +53,11 @@ public final class DuktapeException extends RuntimeException {
     List<StackTraceElement> elements = new ArrayList<>();
 
     // Splice the JavaScript stack in right above the call to Duktape.evaluate.
+    StackTraceElement search = new Exception().getStackTrace()[0];
     boolean spliced = false;
     for (StackTraceElement stackTraceElement : throwable.getStackTrace()) {
       if (!spliced
-          && stackTraceElement.isNativeMethod()
-          && stackTraceElement.getClassName().equals(Duktape.class.getName())
-          && stackTraceElement.getMethodName().equals("evaluate")) {
+          && stackTraceElement.equals(search)) {
         for (int i = 1; i < lines.length; ++i) {
           StackTraceElement jsElement = toStackTraceElement(lines[i]);
           if (jsElement == null) {
