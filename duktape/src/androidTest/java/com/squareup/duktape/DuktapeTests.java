@@ -277,4 +277,63 @@ public class DuktapeTests extends TestCase  {
             Assert.assertTrue(e.getStackTrace()[6].getMethodName().contains("func3"));
         }
     }
+    public void testJavaStackInJavaScript() {
+        Duktape duktape = Duktape.create();
+        String script = "function(cb) {" +
+                "function func1() {" +
+                "cb.callback();" +
+                "}" +
+                "function func2() {" +
+                "func1();" +
+                "}" +
+                "function func3() {" +
+                "func2();" +
+                "}" +
+                "try {" +
+                "func3();" +
+                "}" +
+                "catch(e) {" +
+                "return e.stack;" +
+                "}" +
+                "}";
+        Callback cb = new Callback() {
+            @Override
+            public void callback() {
+                throw new IllegalArgumentException("java!");
+            }
+        };
+
+        JavaScriptObject func = duktape.compileFunction(script, "?");
+        String ret = func.call(cb).toString();
+        String expected = "EvalError: Java Exception java!\n" +
+                "    at [com.squareup.duktape.DuktapeTests$2.callback] (DuktapeTests.java:303)\n" +
+                "    at [java.lang.reflect.Method.invoke] (Method.java:-2)\n" +
+                "    at [com.squareup.duktape.JavaMethodObject.callMethod] (JavaMethodObject.java:106)\n" +
+                "    at [com.squareup.duktape.Duktape.duktapeCallMethod] (Duktape.java:652)    at [anon] (/Volumes/Dev/Scrypted/duktape-android/duktape/src/main/jni/DuktapeContext.cpp:921) internal\n" +
+                "    at [anon] () native strict preventsyield\n" +
+                "    at [anon] (?:5)\n" +
+                "    at func1 (?:1)\n" +
+                "    at func2 (?:1)\n" +
+                "    at func3 (?:1)\n" +
+                "    at [anon] (?:1) preventsyield\n" +
+                "    at [com.squareup.duktape.Duktape.call] (Duktape.java:-2)\n" +
+                "    at [com.squareup.duktape.Duktape.call] (Duktape.java:601)\n" +
+                "    at [com.squareup.duktape.JavaScriptObject.call] (JavaScriptObject.java:36)\n" +
+                "    at [com.squareup.duktape.DuktapeTests.testJavaStackInJavaScript] (DuktapeTests.java:308)\n" +
+                "    at [java.lang.reflect.Method.invoke] (Method.java:-2)\n" +
+                "    at [junit.framework.TestCase.runTest] (TestCase.java:168)\n" +
+                "    at [junit.framework.TestCase.runBare] (TestCase.java:134)\n" +
+                "    at [junit.framework.TestResult$1.protect] (TestResult.java:115)\n" +
+                "    at [junit.framework.TestResult.runProtected] (TestResult.java:133)\n" +
+                "    at [junit.framework.TestResult.run] (TestResult.java:118)\n" +
+                "    at [junit.framework.TestCase.run] (TestCase.java:124)\n" +
+                "    at [android.test.AndroidTestRunner.runTest] (AndroidTestRunner.java:195)\n" +
+                "    at [android.test.AndroidTestRunner.runTest] (AndroidTestRunner.java:181)\n" +
+                "    at [android.test.InstrumentationTestRunner.onStart] (InstrumentationTestRunner.java:564)\n" +
+                "    at [android.app.Instrumentation$InstrumentationThread.run] (Instrumentation.java:2185)";
+
+        // returned stack trace should have same number of lines as above.
+        // a weak assertion, but it's indicative of correctness because javascript adds 3 lines more than expected.
+        Assert.assertEquals(ret.split("\n").length, expected.split("\n").length);
+    }
 }

@@ -16,8 +16,8 @@
 package com.squareup.duktape;
 
 import android.support.annotation.Keep;
+
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -56,8 +56,8 @@ public final class DuktapeException extends RuntimeException {
     StackTraceElement search = new Exception().getStackTrace()[0];
     boolean spliced = false;
     for (StackTraceElement stackTraceElement : throwable.getStackTrace()) {
-      if (!spliced
-          && stackTraceElement.equals(search)) {
+      if (!spliced && stackTraceElement.equals(search)) {
+        spliced = true;
         for (int i = 1; i < lines.length; ++i) {
           StackTraceElement jsElement = toStackTraceElement(lines[i]);
           if (jsElement == null) {
@@ -65,11 +65,28 @@ public final class DuktapeException extends RuntimeException {
           }
           elements.add(jsElement);
         }
-        spliced = true;
       }
       elements.add(stackTraceElement);
     }
     throwable.setStackTrace(elements.toArray(new StackTraceElement[elements.size()]));
+  }
+
+  static String addJavaStack(String detailMessage, Throwable throwable) {
+    String[] parts = detailMessage.split("\n", 2);
+    detailMessage = parts[1];
+    StringBuilder ret = new StringBuilder(parts[0]);
+
+    // Splice the JavaScript stack in right above the call to Duktape.evaluate.
+    StackTraceElement search = new Exception().getStackTrace()[0];
+    boolean spliced = false;
+    for (StackTraceElement stackTraceElement : throwable.getStackTrace()) {
+      if (!spliced && stackTraceElement.equals(search)) {
+        spliced = true;
+        ret.append(detailMessage);
+      }
+      ret.append(String.format("\n    at [%s.%s] (%s:%s)", stackTraceElement.getClassName(), stackTraceElement.getMethodName(), stackTraceElement.getFileName(), stackTraceElement.getLineNumber()));
+    }
+    return ret.toString();
   }
 
   private static String getErrorMessage(String detailMessage) {

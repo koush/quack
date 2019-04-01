@@ -922,6 +922,20 @@ bool checkRethrowDuktapeError(JNIEnv* env, duk_context* ctx) {
   duk_swap_top(ctx, -2);
   duk_put_prop_string(ctx, -2, JAVA_EXCEPTION_PROP_NAME);
 
+  jclass exceptionClass = env->FindClass("com/squareup/duktape/DuktapeException");
+  duk_get_prop_string(ctx, -1, "stack");
+  std::string stack = duk_safe_to_string(ctx, -1);
+  duk_pop(ctx);
+
+  // add the Duktape JavaScript stack to this exception.
+  const jmethodID addJavaStack =
+          env->GetStaticMethodID(exceptionClass,
+                                 "addJavaStack",
+                                 "(Ljava/lang/String;Ljava/lang/Throwable;)Ljava/lang/String;");
+  jobject newStack = env->CallStaticObjectMethod(exceptionClass, addJavaStack, env->NewStringUTF(stack.c_str()), e);
+  duktapeContext->pushObject(env, newStack);
+  duk_put_prop_string(ctx, -2, "stack");
+
   duk_throw(ctx);
   return false;
 }
