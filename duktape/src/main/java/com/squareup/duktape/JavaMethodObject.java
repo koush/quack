@@ -2,9 +2,11 @@ package com.squareup.duktape;
 
 import android.util.Log;
 
+import java.lang.reflect.Array;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
+import java.util.Collections;
 
 public class JavaMethodObject implements DuktapeMethodObject {
     String target;
@@ -19,7 +21,14 @@ public class JavaMethodObject implements DuktapeMethodObject {
     }
 
     protected Method[] getMethods(Object thiz) {
-        return thiz.getClass().getMethods();
+        Method[] methods = thiz.getClass().getMethods();
+        if (!(thiz instanceof Class))
+            return methods;
+
+        ArrayList<Method> arr = new ArrayList<>();
+        Collections.addAll(arr, methods);
+        Collections.addAll(arr, ((Class)thiz).getMethods());
+        return arr.toArray(new Method[0]);
     }
 
     @Override
@@ -98,7 +107,7 @@ public class JavaMethodObject implements DuktapeMethodObject {
                 for (; i < args.length; i++) {
                     varargs.add(duktape.coerceJavaScriptToJava(varargType, args[i]));
                 }
-                coerced.add(varargs.toArray());
+                coerced.add(toArray(varargType, varargs));
             }
             else if (i < args.length) {
                 Log.w("Duktape", "dropping javascript to java arguments on the floor: " + (args.length - i));
@@ -113,5 +122,9 @@ public class JavaMethodObject implements DuktapeMethodObject {
                 throw (RuntimeException)e.getTargetException();
             throw new IllegalArgumentException(best.toString(), e);
         }
+    }
+
+    static private <T> T[] toArray(Class<T> varargType, ArrayList<T> varargs) {
+        return varargs.toArray((T[])Array.newInstance(varargType, 0));
     }
 }

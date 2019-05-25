@@ -5,6 +5,7 @@ import android.text.TextUtils;
 import java.lang.reflect.Array;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 import java.lang.reflect.Proxy;
 import java.util.List;
 import java.util.Map;
@@ -42,6 +43,20 @@ public final class JavaObject implements DuktapeJavaObject {
             }
             return null;
         }, key, methods);
+    }
+
+    private static boolean hasMethod(Class clazz, String key, boolean requiresStatic) {
+        // try to get methods
+        for (Method method : clazz.getMethods()) {
+            if (requiresStatic && !Modifier.isStatic(method.getModifiers()))
+                continue;
+            if (method.getName().equals(key))
+                return true;
+            DuktapeMethodName annotation = method.getAnnotation(DuktapeMethodName.class);
+            if (annotation != null && annotation.name().equals(key))
+                return true;
+        }
+        return false;
     }
 
     @Override
@@ -86,14 +101,10 @@ public final class JavaObject implements DuktapeJavaObject {
         }
 
         Boolean m = Duktape.javaObjectMethods.memoize(() -> {
-            // try to get methods
-            for (Method method : clazz.getMethods()) {
-                if (method.getName().equals(key))
-                    return true;
-                DuktapeMethodName annotation = method.getAnnotation(DuktapeMethodName.class);
-                if (annotation != null && annotation.name().equals(key))
-                    return true;
-            }
+            if (hasMethod(clazz, key, false))
+                return true;
+            if (target instanceof Class)
+                return hasMethod((Class)target, key, true);
             return false;
         }, key, clazz.getMethods());
 

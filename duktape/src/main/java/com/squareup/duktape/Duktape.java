@@ -211,22 +211,22 @@ public final class Duktape implements Closeable {
   }
 
   public interface JavaMethodReference<T> {
-    void invoke(T thiz);
+    void invoke(T thiz) throws Exception;
   }
   public interface JavaMethodReference0<T, A> {
-    void invoke(T thiz, A arg0);
+    void invoke(T thiz, A arg0) throws Exception;
   }
   public interface JavaMethodReference1<T, A, B> {
-    void invoke(T thiz, A arg0, B arg1);
+    void invoke(T thiz, A arg0, B arg1) throws Exception;
   }
   public interface JavaMethodReference2<T, A, B, C> {
-    void invoke(T thiz, A arg0, B arg1, C arg2);
+    void invoke(T thiz, A arg0, B arg1, C arg2) throws Exception;
   }
   public interface JavaMethodReference3<T, A, B, C, D> {
-    void invoke(T thiz, A arg0, B arg1, C arg2, D arg3);
+    void invoke(T thiz, A arg0, B arg1, C arg2, D arg3) throws Exception;
   }
   public interface JavaMethodReference4<T, A, B, C, D, E> {
-    void invoke(T thiz, A arg0, B arg1, C arg2, D arg3, E arg4);
+    void invoke(T thiz, A arg0, B arg1, C arg2, D arg3, E arg4) throws Exception;
   }
 
   public static <T> Method getInterfaceMethod(Class<T> clazz, JavaMethodReference<T> ref) {
