@@ -1,5 +1,7 @@
 package com.squareup.duktape;
 
+import android.text.TextUtils;
+
 import java.lang.reflect.Array;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
@@ -22,24 +24,24 @@ public final class JavaObject implements DuktapeJavaObject {
     }
 
     public static Method getGetterMethod(String key, Method[] methods) {
-        // disabled, tbd.
-        if (false && !key.isEmpty()) {
-            // try getters, preferred over methods
-            // foo -> getFoo()
-            // foo -> foo()
-            return Duktape.javaObjectGetter.memoize(() -> {
-                String getterName = "get" + key.substring(0, 1).toUpperCase() + key.substring(1);
-                for (Method method : methods) {
-                    // name, no args, and a return type
-                    if ((method.getName().equals(key) || method.getName().equals(getterName))
-                            && method.getParameterTypes().length == 0
-                            && method.getReturnType() != void.class && method.getReturnType() != Void.class)
-                        return method;
-                }
-                return null;
-            }, key, methods);
-        }
-        return null;
+        return Duktape.javaObjectGetter.memoize(() -> {
+            for (Method method : methods) {
+                // name match, no args, and a return type
+                if (method.getParameterTypes().length != 0)
+                    continue;
+                if (method.getReturnType() == void.class || method.getReturnType() == Void.class)
+                    continue;
+                DuktapeProperty duktapeProperty = method.getAnnotation(DuktapeProperty.class);
+                if (duktapeProperty == null)
+                    continue;
+                String propName = duktapeProperty.name();
+                if (TextUtils.isEmpty(propName))
+                    propName = method.getName();
+                if (propName.equals(key))
+                    return method;
+            }
+            return null;
+        }, key, methods);
     }
 
     @Override
@@ -66,7 +68,7 @@ public final class JavaObject implements DuktapeJavaObject {
 
             if (f != null) {
                 try {
-                    return f.get(target);
+                    return duktape.coerceJavaToJavaScript(f.get(target));
                 } catch (IllegalAccessException e) {
                     throw new IllegalArgumentException(e);
                 }
@@ -76,7 +78,7 @@ public final class JavaObject implements DuktapeJavaObject {
         Method g = getGetterMethod(key, clazz.getMethods());
         if (g != null) {
             try {
-                return g.invoke(target);
+                return duktape.coerceJavaToJavaScript(g.invoke(target));
             }
             catch (Exception e) {
                 throw new IllegalArgumentException(e);
