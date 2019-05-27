@@ -574,6 +574,8 @@ public final class Duktape implements Closeable {
    * @param args
    */
   public synchronized void debuggerAppNotify(Object... args) {
+    if (context == 0)
+      return;
     debuggerAppNotify(context, args);
   }
 
