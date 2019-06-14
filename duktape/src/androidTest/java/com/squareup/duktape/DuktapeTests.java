@@ -1,16 +1,22 @@
 package com.squareup.duktape;
 
+import android.net.Uri;
+
 import junit.framework.TestCase;
 
 import org.junit.Assert;
 
-import java.lang.reflect.Parameter;
 import java.util.Arrays;
 import java.util.List;
 
 public class DuktapeTests extends TestCase  {
     private static class ResultHolder<T> {
         public T result;
+    }
+
+    public void testUri() {
+        Uri uri = Uri.parse("rtsp://foo:bar@poopbat.com:5555");
+        System.out.println(uri);
     }
 
     public void testRoundtrip() {
@@ -277,6 +283,49 @@ public class DuktapeTests extends TestCase  {
             Assert.assertTrue(e.getStackTrace()[6].getMethodName().contains("func3"));
         }
     }
+
+    public void testDuktapeExceptionMessageFromJava() {
+        Duktape duktape = Duktape.create();
+        String script = "function(cb, cb2) {" +
+                "function func1() {" +
+                "try {" +
+                "cb.callback();" +
+                "}" +
+                "catch(e) {" +
+                "cb2.callback(e.toString());" +
+                "}" +
+                "}" +
+                "function func2() {" +
+                "func1();" +
+                "}" +
+                "function func3() {" +
+                "func2();" +
+                "}" +
+                "func3();" +
+                "}";
+
+        ResultHolder<String> resultHolder = new ResultHolder<>();
+
+        Callback cb = new Callback() {
+            @Override
+            public void callback() {
+                throw new IllegalArgumentException("java!");
+            }
+        };
+        RoundtripCallback cb2 = new RoundtripCallback() {
+            @Override
+            public Object callback(Object o) {
+                resultHolder.result = o.toString();
+                return null;
+            }
+        };
+
+        JavaScriptObject func = duktape.compileFunction(script, "?");
+        func.call(cb, cb2);
+
+        assertEquals(resultHolder.result, "EvalError: Java Exception java.lang.IllegalArgumentException: java!");
+    }
+
     public void testJavaStackInJavaScript() {
         Duktape duktape = Duktape.create();
         String script = "function(cb) {" +

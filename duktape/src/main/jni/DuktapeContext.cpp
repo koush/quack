@@ -773,7 +773,8 @@ void DuktapeContext::waitForDebugger() {
 }
 
 void DuktapeContext::cooperateDebugger() {
-    duk_debugger_cooperate(m_context);
+  duk_debugger_cooperate(m_context);
+  duk_gc(m_context, 0);
 }
 
 bool DuktapeContext::isDebugging() {
@@ -907,7 +908,7 @@ bool checkRethrowDuktapeError(JNIEnv* env, duk_context* ctx) {
   DuktapeContext* duktapeContext = getDuktapeContext(ctx);
   duktapeContext->pushObject(env, e, false);
   jclass clazz = env->GetObjectClass(e);
-  jmethodID getMessage = env->GetMethodID(clazz, "getMessage", "()Ljava/lang/String;");
+  jmethodID getMessage = env->GetMethodID(clazz, "toString", "()Ljava/lang/String;");
   auto jmessage = (jstring)env->CallObjectMethod(e, getMessage);
   std::string msg;
   if (jmessage == nullptr) {
