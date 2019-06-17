@@ -21,6 +21,10 @@ public interface DuktapeObject {
         return false;
     }
 
+    default boolean has(Object key) {
+        return get(key) != null;
+    }
+
     /**
      * Call this object with the expectation that it is a function. The this argument
      * is implicit to the runtime.

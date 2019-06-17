@@ -643,7 +643,7 @@ public final class Duktape implements Closeable {
   }
 
   private boolean duktapeHas(DuktapeObject duktapeObject, Object key) {
-    return duktapeObject.get(key) != null;
+    return duktapeObject.has(key);
   }
 
   private boolean duktapeSet(DuktapeObject duktapeObject, Object key, Object value) {

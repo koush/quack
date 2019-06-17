@@ -438,8 +438,6 @@ duk_ret_t DuktapeContext::duktapeHas() {
       return DUK_RET_REFERENCE_ERROR;
     }
 
-    // todo: actually implement has on the java side.
-
     jboolean has = env->CallBooleanMethod(m_javaDuktape, m_duktapeHasMethod, object, prop);
     if (!checkRethrowDuktapeError(env, m_context)) {
         return DUK_RET_ERROR;
