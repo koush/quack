@@ -45,6 +45,27 @@ public final class JavaObject implements DuktapeJavaObject {
         }, key, methods);
     }
 
+    public static Method getSetterMethod(String key, Method[] methods) {
+        return Duktape.javaObjectSetter.memoize(() -> {
+            for (Method method : methods) {
+                // name match, no args, and a return type
+                if (method.getParameterTypes().length != 1)
+                    continue;
+                if (method.getReturnType() != void.class && method.getReturnType() != Void.class)
+                    continue;
+                DuktapeProperty duktapeProperty = method.getAnnotation(DuktapeProperty.class);
+                if (duktapeProperty == null)
+                    continue;
+                String propName = duktapeProperty.name();
+                if (TextUtils.isEmpty(propName))
+                    propName = method.getName();
+                if (propName.equals(key))
+                    return method;
+            }
+            return null;
+        }, key, methods);
+    }
+
     private static boolean hasMethod(Class clazz, String key, boolean requiresStatic) {
         // try to get methods
         for (Method method : clazz.getMethods()) {
@@ -174,7 +195,9 @@ public final class JavaObject implements DuktapeJavaObject {
 
     @Override
     public boolean set(String key, Object value) {
-        for (Field field: target.getClass().getFields()) {
+        Class clazz = target.getClass();
+
+        for (Field field: clazz.getFields()) {
             if (field.getName().equals(key)) {
                 try {
                     field.set(target, duktape.coerceJavaScriptToJava(field.getType(), value));
@@ -184,6 +207,17 @@ public final class JavaObject implements DuktapeJavaObject {
                 }
                 return true;
             }
+        }
+
+        Method s = getSetterMethod(key, clazz.getMethods());
+        if (s != null) {
+            try {
+                duktape.coerceJavaToJavaScript(s.invoke(target, duktape.coerceJavaScriptToJava(s.getParameterTypes()[0], value)));
+            }
+            catch (Exception e) {
+                throw new IllegalArgumentException(e);
+            }
+            return true;
         }
 
         return putMap(key, value);
