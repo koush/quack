@@ -38,9 +38,23 @@ public final class Duktape implements Closeable {
   private final Map<Class, DuktapeCoercion> JavaToJavascriptCoercions = new LinkedHashMap<>();
   final Map<Method, DuktapeMethodCoercion> JavaScriptToJavaMethodCoercions = new LinkedHashMap<>();
   final Map<Method, DuktapeMethodCoercion> JavaToJavascriptMethodCoercions = new LinkedHashMap<>();
+  private DuktapeInvocationHandlerWrapper invocationHandlerWrapper;
 
   static {
     System.loadLibrary("duktape");
+  }
+
+  public void setInvocationHandlerWrapper(DuktapeInvocationHandlerWrapper invocationHandlerWrapper) {
+    this.invocationHandlerWrapper = invocationHandlerWrapper;
+  }
+
+  InvocationHandler getWrappedInvocationHandler(JavaScriptObject javaScriptObject, InvocationHandler handler) {
+    if (invocationHandlerWrapper == null)
+      return handler;
+    InvocationHandler wrapped = invocationHandlerWrapper.wrapInvocationHandler(javaScriptObject, handler);
+    if (wrapped != null)
+      return wrapped;
+    return handler;
   }
 
   /**

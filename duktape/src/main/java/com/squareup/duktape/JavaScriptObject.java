@@ -97,7 +97,7 @@ public class JavaScriptObject implements DuktapeObject {
     }
 
     public InvocationHandler createInvocationHandler() {
-        return (proxy, method, args) -> {
+        InvocationHandler handler = (proxy, method, args) -> {
             if (method.getDeclaringClass() == Object.class)
                 return method.invoke(JavaScriptObject.this, args);
 
@@ -120,6 +120,8 @@ public class JavaScriptObject implements DuktapeObject {
 
             return duktape.coerceJavaScriptToJava(method.getReturnType(), JavaScriptObject.this.callProperty(methodName, args));
         };
+
+        return duktape.getWrappedInvocationHandler(this, handler);
     }
 
     public <T> T proxyInterface(Class<T> clazz, Class... more) {
