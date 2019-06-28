@@ -251,6 +251,7 @@ public final class Duktape implements Closeable {
   static Memoize<Field> javaObjectFields = new Memoize<>();
   static Memoize<Boolean> javaObjectMethods = new Memoize<>();
   static Memoize<Method> javaObjectGetter = new Memoize<>();
+  static Memoize<Method> javaObjectSetter = new Memoize<>();
   static Memoize<Method> javaObjectMethodCandidates = new Memoize<>();
   static Memoize<Method> interfaceMethods = new Memoize<>();
   static Method getInterfaceMethod(Method method) {
