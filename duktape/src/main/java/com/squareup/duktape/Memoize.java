@@ -21,8 +21,9 @@ public class Memoize<T> {
   }
   int hash(Object... objects) {
     int ret = 0;
-    for (Object o: objects) {
-      ret ^= o == null ? 0 : o.hashCode();
+    for (int i = 0; i < objects.length; i++) {
+      Object o = objects[i];
+      ret ^= Integer.rotateLeft(o == null ? 0 : o.hashCode(), i);
     }
     ret ^= objects.length;
     return ret;
