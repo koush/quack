@@ -153,6 +153,20 @@ static void tracked_free(void *udata, void *ptr) {
   free(ptr);
 }
 
+class ContextSwitcher {
+public:
+    duk_context* originalContext;
+    DuktapeContext* context;
+    ContextSwitcher(DuktapeContext* context, duk_context* newContext) {
+        this->context = context;
+        originalContext = context->m_context;
+        context->m_context = newContext;
+    }
+    ~ContextSwitcher() {
+        context->m_context = originalContext;
+    }
+};
+
 DuktapeContext::DuktapeContext(JavaVM* javaVM, jobject javaDuktape)
     : m_context(duk_create_heap(tracked_alloc, tracked_realloc, tracked_free, this, fatalErrorHandler))
     , m_heapSize(0)
@@ -350,6 +364,7 @@ duk_ret_t DuktapeContext::duktapeSet() {
 
 static duk_ret_t __duktape_set(duk_context *ctx) {
     DuktapeContext *duktapeContext = getDuktapeContext(ctx);
+    const ContextSwitcher _(duktapeContext, ctx);
     return duktapeContext->duktapeSet();
 }
 
@@ -420,6 +435,7 @@ duk_ret_t DuktapeContext::duktapeGet() {
 
 static duk_ret_t __duktape_get(duk_context *ctx) {
   DuktapeContext *duktapeContext = getDuktapeContext(ctx);
+  const ContextSwitcher _(duktapeContext, ctx);
   return duktapeContext->duktapeGet();
 }
 
@@ -450,6 +466,7 @@ duk_ret_t DuktapeContext::duktapeHas() {
 
 static duk_ret_t __duktape_has(duk_context *ctx) {
   DuktapeContext *duktapeContext = getDuktapeContext(ctx);
+  const ContextSwitcher _(duktapeContext, ctx);
   return duktapeContext->duktapeHas();
 }
 
@@ -495,6 +512,7 @@ duk_ret_t DuktapeContext::duktapeApply() {
 
 static duk_ret_t __duktape_apply(duk_context *ctx) {
   DuktapeContext *duktapeContext = getDuktapeContext(ctx);
+  const ContextSwitcher _(duktapeContext, ctx);
   return duktapeContext->duktapeApply();
 }
 
