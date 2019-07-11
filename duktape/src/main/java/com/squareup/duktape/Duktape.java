@@ -28,8 +28,10 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.lang.reflect.UndeclaredThrowableException;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Set;
 import java.util.logging.Logger;
 
 /** A simple EMCAScript (Javascript) interpreter. */
@@ -42,6 +44,11 @@ public final class Duktape implements Closeable {
 
   static {
     System.loadLibrary("duktape");
+  }
+
+  static boolean isNumberClass(Class<?> c) {
+    return c == byte.class || c == Byte.class || c == short.class || c == Short.class || c == int.class || c == Integer.class
+            || c == long.class || c == Long.class || c == float.class || c == Float.class || c == double.class || c == Double.class;
   }
 
   public void setInvocationHandlerWrapper(DuktapeInvocationHandlerWrapper invocationHandlerWrapper) {
@@ -430,32 +437,36 @@ public final class Duktape implements Closeable {
     });
 
     // coerce JavaScript Numbers. duktape supports ints and doubles natively.
-    JavaScriptToJavaCoercions.put(Byte.class, (clazz, o) -> o instanceof Number ? ((Number)o).byteValue() : o);
-    JavaScriptToJavaCoercions.put(byte.class, (clazz, o) -> o instanceof Number ? ((Number)o).byteValue() : o);
+    JavaScriptToJavaCoercions.put(Byte.class, (clazz, o) -> o instanceof Number ? ((Number)o).byteValue() : o instanceof String ? Byte.parseByte(o.toString()) : o);
+    JavaScriptToJavaCoercions.put(byte.class, (clazz, o) -> o instanceof Number ? ((Number)o).byteValue() : o instanceof String ? Byte.parseByte(o.toString()) : o);
     // bytes become ints
     JavaToJavascriptCoercions.put(byte.class, (DuktapeCoercion<Integer, Byte>) (clazz, o) -> o.intValue());
     JavaToJavascriptCoercions.put(Byte.class, (DuktapeCoercion<Integer, Byte>) (clazz, o) -> o.intValue());
 
-    JavaScriptToJavaCoercions.put(Short.class, (clazz, o) -> o instanceof Number ? ((Number)o).shortValue() : o);
-    JavaScriptToJavaCoercions.put(short.class, (clazz, o) -> o instanceof Number ? ((Number)o).shortValue() : o);
+    JavaScriptToJavaCoercions.put(Short.class, (clazz, o) -> o instanceof Number ? ((Number)o).shortValue() : o instanceof String ? Short.parseShort(o.toString()) : o);
+    JavaScriptToJavaCoercions.put(short.class, (clazz, o) -> o instanceof Number ? ((Number)o).shortValue() : o instanceof String ? Short.parseShort(o.toString()) : o);
     // shorts become ints
     JavaToJavascriptCoercions.put(short.class, (DuktapeCoercion<Integer, Short>) (clazz, o) -> o.intValue());
     JavaToJavascriptCoercions.put(Short.class, (DuktapeCoercion<Integer, Short>) (clazz, o) -> o.intValue());
 
-    JavaScriptToJavaCoercions.put(Integer.class, (clazz, o) -> o instanceof Number ? ((Number)o).intValue() : o);
-    JavaScriptToJavaCoercions.put(int.class, (clazz, o) -> o instanceof Number ? ((Number)o).intValue() : o);
+    JavaScriptToJavaCoercions.put(Integer.class, (clazz, o) -> o instanceof Number ? ((Number)o).intValue() : o instanceof String ? Integer.parseInt(o.toString()) : o);
+    JavaScriptToJavaCoercions.put(int.class, (clazz, o) -> o instanceof Number ? ((Number)o).intValue() : o instanceof String ? Integer.parseInt(o.toString()) : o);
 
-    JavaScriptToJavaCoercions.put(Long.class, (clazz, o) -> o instanceof Number ? ((Number)o).longValue() : o);
-    JavaScriptToJavaCoercions.put(long.class, (clazz, o) -> o instanceof Number ? ((Number)o).longValue() : o);
-    // longs become doubles
-    JavaToJavascriptCoercions.put(long.class, (DuktapeCoercion<Double, Long>) (clazz, o) -> o.doubleValue());
-    JavaToJavascriptCoercions.put(Long.class, (DuktapeCoercion<Double, Long>) (clazz, o) -> o.doubleValue());
+    JavaScriptToJavaCoercions.put(Long.class, (clazz, o) -> o instanceof Number ? ((Number)o).longValue() : o instanceof String ? Long.parseLong(o.toString()) : o);
+    JavaScriptToJavaCoercions.put(long.class, (clazz, o) -> o instanceof Number ? ((Number)o).longValue() : o instanceof String ? Long.parseLong(o.toString()) : o);
+    // by default longs become strings, precision loss going to double. that's no good.
+    // coercions can be used to get numbers if necessary.
+    JavaToJavascriptCoercions.put(long.class, (DuktapeCoercion<String, Long>) (clazz, o) -> o.toString());
+    JavaToJavascriptCoercions.put(Long.class, (DuktapeCoercion<String, Long>) (clazz, o) -> o.toString());
 
-    JavaScriptToJavaCoercions.put(Float.class, (clazz, o) -> o instanceof Number ? ((Number)o).floatValue() : o);
-    JavaScriptToJavaCoercions.put(float.class, (clazz, o) -> o instanceof Number ? ((Number)o).floatValue() : o);
+    JavaScriptToJavaCoercions.put(Float.class, (clazz, o) -> o instanceof Number ? ((Number)o).floatValue() : o instanceof String ? Float.parseFloat(o.toString()) : o);
+    JavaScriptToJavaCoercions.put(float.class, (clazz, o) -> o instanceof Number ? ((Number)o).floatValue() : o instanceof String ? Float.parseFloat(o.toString()) : o);
     // floats become doubles
     JavaToJavascriptCoercions.put(float.class, (DuktapeCoercion<Double, Float>) (clazz, o) -> o.doubleValue());
     JavaToJavascriptCoercions.put(Float.class, (DuktapeCoercion<Double, Float>) (clazz, o) -> o.doubleValue());
+
+    JavaScriptToJavaCoercions.put(Double.class, (clazz, o) -> o instanceof Number ? ((Number)o).doubleValue() : o instanceof String ? Double.parseDouble(o.toString()) : o);
+    JavaScriptToJavaCoercions.put(double.class, (clazz, o) -> o instanceof Number ? ((Number)o).doubleValue() : o instanceof String ? Double.parseDouble(o.toString()) : o);
 
     // coercing a java enum into javascript string
     JavaToJavascriptCoercions.put(Enum.class, (DuktapeCoercion<Object, Enum>) (clazz, o) -> o.toString());

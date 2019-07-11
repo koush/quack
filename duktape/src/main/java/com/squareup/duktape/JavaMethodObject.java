@@ -65,11 +65,24 @@ public class JavaMethodObject implements DuktapeMethodObject {
                         continue;
                 }
                 // parameter count is most important
-                int score = Math.abs(argTypes.size() - method.getParameterTypes().length) * 100;
+                int score = Math.abs(argTypes.size() - method.getParameterTypes().length) * 1000;
                 // tiebreak by checking parameter types
                 for (int i = 0; i < Math.min(method.getParameterTypes().length, argTypes.size()); i++) {
-                    if (argTypes.get(i) == null || method.getParameterTypes()[i].isAssignableFrom(argTypes.get(i)))
-                        score--;
+                    // check if the class is assignable or both parameters are numbers
+                    Class<?> argType = argTypes.get(i);
+                    Class<?> paramType = method.getParameterTypes()[i];
+                    if (paramType == argType) {
+                        score -= 4;
+                    }
+                    if (Duktape.isNumberClass(paramType) && Duktape.isNumberClass(argType)) {
+                        score -= 3;
+                    }
+                    else if ((paramType == Long.class || paramType == long.class) && argType == String.class) {
+                        score -= 2;
+                    }
+                    else if (argType == null || paramType.isAssignableFrom(argType)) {
+                        score -= 1;
+                    }
                 }
                 if (score < bestScore) {
                     bestScore = score;
