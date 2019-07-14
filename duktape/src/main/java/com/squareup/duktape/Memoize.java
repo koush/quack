@@ -19,7 +19,8 @@ public class Memoize<T> {
   public Memoize() {
     this(new MemoizeMapImpl<>());
   }
-  int hash(Object... objects) {
+
+  public static int hashCode(Object... objects) {
     int ret = 0;
     for (int i = 0; i < objects.length; i++) {
       Object o = objects[i];
@@ -31,7 +32,7 @@ public class Memoize<T> {
 
   MemoizeMap<T> store;
   public T memoize(MemoizeFunc<T> func, Object... args) {
-    int hash = hash(args);
+    int hash = hashCode(args);
     return memoize(func, hash);
   }
 
@@ -40,14 +41,14 @@ public class Memoize<T> {
   }
 
   public T memoize(MemoizeFunc<T> func, Object arg0, Object[] args) {
-    int hash = hash(args);
+    int hash = hashCode(args);
     hash ^= arg0 == null ? 0 : arg0.hashCode();
     return memoize(func, hash);
   }
 
   public T memoize(MemoizeFunc<T> func, Object arg0, Object[] args0, Object[] args1) {
-    int hash = hash(args0);
-    hash ^= hash(args1);
+    int hash = hashCode(args0);
+    hash ^= hashCode(args1);
     hash ^= arg0 == null ? 0 : arg0.hashCode();
     return memoize(func, hash);
   }

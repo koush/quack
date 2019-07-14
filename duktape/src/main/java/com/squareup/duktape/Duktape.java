@@ -55,7 +55,22 @@ public final class Duktape implements Closeable {
     this.invocationHandlerWrapper = invocationHandlerWrapper;
   }
 
+
+  // trap for Object methods.
+  private static InvocationHandler wrapObjectInvocationHandler(JavaScriptObject jo, InvocationHandler handler) {
+    return (proxy, method, args) -> {
+      if (method.getDeclaringClass() == Object.class)
+        return method.invoke(jo, args);
+
+      return handler.invoke(proxy, method, args);
+    };
+  }
+
   InvocationHandler getWrappedInvocationHandler(JavaScriptObject javaScriptObject, InvocationHandler handler) {
+    // trap Object methods before allowing it to go to the JavaScriptObject or the JavaScriptObject single method lambda.
+    // higher level wrappers may trap the Object methods themselves.
+    handler = wrapObjectInvocationHandler(javaScriptObject, handler);
+
     if (invocationHandlerWrapper == null)
       return handler;
     InvocationHandler wrapped = invocationHandlerWrapper.wrapInvocationHandler(javaScriptObject, handler);
@@ -209,8 +224,8 @@ public final class Duktape implements Closeable {
       // single method arguments are simply callbacks
       if (clazz.getMethods().length == 1) {
         return Proxy.newProxyInstance(clazz.getClassLoader(), new Class[]{clazz},
-                (proxy, method, args) ->
-                        coerceJavaScriptToJava(method.getReturnType(), jo.call(args)));
+                getWrappedInvocationHandler(jo, (proxy, method, args) ->
+                        coerceJavaScriptToJava(method.getReturnType(), jo.call(args))));
       }
       else {
         InvocationHandler handler = jo.createInvocationHandler();
@@ -658,7 +673,7 @@ public final class Duktape implements Closeable {
       finalizeJavaScriptObject(context, object);
   }
 
-  public synchronized long getHeapSize() {
+  public long getHeapSize() {
     if (context == 0)
       return 0;
     return getHeapSize(context);

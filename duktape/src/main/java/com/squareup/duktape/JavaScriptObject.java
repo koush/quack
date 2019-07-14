@@ -98,9 +98,6 @@ public class JavaScriptObject implements DuktapeObject {
 
     public InvocationHandler createInvocationHandler() {
         InvocationHandler handler = (proxy, method, args) -> {
-            if (method.getDeclaringClass() == Object.class)
-                return method.invoke(JavaScriptObject.this, args);
-
             Method interfaceMethod = Duktape.getInterfaceMethod(method);
             DuktapeMethodCoercion methodCoercion = duktape.JavaToJavascriptMethodCoercions.get(interfaceMethod);
             if (methodCoercion != null)
