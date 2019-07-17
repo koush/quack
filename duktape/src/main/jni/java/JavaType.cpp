@@ -673,5 +673,5 @@ const JavaType* JavaTypeMap::find(JNIEnv* env, const std::string& name) {
     return I->second;
   }
 
-  throw std::invalid_argument("Unsupported Java type " + name);
+  return nullptr;
 }

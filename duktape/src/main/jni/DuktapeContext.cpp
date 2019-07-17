@@ -30,7 +30,7 @@ namespace {
 // The \xff\xff part keeps the variable hidden from JavaScript (visible through C API only).
 const char* JAVA_VM_PROP_NAME = "\xff\xffjavaVM";
 const char* JAVA_THIS_PROP_NAME = "\xff\xffjava_this";
-const char* JAVA_METHOD_PROP_NAME = "\xff\xffjava_method";
+const char* JAVASCRIPT_THIS_PROP_NAME = "__javascript_this";
 const char* DUKTAPE_CONTEXT_PROP_NAME = "\xff\xffjava_duktapecontext";
 const char* JAVA_EXCEPTION_PROP_NAME = "\xff\xffjava_exception";
 
@@ -52,14 +52,6 @@ DuktapeContext* getDuktapeContext(duk_context *ctx) {
   return duktapeContext;
 }
 
-jobject getJavaThis(duk_context* ctx) {
-  duk_push_this(ctx);
-  duk_get_prop_string(ctx, -1, JAVA_THIS_PROP_NAME);
-  jobject thisObject = static_cast<jobject>(duk_require_pointer(ctx, -1));
-  duk_pop_2(ctx);
-  return thisObject;
-}
-
 duk_int_t eval_string_with_filename(duk_context *ctx, const char *src, const char *fileName) {
   duk_push_string(ctx, fileName);
   const int numArgs = 1;
@@ -69,11 +61,19 @@ duk_int_t eval_string_with_filename(duk_context *ctx, const char *src, const cha
 
 // Called by Duktape to handle finalization of bound JavaObjects.
 duk_ret_t javaObjectFinalizer(duk_context *ctx) {
-  if (duk_get_prop_string(ctx, -1, JAVA_THIS_PROP_NAME)) {
-    // Remove the global reference from the bound Java object.
-    getJNIEnv(ctx)->DeleteGlobalRef(static_cast<jobject>(duk_require_pointer(ctx, -1)));
+  {
+    CHECK_STACK(ctx);
+
+    // todo: should this EVER be null? it's a global ref.
+    if (duk_get_prop_string(ctx, -1, JAVASCRIPT_THIS_PROP_NAME)) {
+      // Remove the global reference from the bound Java object.
+      void* ptr = duk_require_pointer(ctx, -1);
+      duk_del_prop_string(ctx, -2, JAVASCRIPT_THIS_PROP_NAME);
+      if (ptr) {
+        getJNIEnv(ctx)->DeleteGlobalRef(static_cast<jobject>(ptr));
+      }
+    }
     duk_pop(ctx);
-    duk_del_prop_string(ctx, -1, JAVA_METHOD_PROP_NAME);
   }
 
   // Pop the object passed in as an argument.
@@ -83,15 +83,15 @@ duk_ret_t javaObjectFinalizer(duk_context *ctx) {
 
 // Called by Duktape to handle finalization of bound JavaScriptObjects.
 void javascriptObjectFinalizerInternal(duk_context *ctx) {
+  CHECK_STACK(ctx);
+
   // get the pointer or undefined
-  if (duk_get_prop_string(ctx, -1, "__java_this")) {
+  if (duk_get_prop_string(ctx, -1, JAVA_THIS_PROP_NAME)) {
     void* ptr = duk_require_pointer(ctx, -1);
+    duk_del_prop_string(ctx, -2, JAVA_THIS_PROP_NAME);
     if (ptr) {
-        // Remove the global reference from the bound Java object.
-        getJNIEnv(ctx)->DeleteWeakGlobalRef(static_cast<jobject>(duk_require_pointer(ctx, -1)));
+      getJNIEnv(ctx)->DeleteWeakGlobalRef(static_cast<jobject>(ptr));
     }
-    // delete the pointer prop
-    duk_del_prop_string(ctx, -2, "__java_this");
   }
   // pop the pointer or undefined
   duk_pop(ctx);
@@ -167,6 +167,12 @@ public:
     }
 };
 
+static duk_ret_t __duktape_get(duk_context *ctx);
+static duk_ret_t __duktape_has(duk_context *ctx);
+static duk_ret_t __duktape_set(duk_context *ctx);
+static duk_ret_t __duktape_apply(duk_context *ctx);
+static duk_ret_t __duktape_noop(duk_context *) { return 0; }
+
 DuktapeContext::DuktapeContext(JavaVM* javaVM, jobject javaDuktape)
     : m_context(duk_create_heap(tracked_alloc, tracked_realloc, tracked_free, this, fatalErrorHandler))
     , m_heapSize(0)
@@ -210,6 +216,28 @@ DuktapeContext::DuktapeContext(JavaVM* javaVM, jobject javaDuktape)
   duk_push_pointer(m_context, this);
   duk_put_prop_string(m_context, -2, DUKTAPE_CONTEXT_PROP_NAME);
   duk_pop(m_context);
+
+
+  // bind the traps
+  duk_push_global_object(m_context);
+
+  // bind has
+  duk_push_c_function(m_context, __duktape_has, 2);
+  duk_put_prop_string(m_context, -2, "__duktape_has");
+
+  // bind get
+  duk_push_c_function(m_context, __duktape_get, 3);
+  duk_put_prop_string(m_context, -2, "__duktape_get");
+
+  // bind set
+  duk_push_c_function(m_context, __duktape_set, 4);
+  duk_put_prop_string(m_context, -2, "__duktape_set");
+
+  // bind apply
+  duk_push_c_function(m_context, __duktape_apply, 3);
+  duk_put_prop_string(m_context, -2, "__duktape_apply");
+
+  duk_pop(m_context);
 }
 
 jlong DuktapeContext::getHeapSize() {
@@ -243,29 +271,46 @@ jobject DuktapeContext::popObject(JNIEnv *env) const {
   else if (duk_get_type(m_context, -1) == DUK_TYPE_OBJECT) {
     jobject javaThis = nullptr;
 
-    // JavaScriptObject and JavaObject both contain a __java_this which points to the Java
-    // instance of that object. JavaScriptObject will be created as needed, whereas JavaObject
-    // will retrieve it from the JAVA_THIS_PROP_NAME  with __duktape_get Proxy handler.
-    if (duk_has_prop_string(m_context, -1, "__java_this")) {
-      duk_get_prop_string(m_context, -1, "__java_this");
+    // JavaScriptObject and JavaObject both contain an internal "this" which points to the Java
+    // instance of that object. Try to extract that object.
+
+    // Duktape Java Proxy can NOT be queried for JAVA_THIS_PROP_NAME since it is a special hidden
+    // key (check the string prefix). So, query for JAVASCRIPT_THIS_PROP_NAME, which is
+    // a "normal" key. The proxy trap will not be invoked otherwise. This key is not enumerated
+    // due to the Java side proxy implementation.
+
+    // However, Duktape JavaScript objects should use JAVA_THIS_PROP_NAME, because
+    // JAVASCRIPT_THIS_PROP_NAME is publicly visible and this causes key iteration pollution issues.
+
+    duk_bool_t hasThis = duk_has_prop_string(m_context, -1, JAVASCRIPT_THIS_PROP_NAME);
+    if (hasThis) {
+        duk_get_prop_string(m_context, -1, JAVASCRIPT_THIS_PROP_NAME);
+    }
+    else {
+        // this code will not be trapped on Duktape Java Proxy due to the key name.
+        hasThis = duk_has_prop_string(m_context, -1, JAVA_THIS_PROP_NAME);
+        if (hasThis) {
+            duk_get_prop_string(m_context, -1, JAVA_THIS_PROP_NAME);
+        }
+    }
+
+    if (hasThis) {
       javaThis = reinterpret_cast<jobject>(duk_get_pointer(m_context, -1));
       // pop the pointer
       duk_pop(m_context);
-      // this may be a weak or strong reference. make sure the weak reference is still valid.
-      // weak references are used by JavaScript objects marshalled to Java.
-      // strong references are used by Java objects marshalled to JavaScript.
+      // Duktape JavaScript objects only hold weak references to their Java counterparts, which
+      // may be invalid. Check this, and delete as necessary.
       if (javaThis && env->IsSameObject(javaThis, nullptr)) {
-        // todo: is this code still called with JavaScriptObject.finalize being implemented?
-        // todo: finalize is called on GC, but is finalize run immediately after an object is deemed
-        // todo: to be unreachable, or sometime afterwards?
         env->DeleteWeakGlobalRef(javaThis);
         javaThis = nullptr;
-        duk_del_prop_string(m_context, -1, "__java_this");
+        duk_del_prop_string(m_context, -1, JAVA_THIS_PROP_NAME);
       }
     }
 
     if (javaThis != nullptr) {
-      // pop the JavaScript object
+      // found an existing Java proxy tucked away in this object. Must create a
+      // local ref before popping, because the pop finalizer may destroy the global (weak) ref.
+      javaThis = env->NewLocalRef(javaThis);
       duk_pop(m_context);
       return javaThis;
     }
@@ -306,7 +351,7 @@ jobject DuktapeContext::popObject(JNIEnv *env) const {
 
     // attach the Java object's weak reference to the JavaScript object
     duk_push_pointer(m_context, weakRef);
-    duk_put_prop_string(m_context, -2, "__java_this");
+    duk_put_prop_string(m_context, -2, JAVA_THIS_PROP_NAME);
 
     // pop the JavaScript object, it is hard referenced
     duk_pop(m_context);
@@ -335,8 +380,10 @@ duk_ret_t DuktapeContext::duktapeSet() {
   jobject prop = popObject(env);
 
   // get the java reference
-  duk_get_prop_string(m_context, -1, JAVA_THIS_PROP_NAME);
+  duk_get_prop_string(m_context, -1, "target");
+  duk_get_prop_string(m_context, -1, JAVASCRIPT_THIS_PROP_NAME);
   jobject object = static_cast<jobject>(duk_require_pointer(m_context, -1));
+  duk_pop(m_context);
   duk_pop(m_context);
 
   if (object == nullptr) {
@@ -377,11 +424,11 @@ duk_ret_t DuktapeContext::duktapeGet() {
   jobject jprop;
   jobject object;
   {
-    // need to specially handle string keys to get the java reference (JAVA_THIS_PROP_NAME)
     std::string prop;
     if (duk_get_type(m_context, -1) == DUK_TYPE_STRING) {
       // get the property name
       const char* cprop = duk_get_string(m_context, -1);
+      prop = cprop;
       // not a valid utf string. duktape internal.
       if (cprop[0] == '\x81') {
           duk_pop_2(m_context);
@@ -389,7 +436,6 @@ duk_ret_t DuktapeContext::duktapeGet() {
           return 1;
       }
       jprop = env->NewStringUTF(cprop);
-      prop = cprop;
       duk_pop(m_context);
     }
     else {
@@ -397,16 +443,17 @@ duk_ret_t DuktapeContext::duktapeGet() {
     }
 
     // get the java reference
-    duk_get_prop_string(m_context, -1, JAVA_THIS_PROP_NAME);
+    duk_get_prop_string(m_context, -1, "target");
+    duk_get_prop_string(m_context, -1, JAVASCRIPT_THIS_PROP_NAME);
     object = static_cast<jobject>(duk_require_pointer(m_context, -1));
-    duk_pop(m_context);
+    duk_pop_2(m_context);
 
     if (object == nullptr) {
       fatalErrorHandler(object, "DuktapeObject is null");
       return DUK_RET_REFERENCE_ERROR;
     }
 
-    if (prop == "__java_this") {
+    if (prop == JAVASCRIPT_THIS_PROP_NAME) {
       // short circuit the pointer retrieval from popObject here.
       duk_push_pointer(m_context, object);
       return 1;
@@ -442,8 +489,30 @@ static duk_ret_t __duktape_get(duk_context *ctx) {
 duk_ret_t DuktapeContext::duktapeHas() {
     JNIEnv *env = getJNIEnv(m_context);
 
-    jobject prop = popObject(env);
+    std::string prop;
+    if (duk_get_type(m_context, -1) == DUK_TYPE_STRING) {
+        // get the property name
+        const char* cprop = duk_get_string(m_context, -1);
+        prop = cprop;
+        if (cprop[0] == '\x81') {
+            duk_pop_2(m_context);
+            // not a valid utf string. duktape internal.
+            duk_push_boolean(m_context, (duk_bool_t )false);
+            return 1;
+        }
+    }
+
+    if (prop == JAVASCRIPT_THIS_PROP_NAME) {
+        // short circuit the pointer retrieval from popObject here.
+        duk_pop_2(m_context);
+        duk_push_boolean(m_context, (duk_bool_t )true);
+        return 1;
+    }
+
+    jobject jprop = popObject(env);
+    duk_get_prop_string(m_context, -1, "target");
     jobject object = static_cast<jobject>(duk_require_pointer(m_context, -1));
+    duk_pop(m_context);
     duk_pop(m_context);
 
     jclass objectClass = env->GetObjectClass(object);
@@ -454,7 +523,7 @@ duk_ret_t DuktapeContext::duktapeHas() {
       return DUK_RET_REFERENCE_ERROR;
     }
 
-    jboolean has = env->CallBooleanMethod(m_javaDuktape, m_duktapeHasMethod, object, prop);
+    jboolean has = env->CallBooleanMethod(m_javaDuktape, m_duktapeHasMethod, object, jprop);
     if (!checkRethrowDuktapeError(env, m_context)) {
         return DUK_RET_ERROR;
     }
@@ -487,8 +556,10 @@ duk_ret_t DuktapeContext::duktapeApply() {
   jobject javaThis = popObject(env);
 
   // get the java reference
-  duk_get_prop_string(m_context, -1, JAVA_THIS_PROP_NAME);
+  duk_get_prop_string(m_context, -1, "target");
+  duk_get_prop_string(m_context, -1, JAVASCRIPT_THIS_PROP_NAME);
   jobject object = static_cast<jobject>(duk_require_pointer(m_context, -1));
+  duk_pop(m_context);
   duk_pop(m_context);
 
   jclass objectClass = env->GetObjectClass(object);
@@ -530,19 +601,16 @@ void DuktapeContext::pushObject(JNIEnv *env, jobject object, bool deleteLocalRef
 
   // try to push a native object first.
   {
-    try {
-      const JavaType* type = m_javaValues.get(env, objectClass);
+    const JavaType* type = m_javaValues.get(env, objectClass);
+    if (type != nullptr) {
       jvalue value;
       value.l = object;
       type->push(m_context, env, value);
       // safe to delete the local refs now
       if (deleteLocalRef)
-        env->DeleteLocalRef(object);
+          env->DeleteLocalRef(object);
       env->DeleteLocalRef(objectClass);
       return;
-    }
-    catch (...) {
-      // not a native object, so marshall it
     }
   }
 
@@ -585,44 +653,46 @@ void DuktapeContext::pushObject(JNIEnv *env, jobject object, bool deleteLocalRef
 
   env->DeleteLocalRef(objectClass);
 
-    // at this point, the object is guaranteed to be a JavaScriptObject from another DuktapeContext
-  // or a DuktapeObject (java proxy of some sort). JavaScriptObject implements DuktapeObject,
-  // so, it works without any further coercion.
+  // target (needs to be a function to trap apply)
+  const duk_idx_t funcIndex = duk_require_normalize_index(m_context, duk_push_c_function(m_context, __duktape_noop, 0));
 
-  duk_get_global_string(m_context, "__makeProxy");
-
+  // handler
+  // create a per object handler, because finalizers do not run on the function themselves.
   const duk_idx_t objIndex = duk_require_normalize_index(m_context, duk_push_object(m_context));
+
+  duk_dup(m_context, objIndex);
+  duk_put_prop_string(m_context, funcIndex, "target");
 
   jobject ptr = env->NewGlobalRef(object);
   duk_push_pointer(m_context, ptr);
   // safe to delete the local ref now
   if (deleteLocalRef)
-    env->DeleteLocalRef(object);
-  duk_put_prop_string(m_context, objIndex, JAVA_THIS_PROP_NAME);
+      env->DeleteLocalRef(object);
+  // the proxy target is not exposed, so no need to use the hidden key.
+  // for consistency, this is the key that will be used in get/set/apply/has traps.
+  duk_put_prop_string(m_context, objIndex, JAVASCRIPT_THIS_PROP_NAME);
 
-  // set a finalizer for the ref
+  // set a finalizer for the ref on the handler
   duk_push_c_function(m_context, javaObjectFinalizer, 1);
   duk_set_finalizer(m_context, objIndex);
 
   // bind has
   duk_push_c_function(m_context, __duktape_has, 2);
-  duk_put_prop_string(m_context, objIndex, "__duktape_has");
+  duk_put_prop_string(m_context, objIndex, "has");
 
   // bind get
   duk_push_c_function(m_context, __duktape_get, 3);
-  duk_put_prop_string(m_context, objIndex, "__duktape_get");
+  duk_put_prop_string(m_context, objIndex, "get");
 
   // bind set
   duk_push_c_function(m_context, __duktape_set, 4);
-  duk_put_prop_string(m_context, objIndex, "__duktape_set");
+  duk_put_prop_string(m_context, objIndex, "set");
 
   // bind apply
   duk_push_c_function(m_context, __duktape_apply, 3);
-  duk_put_prop_string(m_context, objIndex, "__duktape_apply");
+  duk_put_prop_string(m_context, objIndex, "apply");
 
-  // make the proxy
-  if (duk_pcall(m_context, 1) != DUK_EXEC_SUCCESS)
-    queueJavaExceptionForDuktapeError(env, m_context);
+  duk_push_proxy(m_context, 0);
 }
 
 jobject DuktapeContext::call(JNIEnv *env, jlong object, jobjectArray args) {

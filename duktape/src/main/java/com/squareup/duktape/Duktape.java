@@ -28,10 +28,8 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.lang.reflect.UndeclaredThrowableException;
-import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.Set;
 import java.util.logging.Logger;
 
 /** A simple EMCAScript (Javascript) interpreter. */
@@ -425,19 +423,6 @@ public final class Duktape implements Closeable {
       throw new OutOfMemoryError("Cannot create Duktape instance");
     }
     duktape.context = context;
-    duktape.evaluate(
-            "var __proxyHandler = {\n" +
-                    "\thas: function(f, prop) { return prop == '__java_this' || f.target.__duktape_has(f.target, prop); },\n" +
-                    "\tget: function(f, prop, receiver) { return f.target.__duktape_get(f.target, prop, receiver); },\n" +
-                    "\tset: function(f, prop, value, receiver) { return f.target.__duktape_set(f.target, prop, value, receiver); },\n" +
-                    "\tapply: function(f, thisArg, argumentsList) { return f.target.__duktape_apply(f.target, thisArg, argumentsList); },\n" +
-                    "};\n" +
-                    "function __makeProxy(obj) {\n" +
-                    "\tfunction f() {};\n" +
-                    "\tf.target = obj;\n" +
-                    "\treturn new Proxy(f, __proxyHandler);\n" +
-                    "};\n"
-    );
     return duktape;
   }
 
