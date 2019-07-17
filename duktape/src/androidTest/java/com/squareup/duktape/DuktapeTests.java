@@ -80,10 +80,16 @@ public class DuktapeTests extends TestCase  {
         RoundtripCallback cb = ((JavaScriptObject)func.call()).proxyInterface(RoundtripCallback.class);
 
         // should all come back as doubles.
-        List<Object> values = Arrays.asList((byte)0, (short)0, 0, 0l, 0f, 0d);
+        List<Object> values = Arrays.asList((byte)0, (short)0, 0, 0f, 0d);
         for (Object value: values) {
             Object ret = cb.callback(value);
             assertTrue(ret instanceof Double);
+        }
+
+        values = Arrays.asList(0L, "0");
+        for (Object value: values) {
+            Object ret = cb.callback(value);
+            assertTrue(ret instanceof String);
         }
     }
 
@@ -384,5 +390,51 @@ public class DuktapeTests extends TestCase  {
         // returned stack trace should have same number of lines as above.
         // a weak assertion, but it's indicative of correctness because javascript adds 3 lines more than expected.
         Assert.assertEquals(ret.split("\n").length, expected.split("\n").length);
+    }
+
+    interface MarshallCallback {
+        void callback(Object o, Boolean B, Short S, Integer I, Long L, Float F, Double D, boolean b, short s, int i, long l, float f, double d, String str);
+    }
+
+    public void testJavaProxyInDuktapeThreadCrash() {
+        Duktape duktape = Duktape.create();
+        String script = "function(cb, o, B, S, I, L, F, D, b, s, i, l, f, d, str) {\n" +
+                "function yielder() {\n" +
+                "\tcb.callback(o, B, S, I, L, F, D, b, s, i, l, f, d, str);\n" +
+                "}\n" +
+                "\n" +
+                "var t = new Duktape.Thread(yielder);\n" +
+                "Duktape.Thread.resume(t, cb);\n" +
+                "}\n";
+
+        try {
+            Object o = new Object();
+            MarshallCallback cb = new MarshallCallback() {
+                @Override
+                public void callback(Object oo, Boolean B, Short S, Integer I, Long L, Float F, Double D, boolean b, short s, int i, long l, float f, double d, String str) {
+                    assertTrue(oo == o);
+                    assertTrue(b == true);
+                    assertTrue(s == 2);
+                    assertTrue(i == 2);
+                    assertTrue(l == 2);
+                    assertTrue(f == 2);
+                    assertTrue(d == 2);
+                    assertTrue(B == true);
+                    assertTrue(S == 2);
+                    assertTrue(I == 2);
+                    assertTrue(L == 2);
+                    assertTrue(F == 2);
+                    assertTrue(D == 2);
+                    assertEquals("test", str);
+                    throw new IllegalArgumentException("java!");
+                }
+            };
+
+            JavaScriptObject func = duktape.compileFunction(script, "?");
+            func.call(cb, o, (Boolean)true, (Short)(short)2, (Integer)2, (Long)2L, (Float)2f, (Double)2d, true, (short)2, 2, 2L, 2f, 2d, "test");
+        }
+        catch (Exception e) {
+            Assert.assertTrue(e.getMessage().contains("java!"));
+        }
     }
 }

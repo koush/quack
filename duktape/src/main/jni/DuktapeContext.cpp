@@ -34,11 +34,6 @@ const char* JAVASCRIPT_THIS_PROP_NAME = "__javascript_this";
 const char* DUKTAPE_CONTEXT_PROP_NAME = "\xff\xffjava_duktapecontext";
 const char* JAVA_EXCEPTION_PROP_NAME = "\xff\xffjava_exception";
 
-class DuktapeError: std::runtime_error {
-public:
-    DuktapeError() : runtime_error("duktape error"){}
-};
-
 JNIEnv* getJNIEnv(duk_context *ctx) {
   duk_push_global_stash(ctx);
   duk_get_prop_string(ctx, -1, JAVA_VM_PROP_NAME);
@@ -382,15 +377,17 @@ duk_ret_t DuktapeContext::duktapeSet() {
   // pop the receiver, useless
   duk_pop(m_context);
 
+  // pop the value
   jobject value = popObject(env);
+  // pop the prop
   jobject prop = popObject(env);
 
   // get the java reference
   duk_get_prop_string(m_context, -1, "target");
   duk_get_prop_string(m_context, -1, JAVASCRIPT_THIS_PROP_NAME);
   jobject object = static_cast<jobject>(duk_require_pointer(m_context, -1));
-  duk_pop(m_context);
-  duk_pop(m_context);
+  // pop the real target, real jobject, and the target
+  duk_pop_3(m_context);
 
   if (object == nullptr) {
     fatalErrorHandler(object, "DuktapeObject is null");
@@ -417,13 +414,16 @@ duk_ret_t DuktapeContext::duktapeSet() {
 
 static duk_ret_t __duktape_set(duk_context *ctx) {
     DuktapeContext *duktapeContext = getDuktapeContext(ctx);
-    try {
+    {
         const ContextSwitcher _(duktapeContext, ctx);
-        return duktapeContext->duktapeSet();
+        duk_ret_t ret = duktapeContext->duktapeSet();
+        if (ret != DUK_RET_ERROR) {
+            return ret;
+        }
+        duk_pop(ctx);
     }
-    catch (DuktapeError) {
-        duk_throw(ctx);
-    }
+    return DUK_RET_ERROR;
+    duk_throw(ctx);
 }
 
 duk_ret_t DuktapeContext::duktapeGet() {
@@ -447,9 +447,11 @@ duk_ret_t DuktapeContext::duktapeGet() {
           return 1;
       }
       jprop = env->NewStringUTF(cprop);
+      // pop the property
       duk_pop(m_context);
     }
     else {
+      // pop the property
       jprop = popObject(env);
     }
 
@@ -457,7 +459,8 @@ duk_ret_t DuktapeContext::duktapeGet() {
     duk_get_prop_string(m_context, -1, "target");
     duk_get_prop_string(m_context, -1, JAVASCRIPT_THIS_PROP_NAME);
     object = static_cast<jobject>(duk_require_pointer(m_context, -1));
-    duk_pop_2(m_context);
+    // pop the real target, real jobject, and the target
+    duk_pop_3(m_context);
 
     if (object == nullptr) {
       fatalErrorHandler(object, "DuktapeObject is null");
@@ -493,13 +496,16 @@ duk_ret_t DuktapeContext::duktapeGet() {
 
 static duk_ret_t __duktape_get(duk_context *ctx) {
   DuktapeContext *duktapeContext = getDuktapeContext(ctx);
-    try {
+    {
         const ContextSwitcher _(duktapeContext, ctx);
-        return duktapeContext->duktapeGet();
+        duk_ret_t ret = duktapeContext->duktapeGet();
+        if (ret != DUK_RET_ERROR) {
+            return ret;
+        }
+        duk_pop(ctx);
     }
-    catch (DuktapeError) {
-        duk_throw(ctx);
-    }
+    return DUK_RET_ERROR;
+    duk_throw(ctx);
 }
 
 duk_ret_t DuktapeContext::duktapeHas() {
@@ -511,6 +517,7 @@ duk_ret_t DuktapeContext::duktapeHas() {
         const char* cprop = duk_get_string(m_context, -1);
         prop = cprop;
         if (cprop[0] == '\x81') {
+            // pop target and prop
             duk_pop_2(m_context);
             // not a valid utf string. duktape internal.
             duk_push_boolean(m_context, (duk_bool_t )false);
@@ -525,11 +532,14 @@ duk_ret_t DuktapeContext::duktapeHas() {
         return 1;
     }
 
+    // get the java reference
     jobject jprop = popObject(env);
     duk_get_prop_string(m_context, -1, "target");
+    duk_get_prop_string(m_context, -1, JAVASCRIPT_THIS_PROP_NAME);
     jobject object = static_cast<jobject>(duk_require_pointer(m_context, -1));
-    duk_pop(m_context);
-    duk_pop(m_context);
+    // pop the real target, real jobject, and the target
+    duk_pop_3(m_context);
+
 
     jclass objectClass = env->GetObjectClass(object);
     jboolean assignable = env->IsAssignableFrom(objectClass, m_duktapeObjectClass);
@@ -551,13 +561,16 @@ duk_ret_t DuktapeContext::duktapeHas() {
 
 static duk_ret_t __duktape_has(duk_context *ctx) {
   DuktapeContext *duktapeContext = getDuktapeContext(ctx);
-    try {
+    {
         const ContextSwitcher _(duktapeContext, ctx);
-        return duktapeContext->duktapeHas();
+        duk_ret_t ret = duktapeContext->duktapeHas();
+        if (ret != DUK_RET_ERROR) {
+            return ret;
+        }
+        duk_pop(ctx);
     }
-    catch (DuktapeError) {
-        duk_throw(ctx);
-    }
+    return DUK_RET_ERROR;
+    duk_throw(ctx);
 }
 
 duk_ret_t DuktapeContext::duktapeApply() {
@@ -580,8 +593,7 @@ duk_ret_t DuktapeContext::duktapeApply() {
   duk_get_prop_string(m_context, -1, "target");
   duk_get_prop_string(m_context, -1, JAVASCRIPT_THIS_PROP_NAME);
   jobject object = static_cast<jobject>(duk_require_pointer(m_context, -1));
-  duk_pop(m_context);
-  duk_pop(m_context);
+  duk_pop_3(m_context);
 
   jclass objectClass = env->GetObjectClass(object);
   jboolean assignable = env->IsAssignableFrom(objectClass, m_duktapeObjectClass);
@@ -604,13 +616,16 @@ duk_ret_t DuktapeContext::duktapeApply() {
 
 static duk_ret_t __duktape_apply(duk_context *ctx) {
   DuktapeContext *duktapeContext = getDuktapeContext(ctx);
-    try {
+    {
         const ContextSwitcher _(duktapeContext, ctx);
-        return duktapeContext->duktapeApply();
+        duk_ret_t ret = duktapeContext->duktapeApply();
+        if (ret != DUK_RET_ERROR) {
+            return ret;
+        }
+        duk_pop(ctx);
     }
-    catch (DuktapeError) {
-        duk_throw(ctx);
-    }
+    return DUK_RET_ERROR;
+    duk_throw(ctx);
 }
 
 void DuktapeContext::pushObject(JNIEnv *env, jlong object) {
@@ -1061,10 +1076,7 @@ bool checkRethrowDuktapeError(JNIEnv* env, duk_context* ctx) {
 }
 
 bool checkRethrowDuktapeErrorException(JNIEnv* env, duk_context* ctx) {
-    if (!checkRethrowDuktapeErrorInternal(env, ctx)) {
-        throw DuktapeError();
-    }
-    return true;
+    return checkRethrowDuktapeErrorInternal(env, ctx);
 }
 
 void queueJavaExceptionForDuktapeError(JNIEnv *env, duk_context *ctx) {
