@@ -695,7 +695,11 @@ void DuktapeContext::pushObject(JNIEnv *env, jobject object, bool deleteLocalRef
   env->DeleteLocalRef(objectClass);
 
   // target (needs to be a function to trap apply)
-  const duk_idx_t funcIndex = duk_require_normalize_index(m_context, duk_push_c_function(m_context, __duktape_noop, 0));
+  // unsure why, but pushing a C function causes weird debugger issues. random detatches.
+  // eval a normal function instead. no such call exists in duktape.
+//  const duk_idx_t funcIndex = duk_require_normalize_index(m_context, duk_push_c_function(m_context, __duktape_noop, 0));
+  duk_eval_string(m_context, "(function(){});");
+  const duk_idx_t funcIndex = duk_require_normalize_index(m_context, -1);
 
   // handler
   // create a per object handler, because finalizers do not run on the function themselves.
