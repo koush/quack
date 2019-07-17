@@ -34,6 +34,11 @@ const char* JAVASCRIPT_THIS_PROP_NAME = "__javascript_this";
 const char* DUKTAPE_CONTEXT_PROP_NAME = "\xff\xffjava_duktapecontext";
 const char* JAVA_EXCEPTION_PROP_NAME = "\xff\xffjava_exception";
 
+class DuktapeError: std::runtime_error {
+public:
+    DuktapeError() : runtime_error("duktape error"){}
+};
+
 JNIEnv* getJNIEnv(duk_context *ctx) {
   duk_push_global_stash(ctx);
   duk_get_prop_string(ctx, -1, JAVA_VM_PROP_NAME);
@@ -255,6 +260,7 @@ DuktapeContext::~DuktapeContext() {
 }
 
 jobject DuktapeContext::popObject(JNIEnv *env) const {
+  duk_int_t dukType = duk_get_type(m_context, -1);
   const int supportedTypeMask = DUK_TYPE_MASK_BOOLEAN | DUK_TYPE_MASK_NUMBER | DUK_TYPE_MASK_STRING;
   if (duk_check_type_mask(m_context, -1, supportedTypeMask)) {
     // The result is a supported scalar type - return it.
@@ -400,7 +406,7 @@ duk_ret_t DuktapeContext::duktapeSet() {
   }
 
   jboolean ret = env->CallBooleanMethod(m_javaDuktape, m_duktapeSetMethod, object, prop, value);
-  if (!checkRethrowDuktapeError(env, m_context)) {
+  if (!checkRethrowDuktapeErrorException(env, m_context)) {
     return DUK_RET_ERROR;
   }
 
@@ -411,8 +417,13 @@ duk_ret_t DuktapeContext::duktapeSet() {
 
 static duk_ret_t __duktape_set(duk_context *ctx) {
     DuktapeContext *duktapeContext = getDuktapeContext(ctx);
-    const ContextSwitcher _(duktapeContext, ctx);
-    return duktapeContext->duktapeSet();
+    try {
+        const ContextSwitcher _(duktapeContext, ctx);
+        return duktapeContext->duktapeSet();
+    }
+    catch (DuktapeError) {
+        duk_throw(ctx);
+    }
 }
 
 duk_ret_t DuktapeContext::duktapeGet() {
@@ -471,7 +482,7 @@ duk_ret_t DuktapeContext::duktapeGet() {
 //  jobject push = env->CallObjectMethod(object, m_duktapeObjectGetMethod, jprop);
   jobject push = env->CallObjectMethod(m_javaDuktape, m_duktapeGetMethod, object, jprop);
   env->DeleteLocalRef(jprop);
-  if (!checkRethrowDuktapeError(env, m_context)) {
+  if (!checkRethrowDuktapeErrorException(env, m_context)) {
     return DUK_RET_ERROR;
   }
 
@@ -482,8 +493,13 @@ duk_ret_t DuktapeContext::duktapeGet() {
 
 static duk_ret_t __duktape_get(duk_context *ctx) {
   DuktapeContext *duktapeContext = getDuktapeContext(ctx);
-  const ContextSwitcher _(duktapeContext, ctx);
-  return duktapeContext->duktapeGet();
+    try {
+        const ContextSwitcher _(duktapeContext, ctx);
+        return duktapeContext->duktapeGet();
+    }
+    catch (DuktapeError) {
+        duk_throw(ctx);
+    }
 }
 
 duk_ret_t DuktapeContext::duktapeHas() {
@@ -524,7 +540,7 @@ duk_ret_t DuktapeContext::duktapeHas() {
     }
 
     jboolean has = env->CallBooleanMethod(m_javaDuktape, m_duktapeHasMethod, object, jprop);
-    if (!checkRethrowDuktapeError(env, m_context)) {
+    if (!checkRethrowDuktapeErrorException(env, m_context)) {
         return DUK_RET_ERROR;
     }
 
@@ -535,8 +551,13 @@ duk_ret_t DuktapeContext::duktapeHas() {
 
 static duk_ret_t __duktape_has(duk_context *ctx) {
   DuktapeContext *duktapeContext = getDuktapeContext(ctx);
-  const ContextSwitcher _(duktapeContext, ctx);
-  return duktapeContext->duktapeHas();
+    try {
+        const ContextSwitcher _(duktapeContext, ctx);
+        return duktapeContext->duktapeHas();
+    }
+    catch (DuktapeError) {
+        duk_throw(ctx);
+    }
 }
 
 duk_ret_t DuktapeContext::duktapeApply() {
@@ -573,7 +594,7 @@ duk_ret_t DuktapeContext::duktapeApply() {
 
   jobject push = env->CallObjectMethod(m_javaDuktape, m_duktapeCallMethodMethod, object, javaThis, javaArgs);
   env->DeleteLocalRef(javaArgs);
-  if (!checkRethrowDuktapeError(env, m_context)) {
+  if (!checkRethrowDuktapeErrorException(env, m_context)) {
     return DUK_RET_ERROR;
   }
 
@@ -583,8 +604,13 @@ duk_ret_t DuktapeContext::duktapeApply() {
 
 static duk_ret_t __duktape_apply(duk_context *ctx) {
   DuktapeContext *duktapeContext = getDuktapeContext(ctx);
-  const ContextSwitcher _(duktapeContext, ctx);
-  return duktapeContext->duktapeApply();
+    try {
+        const ContextSwitcher _(duktapeContext, ctx);
+        return duktapeContext->duktapeApply();
+    }
+    catch (DuktapeError) {
+        duk_throw(ctx);
+    }
 }
 
 void DuktapeContext::pushObject(JNIEnv *env, jlong object) {
@@ -982,7 +1008,7 @@ void queueNullPointerException(JNIEnv* env, const std::string& message) {
   env->ThrowNew(exceptionClass, message.c_str());
 }
 
-bool checkRethrowDuktapeError(JNIEnv* env, duk_context* ctx) {
+bool checkRethrowDuktapeErrorInternal(JNIEnv* env, duk_context* ctx) {
   if (!env->ExceptionCheck()) {
     return true;
   }
@@ -1023,8 +1049,22 @@ bool checkRethrowDuktapeError(JNIEnv* env, duk_context* ctx) {
   duktapeContext->pushObject(env, newStack);
   duk_put_prop_string(ctx, -2, "stack");
 
-  duk_throw(ctx);
   return false;
+}
+
+bool checkRethrowDuktapeError(JNIEnv* env, duk_context* ctx) {
+    if (!checkRethrowDuktapeErrorInternal(env, ctx)) {
+        duk_throw(ctx);
+        return false;
+    }
+    return true;
+}
+
+bool checkRethrowDuktapeErrorException(JNIEnv* env, duk_context* ctx) {
+    if (!checkRethrowDuktapeErrorInternal(env, ctx)) {
+        throw DuktapeError();
+    }
+    return true;
 }
 
 void queueJavaExceptionForDuktapeError(JNIEnv *env, duk_context *ctx) {
