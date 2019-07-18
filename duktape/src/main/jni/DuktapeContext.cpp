@@ -420,9 +420,7 @@ static duk_ret_t __duktape_set(duk_context *ctx) {
         if (ret != DUK_RET_ERROR) {
             return ret;
         }
-        duk_pop(ctx);
     }
-    return DUK_RET_ERROR;
     duk_throw(ctx);
 }
 
@@ -502,9 +500,7 @@ static duk_ret_t __duktape_get(duk_context *ctx) {
         if (ret != DUK_RET_ERROR) {
             return ret;
         }
-        duk_pop(ctx);
     }
-    return DUK_RET_ERROR;
     duk_throw(ctx);
 }
 
@@ -567,9 +563,7 @@ static duk_ret_t __duktape_has(duk_context *ctx) {
         if (ret != DUK_RET_ERROR) {
             return ret;
         }
-        duk_pop(ctx);
     }
-    return DUK_RET_ERROR;
     duk_throw(ctx);
 }
 
@@ -622,9 +616,7 @@ static duk_ret_t __duktape_apply(duk_context *ctx) {
         if (ret != DUK_RET_ERROR) {
             return ret;
         }
-        duk_pop(ctx);
     }
-    return DUK_RET_ERROR;
     duk_throw(ctx);
 }
 
