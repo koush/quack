@@ -223,7 +223,7 @@ DuktapeContext::DuktapeContext(JavaVM* javaVM, jobject javaDuktape)
   std::string proxyScript =
     "(function() {\n"
     "var __proxyHandler = {\n"
-    "\thas: function(f, prop) { return prop == '__java_this' || f.target.__duktape_has(f, prop); },\n"
+    "\thas: function(f, prop) { return f.target.__duktape_has(f, prop); },\n"
     "\tget: function(f, prop, receiver) { return f.target.__duktape_get(f, prop, receiver); },\n"
     "\tset: function(f, prop, value, receiver) { return f.target.__duktape_set(f, prop, value, receiver); },\n"
     "\tapply: function(f, thisArg, argumentsList) { return f.target.__duktape_apply(f, thisArg, argumentsList); },\n"
