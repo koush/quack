@@ -223,10 +223,10 @@ DuktapeContext::DuktapeContext(JavaVM* javaVM, jobject javaDuktape)
   std::string proxyScript =
     "(function(__duktape_has, __duktape_get, __duktape_set, __duktape_apply) {\n"
     "var __proxyHandler = {\n"
-    "\thas: function(f, prop) { return __duktape_has(f, prop); },\n"
-    "\tget: function(f, prop, receiver) { return __duktape_get(f, prop, receiver); },\n"
-    "\tset: function(f, prop, value, receiver) { return __duktape_set(f, prop, value, receiver); },\n"
-    "\tapply: function(f, thisArg, argumentsList) { return __duktape_apply(f, thisArg, argumentsList); },\n"
+    "\thas: function(f, prop) { return __duktape_has(f.target, prop); },\n"
+    "\tget: function(f, prop, receiver) { return __duktape_get(f.target, prop, receiver); },\n"
+    "\tset: function(f, prop, value, receiver) { return __duktape_set(f.target, prop, value, receiver); },\n"
+    "\tapply: function(f, thisArg, argumentsList) { return __duktape_apply(f.target, thisArg, argumentsList); },\n"
     "};\n"
     "return function(obj) {\n"
     "\tfunction f() {};\n"
@@ -391,11 +391,10 @@ duk_ret_t DuktapeContext::duktapeSet() {
   jobject prop = popObject(env);
 
   // get the java reference
-  duk_get_prop_string(m_context, -1, "target");
   duk_get_prop_string(m_context, -1, JAVASCRIPT_THIS_PROP_NAME);
   jobject object = static_cast<jobject>(duk_require_pointer(m_context, -1));
   // pop the real target, real jobject, and the target
-  duk_pop_3(m_context);
+  duk_pop_2(m_context);
 
   if (object == nullptr) {
     fatalErrorHandler(object, "DuktapeObject is null");
@@ -462,11 +461,10 @@ duk_ret_t DuktapeContext::duktapeGet() {
     }
 
     // get the java reference
-    duk_get_prop_string(m_context, -1, "target");
     duk_get_prop_string(m_context, -1, JAVASCRIPT_THIS_PROP_NAME);
     object = static_cast<jobject>(duk_require_pointer(m_context, -1));
     // pop the real target, real jobject, and the target
-    duk_pop_3(m_context);
+    duk_pop_2(m_context);
 
     if (object == nullptr) {
       fatalErrorHandler(object, "DuktapeObject is null");
@@ -538,11 +536,10 @@ duk_ret_t DuktapeContext::duktapeHas() {
 
     // get the java reference
     jobject jprop = popObject(env);
-    duk_get_prop_string(m_context, -1, "target");
     duk_get_prop_string(m_context, -1, JAVASCRIPT_THIS_PROP_NAME);
     jobject object = static_cast<jobject>(duk_require_pointer(m_context, -1));
     // pop the real target, real jobject, and the target
-    duk_pop_3(m_context);
+    duk_pop_2(m_context);
 
 
     jclass objectClass = env->GetObjectClass(object);
@@ -592,10 +589,9 @@ duk_ret_t DuktapeContext::duktapeApply() {
   jobject javaThis = popObject(env);
 
   // get the java reference
-  duk_get_prop_string(m_context, -1, "target");
   duk_get_prop_string(m_context, -1, JAVASCRIPT_THIS_PROP_NAME);
   jobject object = static_cast<jobject>(duk_require_pointer(m_context, -1));
-  duk_pop_3(m_context);
+  duk_pop_2(m_context);
 
   jclass objectClass = env->GetObjectClass(object);
   jboolean assignable = env->IsAssignableFrom(objectClass, m_duktapeObjectClass);
