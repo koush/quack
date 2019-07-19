@@ -221,20 +221,28 @@ DuktapeContext::DuktapeContext(JavaVM* javaVM, jobject javaDuktape)
   duk_push_global_stash(m_context);
 
   std::string proxyScript =
-    "(function() {\n"
+    "(function(__duktape_has, __duktape_get, __duktape_set, __duktape_apply) {\n"
     "var __proxyHandler = {\n"
-    "\thas: function(f, prop) { return f.target.__duktape_has(f, prop); },\n"
-    "\tget: function(f, prop, receiver) { return f.target.__duktape_get(f, prop, receiver); },\n"
-    "\tset: function(f, prop, value, receiver) { return f.target.__duktape_set(f, prop, value, receiver); },\n"
-    "\tapply: function(f, thisArg, argumentsList) { return f.target.__duktape_apply(f, thisArg, argumentsList); },\n"
+    "\thas: function(f, prop) { return __duktape_has(f, prop); },\n"
+    "\tget: function(f, prop, receiver) { return __duktape_get(f, prop, receiver); },\n"
+    "\tset: function(f, prop, value, receiver) { return __duktape_set(f, prop, value, receiver); },\n"
+    "\tapply: function(f, thisArg, argumentsList) { return __duktape_apply(f, thisArg, argumentsList); },\n"
     "};\n"
     "return function(obj) {\n"
     "\tfunction f() {};\n"
     "\tf.target = obj;\n"
     "\treturn new Proxy(f, __proxyHandler);\n"
     "};\n"
-    "})();\n";
+    "});\n";
   duk_eval_string(m_context, proxyScript.c_str());
+
+  // proxy traps
+  duk_push_c_function(m_context, __duktape_has, 2);
+  duk_push_c_function(m_context, __duktape_get, 3);
+  duk_push_c_function(m_context, __duktape_set, 4);
+  duk_push_c_function(m_context, __duktape_apply, 3);
+
+  duk_pcall(m_context, 4);
   duk_put_prop_string(m_context, -2, "__makeProxy");
 
   duk_pop(m_context);
@@ -707,22 +715,6 @@ void DuktapeContext::pushObject(JNIEnv *env, jobject object, bool deleteLocalRef
   // set a finalizer for the ref
   duk_push_c_function(m_context, javaObjectFinalizer, 1);
   duk_set_finalizer(m_context, objIndex);
-
-  // bind has
-  duk_push_c_function(m_context, __duktape_has, 2);
-  duk_put_prop_string(m_context, objIndex, "__duktape_has");
-
-  // bind get
-  duk_push_c_function(m_context, __duktape_get, 3);
-  duk_put_prop_string(m_context, objIndex, "__duktape_get");
-
-  // bind set
-  duk_push_c_function(m_context, __duktape_set, 4);
-  duk_put_prop_string(m_context, objIndex, "__duktape_set");
-
-  // bind apply
-  duk_push_c_function(m_context, __duktape_apply, 3);
-  duk_put_prop_string(m_context, objIndex, "__duktape_apply");
 
   // make the proxy
   if (duk_pcall(m_context, 1) != DUK_EXEC_SUCCESS)
