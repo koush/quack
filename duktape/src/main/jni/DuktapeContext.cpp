@@ -217,25 +217,25 @@ DuktapeContext::DuktapeContext(JavaVM* javaVM, jobject javaDuktape)
   duk_put_prop_string(m_context, -2, DUKTAPE_CONTEXT_PROP_NAME);
   duk_pop(m_context);
 
-
   // bind the traps
-  duk_push_global_object(m_context);
+  duk_push_global_stash(m_context);
 
-  // bind has
-  duk_push_c_function(m_context, __duktape_has, 2);
-  duk_put_prop_string(m_context, -2, "__duktape_has");
-
-  // bind get
-  duk_push_c_function(m_context, __duktape_get, 3);
-  duk_put_prop_string(m_context, -2, "__duktape_get");
-
-  // bind set
-  duk_push_c_function(m_context, __duktape_set, 4);
-  duk_put_prop_string(m_context, -2, "__duktape_set");
-
-  // bind apply
-  duk_push_c_function(m_context, __duktape_apply, 3);
-  duk_put_prop_string(m_context, -2, "__duktape_apply");
+  std::string proxyScript =
+    "(function() {\n"
+    "var __proxyHandler = {\n"
+    "\thas: function(f, prop) { return prop == '__java_this' || f.target.__duktape_has(f, prop); },\n"
+    "\tget: function(f, prop, receiver) { return f.target.__duktape_get(f, prop, receiver); },\n"
+    "\tset: function(f, prop, value, receiver) { return f.target.__duktape_set(f, prop, value, receiver); },\n"
+    "\tapply: function(f, thisArg, argumentsList) { return f.target.__duktape_apply(f, thisArg, argumentsList); },\n"
+    "};\n"
+    "return function(obj) {\n"
+    "\tfunction f() {};\n"
+    "\tf.target = obj;\n"
+    "\treturn new Proxy(f, __proxyHandler);\n"
+    "};\n"
+    "})();\n";
+  duk_eval_string(m_context, proxyScript.c_str());
+  duk_put_prop_string(m_context, -2, "__makeProxy");
 
   duk_pop(m_context);
 }
@@ -686,50 +686,47 @@ void DuktapeContext::pushObject(JNIEnv *env, jobject object, bool deleteLocalRef
 
   env->DeleteLocalRef(objectClass);
 
-  // target (needs to be a function to trap apply)
-  // unsure why, but pushing a C function causes weird debugger issues. random detatches.
-  // eval a normal function instead. no such call exists in duktape.
-//  const duk_idx_t funcIndex = duk_require_normalize_index(m_context, duk_push_c_function(m_context, __duktape_noop, 0));
-  duk_eval_string(m_context, "(function(){});");
-  const duk_idx_t funcIndex = duk_require_normalize_index(m_context, -1);
+  // at this point, the object is guaranteed to be a JavaScriptObject from another DuktapeContext
+  // or a DuktapeObject (java proxy of some sort). JavaScriptObject implements DuktapeObject,
+  // so, it works without any further coercion.
 
-  // handler
-  // create a per object handler, because finalizers do not run on the function themselves.
+  duk_push_global_stash(m_context);
+  duk_get_prop_string(m_context, -1, "__makeProxy");
+  duk_swap(m_context, -2, -1);
+  duk_pop(m_context);
+
   const duk_idx_t objIndex = duk_require_normalize_index(m_context, duk_push_object(m_context));
-
-  duk_dup(m_context, objIndex);
-  duk_put_prop_string(m_context, funcIndex, "target");
 
   jobject ptr = env->NewGlobalRef(object);
   duk_push_pointer(m_context, ptr);
   // safe to delete the local ref now
   if (deleteLocalRef)
       env->DeleteLocalRef(object);
-  // the proxy target is not exposed, so no need to use the hidden key.
-  // for consistency, this is the key that will be used in get/set/apply/has traps.
   duk_put_prop_string(m_context, objIndex, JAVASCRIPT_THIS_PROP_NAME);
 
-  // set a finalizer for the ref on the handler
+  // set a finalizer for the ref
   duk_push_c_function(m_context, javaObjectFinalizer, 1);
   duk_set_finalizer(m_context, objIndex);
 
   // bind has
   duk_push_c_function(m_context, __duktape_has, 2);
-  duk_put_prop_string(m_context, objIndex, "has");
+  duk_put_prop_string(m_context, objIndex, "__duktape_has");
 
   // bind get
   duk_push_c_function(m_context, __duktape_get, 3);
-  duk_put_prop_string(m_context, objIndex, "get");
+  duk_put_prop_string(m_context, objIndex, "__duktape_get");
 
   // bind set
   duk_push_c_function(m_context, __duktape_set, 4);
-  duk_put_prop_string(m_context, objIndex, "set");
+  duk_put_prop_string(m_context, objIndex, "__duktape_set");
 
   // bind apply
   duk_push_c_function(m_context, __duktape_apply, 3);
-  duk_put_prop_string(m_context, objIndex, "apply");
+  duk_put_prop_string(m_context, objIndex, "__duktape_apply");
 
-  duk_push_proxy(m_context, 0);
+  // make the proxy
+  if (duk_pcall(m_context, 1) != DUK_EXEC_SUCCESS)
+      queueJavaExceptionForDuktapeError(env, m_context);
 }
 
 jobject DuktapeContext::call(JNIEnv *env, jlong object, jobjectArray args) {
