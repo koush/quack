@@ -70,6 +70,7 @@ private:
   jclass m_duktapeObjectClass;
   jclass m_javaScriptObjectClass;
   jclass m_javaObjectClass;
+  jclass m_jsonObjectClass;
   jclass m_byteBufferClass;
   jmethodID m_duktapeHasMethod;
   jmethodID m_duktapeGetMethod;
@@ -80,6 +81,7 @@ private:
   jmethodID m_byteBufferAllocateDirect;
   jfieldID m_contextField;
   jfieldID m_pointerField;
+  jfieldID m_jsonField;
 
   jobject popObject2(JNIEnv* env) const;
   void pushObject(JNIEnv* env, jlong object);

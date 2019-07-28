@@ -192,6 +192,7 @@ DuktapeContext::DuktapeContext(JavaVM* javaVM, jobject javaDuktape)
   m_duktapeObjectClass = findClass(env, "com/squareup/duktape/DuktapeObject");
   m_javaScriptObjectClass = findClass(env, "com/squareup/duktape/JavaScriptObject");
   m_javaObjectClass = findClass(env, "com/squareup/duktape/JavaObject");
+  m_jsonObjectClass = findClass(env, "com/squareup/duktape/DuktapeJsonObject");
   m_byteBufferClass = findClass(env, "java/nio/ByteBuffer");
 
   m_duktapeHasMethod = env->GetMethodID(m_duktapeClass, "duktapeHas", "(Lcom/squareup/duktape/DuktapeObject;Ljava/lang/Object;)Z");
@@ -206,6 +207,8 @@ DuktapeContext::DuktapeContext(JavaVM* javaVM, jobject javaDuktape)
 
   m_contextField = env->GetFieldID(m_javaScriptObjectClass, "context", "J");
   m_pointerField = env->GetFieldID(m_javaScriptObjectClass, "pointer", "J");
+
+  m_jsonField = env->GetFieldID(m_jsonObjectClass, "json", "Ljava/lang/String;");
 
   m_DebuggerSocket.client_sock = -1;
 
@@ -676,6 +679,16 @@ void DuktapeContext::pushObject(JNIEnv *env, jobject object, bool deleteLocalRef
     if (deleteLocalRef)
       env->DeleteLocalRef(object);
     env->DeleteLocalRef(objectClass);
+    return;
+  }
+  else if (env->IsAssignableFrom(objectClass, m_jsonObjectClass)) {
+    jstring json = (jstring)env->GetObjectField(object, m_jsonField);
+    JString jString(env, json);
+    duk_push_string(m_context, jString);
+    // if this is passed bad json, the process crashes. so do not pass bad json.
+    // this is a fast path, so sanity checking is disabled. cleaning up a busted
+    // stack due to an incomplete method call is gnarly as well.
+    duk_json_decode(m_context, -1);
     return;
   }
   else if (!env->IsAssignableFrom(objectClass, m_duktapeObjectClass)) {

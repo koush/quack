@@ -437,4 +437,21 @@ public class DuktapeTests extends TestCase  {
             Assert.assertTrue(e.getMessage().contains("java!"));
         }
     }
+
+    public void testJson() {
+        Duktape duktape = Duktape.create();
+        String script = "function() {" +
+                "function RoundtripCallback() {" +
+                "}" +
+                "RoundtripCallback.prototype.callback = function(o) {" +
+                "return o;" +
+                "};" +
+                "return new RoundtripCallback();" +
+                "}";
+        JavaScriptObject func = duktape.compileFunction(script, "?");
+        RoundtripCallback cb = ((JavaScriptObject)func.call()).proxyInterface(RoundtripCallback.class);
+
+        JavaScriptObject ret = (JavaScriptObject)cb.callback(new DuktapeJsonObject("!{\"meaningOfLife\":42}"));
+        assertEquals(42d, ret.get("meaningOfLife"));
+    }
 }
