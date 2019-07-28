@@ -689,6 +689,8 @@ void DuktapeContext::pushObject(JNIEnv *env, jobject object, bool deleteLocalRef
     // this is a fast path, so sanity checking is disabled. cleaning up a busted
     // stack due to an incomplete method call is gnarly as well.
     duk_json_decode(m_context, -1);
+    if (deleteLocalRef)
+        env->DeleteLocalRef(object);
     return;
   }
   else if (!env->IsAssignableFrom(objectClass, m_duktapeObjectClass)) {
