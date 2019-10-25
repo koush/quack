@@ -1,7 +1,5 @@
 package com.squareup.duktape;
 
-import android.text.TextUtils;
-
 import java.lang.reflect.Array;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
@@ -9,6 +7,8 @@ import java.lang.reflect.Modifier;
 import java.lang.reflect.Proxy;
 import java.util.List;
 import java.util.Map;
+
+import static com.squareup.duktape.Duktape.isEmpty;
 
 public final class JavaObject implements DuktapeJavaObject {
     private final Object target;
@@ -18,7 +18,6 @@ public final class JavaObject implements DuktapeJavaObject {
         this.duktape = duktape;
         this.target = target;
     }
-
     @Override
     public Object getObject(Class clazz) {
         return target;
@@ -36,7 +35,7 @@ public final class JavaObject implements DuktapeJavaObject {
                 if (duktapeProperty == null)
                     continue;
                 String propName = duktapeProperty.name();
-                if (TextUtils.isEmpty(propName))
+                if (isEmpty(propName))
                     propName = method.getName();
                 if (propName.equals(key))
                     return method;
@@ -57,7 +56,7 @@ public final class JavaObject implements DuktapeJavaObject {
                 if (duktapeProperty == null)
                     continue;
                 String propName = duktapeProperty.name();
-                if (TextUtils.isEmpty(propName))
+                if (isEmpty(propName))
                     propName = method.getName();
                 if (propName.equals(key))
                     return method;

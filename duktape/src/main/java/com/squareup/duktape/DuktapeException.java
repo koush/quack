@@ -15,7 +15,6 @@
  */
 package com.squareup.duktape;
 
-import androidx.annotation.Keep;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -23,7 +22,6 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 @SuppressWarnings("unused") // Called from native code.
-@Keep // Instruct ProGuard not to strip this type.
 public final class DuktapeException extends RuntimeException {
   /**
    * Duktape stack trace strings have multiple lines of the format "    at func (file.ext:line)".

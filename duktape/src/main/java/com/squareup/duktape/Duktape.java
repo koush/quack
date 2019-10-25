@@ -15,11 +15,6 @@
  */
 package com.squareup.duktape;
 
-import android.os.SystemClock;
-
-import org.json.JSONException;
-import org.json.JSONObject;
-
 import java.io.Closeable;
 import java.lang.reflect.Array;
 import java.lang.reflect.Field;
@@ -41,7 +36,15 @@ public final class Duktape implements Closeable {
   private DuktapeInvocationHandlerWrapper invocationHandlerWrapper;
 
   static {
-    System.loadLibrary("duktape");
+    try {
+      System.loadLibrary("duktape");
+    }
+    catch (UnsatisfiedLinkError err) {
+    }
+  }
+
+  static boolean isEmpty(String str) {
+    return str == null || str.length() == 0;
   }
 
   static boolean isNumberClass(Class<?> c) {
@@ -231,15 +234,6 @@ public final class Duktape implements Closeable {
       }
     }
 
-    // JSONObject is a one way deserialization
-    if (clazz == JSONObject.class && o instanceof JavaScriptObject) {
-      try {
-        return new JSONObject(((JavaScriptObject)o).stringify());
-      }
-      catch (JSONException e) {
-        throw new IllegalArgumentException(e);
-      }
-    }
 
     return o;
   }
@@ -497,12 +491,12 @@ public final class Duktape implements Closeable {
    * @throws DuktapeException if there is an error evaluating the script.
    */
   public synchronized <T> T evaluate(String script, String fileName) {
-    long start = SystemClock.elapsedRealtime();
+    long start = System.nanoTime() / 1000000;
     try {
       return evaluate(context, script, fileName);
     }
     finally {
-      totalElapsedScriptExecutionMs += SystemClock.elapsedRealtime() - start;
+      totalElapsedScriptExecutionMs += System.nanoTime() / 1000000 - start;
     }
   }
 
@@ -624,30 +618,30 @@ public final class Duktape implements Closeable {
     return setKeyInteger(context, object, index, value);
   }
   synchronized Object call(long object, Object... args) {
-    long start = SystemClock.elapsedRealtime();
+    long start = System.nanoTime() / 1000000;
     try {
       return call(context, object, args);
     }
     finally {
-      totalElapsedScriptExecutionMs += SystemClock.elapsedRealtime() - start;
+      totalElapsedScriptExecutionMs += System.nanoTime() / 1000000 - start;
     }
   }
   synchronized Object callMethod(long object, Object thiz, Object... args) {
-    long start = SystemClock.elapsedRealtime();
+    long start = System.nanoTime() / 1000000;
     try {
       return callMethod(context, object, thiz, args);
     }
     finally {
-      totalElapsedScriptExecutionMs += SystemClock.elapsedRealtime() - start;
+      totalElapsedScriptExecutionMs += System.nanoTime() / 1000000 - start;
     }
   }
   synchronized Object callProperty(long object, Object property, Object... args) {
-    long start = SystemClock.elapsedRealtime();
+    long start = System.nanoTime() / 1000000;
     try {
       return callProperty(context, object, property, args);
     }
     finally {
-      totalElapsedScriptExecutionMs += SystemClock.elapsedRealtime() - start;
+      totalElapsedScriptExecutionMs += System.nanoTime() / 1000000 - start;
     }
   }
   synchronized String stringify(long object) {
