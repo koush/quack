@@ -79,7 +79,7 @@ void duk_trans_socket_init(void) {
 
 void duk_trans_socket_finish(struct client_sock_t *client_sock) {
 	if (client_sock->client_sock >= 0) {
-		(void) close(client_sock);
+		(void) close(client_sock->client_sock);
 		client_sock->client_sock = -1;
 	}
 	if (server_sock >= 0) {

@@ -1,6 +1,6 @@
 package com.squareup.duktape;
 
-import android.util.Log;
+//import android.util.Log;
 
 import java.lang.reflect.Array;
 import java.lang.reflect.InvocationTargetException;
@@ -123,7 +123,7 @@ public class JavaMethodObject implements DuktapeMethodObject {
                 coerced.add(toArray(varargType, varargs));
             }
             else if (i < args.length) {
-                Log.w("Duktape", "dropping javascript to java arguments on the floor: " + (args.length - i));
+//                Log.w("Duktape", "dropping javascript to java arguments on the floor: " + (args.length - i));
             }
             return duktape.coerceJavaToJavaScript(best.invoke(thiz, coerced.toArray()));
         }
