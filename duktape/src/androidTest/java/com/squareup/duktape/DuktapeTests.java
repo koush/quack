@@ -143,12 +143,12 @@ public class DuktapeTests extends TestCase  {
         RoundtripInterfaceCallback iface = ((JavaScriptObject)func.call()).proxyInterface(RoundtripInterfaceCallback.class);
 
         // should all come back as doubles.
-        List<Object> values = Arrays.asList((byte)0, (short)0, 0, 0l, 0f, 0d);
+        List<Object> values = Arrays.asList((byte)0, (short)0, 0, 0f, 0d);
         for (Object value: values) {
             Object ret = iface.callback(value, cb);
             assertTrue(ret instanceof Double);
         }
-        assertTrue(resultHolder.result == 6);
+        assertTrue(resultHolder.result == 5);
     }
 
     enum Foo {
