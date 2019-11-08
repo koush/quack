@@ -18,9 +18,9 @@
 
 #include <jni.h>
 #include <list>
-#include "duktape/duktape.h"
+#include "../duktape/duktape.h"
 #include "java/JavaType.h"
-#include "duktape/duk_trans_socket.h"
+#include "../duktape/duk_trans_socket.h"
 
 class DuktapeContext {
 public:

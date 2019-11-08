@@ -18,7 +18,7 @@
 
 #include <map>
 #include <jni.h>
-#include "../duktape/duktape.h"
+#include "../../duktape/duktape.h"
 #include "GlobalRef.h"
 
 /**

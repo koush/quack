@@ -1,18 +1,10 @@
 cmake_minimum_required(VERSION 3.4.1)
 
-file(GLOB common_SRC
-    "*.h"
-    "*.c"
-    "*.cpp"
-)
+file(GLOB_RECURSE duktape_SRC
+    "duktape-jni/*.h"
+    "duktape-jni/*.c"
+    "duktape-jni/*.cpp"
 
-file(GLOB java_SRC
-    "java/*.h"
-    "java/*.c"
-    "java/*.cpp"
-)
-
-file(GLOB duktape_SRC
     "duktape/*.h"
     "duktape/*.c"
     "duktape/*.cpp"
@@ -30,6 +22,6 @@ file(GLOB quickjs_SRC
     "quickjs/cutils.c"
 )
 
-add_library(duktape SHARED ${common_SRC} ${java_SRC} ${duktape_SRC} ${quickjs_SRC})
+add_library(duktape SHARED ${duktape_SRC})
 
 target_link_libraries(duktape)

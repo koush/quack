@@ -22,7 +22,7 @@
 #include "java/GlobalRef.h"
 #include "java/JavaExceptions.h"
 #include "StackChecker.h"
-#include "duktape/duk_trans_socket.h"
+#include "../duktape/duk_trans_socket.h"
 
 namespace {
 
