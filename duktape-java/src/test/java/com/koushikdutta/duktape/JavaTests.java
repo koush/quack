@@ -1,31 +1,22 @@
 package com.koushikdutta.duktape;
 
-import org.jetbrains.annotations.NotNull;
+import java.io.File;
+
+import com.squareup.duktape.Duktape;
+import com.squareup.duktape.JavaScriptObject;
+
 import org.junit.Test;
 
-import kotlin.coroutines.Continuation;
-import kotlin.coroutines.CoroutineContext;
-import kotlin.coroutines.EmptyCoroutineContext;
-import kotlin.coroutines.intrinsics.CoroutineSingletons;
 
 public class JavaTests {
     @Test
     public void testPoop() {
-        Poops poops = new Poops();
-        Object ret = poops.doThing(new Continuation<Integer>() {
-            @NotNull
-            @Override
-            public CoroutineContext getContext() {
-                return EmptyCoroutineContext.INSTANCE;
-            }
+        System.load(new File("duktape-jni/build/lib/main/debug/libduktape-jni.dylib").getAbsolutePath());
 
-            @Override
-            public void resumeWith(@NotNull Object o) {
-                System.out.println(o);
-            }
-        });
-        if (ret == CoroutineSingletons.COROUTINE_SUSPENDED) {
-            System.out.println("SUP");
-        }
+        Duktape duktape = Duktape.create();
+        JavaScriptObject jo = duktape.evaluateForJavaScriptObject("({ doThing: function() { return 5555 }})");
+        System.out.println(jo);
+        duktape.close();
+        System.out.println("OK");
     }
 }

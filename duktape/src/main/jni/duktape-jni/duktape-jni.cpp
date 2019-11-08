@@ -20,7 +20,7 @@
 #include "DuktapeContext.h"
 #include "java/GlobalRef.h"
 #include "java/JavaExceptions.h"
-
+#error foo
 extern "C" {
 
 JNIEXPORT jlong JNICALL

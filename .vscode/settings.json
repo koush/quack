@@ -1,4 +1,6 @@
 {
+    "java.configuration.updateBuildConfiguration": "automatic",
+    "java.dependency.syncWithFolderExplorer": true,
     "files.associations": {
         "quickjs-debugger.h": "c",
         "__locale": "c",

@@ -6,6 +6,7 @@ import java.lang.reflect.Proxy;
 import java.util.ArrayList;
 import java.util.Collections;
 
+@SuppressWarnings({"unchecked", "rawtypes"})
 public class JavaScriptObject implements DuktapeObject {
     final public Duktape duktape;
     public final long context;

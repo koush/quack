@@ -1,0 +1,3 @@
+include 'duktape'
+include 'duktape-java'
+include 'duktape-jni'

@@ -21,12 +21,15 @@ import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-@SuppressWarnings("unused") // Called from native code.
 public final class DuktapeException extends RuntimeException {
   /**
-   * Duktape stack trace strings have multiple lines of the format "    at func (file.ext:line)".
-   * "func" is optional, but we'll omit frames without a function, since it means the frame is in
-   * native code.
+   *
+   */
+  private static final long serialVersionUID = 1538523787401076917L;
+  /**
+   * Duktape stack trace strings have multiple lines of the format " at func
+   * (file.ext:line)". "func" is optional, but we'll omit frames without a
+   * function, since it means the frame is in native code.
    */
   private final static Pattern STACK_TRACE_PATTERN =
       Pattern.compile("\\s*at ([^\\s^\\[]+) \\(([^\\s]+):(\\d+)\\).*$");

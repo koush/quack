@@ -18,3 +18,10 @@ duktape/.externalNativeBuild
 .DS_Store
 .cxx
 duktape-java/*.log
+
+.classpath
+bin
+.project
+.settings
+
+duktape/src/main/jni/quickjs/

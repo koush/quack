@@ -11,6 +11,10 @@ public class Memoize<T> {
   }
 
   private static class MemoizeMapImpl<V> extends HashMap<Integer, V> implements MemoizeMap<V> {
+    /**
+     *
+     */
+    private static final long serialVersionUID = -4020434697394716201L;
   }
 
   public Memoize(MemoizeMap<T> map) {

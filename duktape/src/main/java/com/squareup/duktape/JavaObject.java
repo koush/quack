@@ -10,6 +10,7 @@ import java.util.Map;
 
 import static com.squareup.duktape.Duktape.isEmpty;
 
+@SuppressWarnings({"unchecked", "rawtypes"})
 public final class JavaObject implements DuktapeJavaObject {
     private final Object target;
     private final Duktape duktape;

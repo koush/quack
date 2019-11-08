@@ -8,6 +8,7 @@ import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Collections;
 
+@SuppressWarnings({"unchecked", "rawtypes"})
 public class JavaMethodObject implements DuktapeMethodObject {
     String target;
     Duktape duktape;

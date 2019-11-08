@@ -28,6 +28,7 @@ import java.util.Map;
 import java.util.logging.Logger;
 
 /** A simple EMCAScript (Javascript) interpreter. */
+@SuppressWarnings({"unchecked", "rawtypes"})
 public final class Duktape implements Closeable {
   private final Map<Class, DuktapeCoercion> JavaScriptToJavaCoercions = new LinkedHashMap<>();
   private final Map<Class, DuktapeCoercion> JavaToJavascriptCoercions = new LinkedHashMap<>();
@@ -325,6 +326,10 @@ public final class Duktape implements Closeable {
   }
 
   private static class MethodException extends Exception {
+    /**
+     *
+     */
+    private static final long serialVersionUID = -1432377890337490927L;
     Method method;
     MethodException(Method method) {
       this.method = method;
@@ -391,7 +396,6 @@ public final class Duktape implements Closeable {
     // check to see if there exists a more specific superclass converter.
     for (Map.Entry<Class, DuktapeCoercion> check: coerce.entrySet()) {
       if (clazz.isAssignableFrom(check.getKey())) {
-        // TODO: this might just be dead code? delete? 3/19/2019
         throw new AssertionError("Superclass converter not implemented.");
       }
     }
