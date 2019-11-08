@@ -21,37 +21,10 @@
 #include "java/GlobalRef.h"
 #include "java/JavaExceptions.h"
 
-namespace {
-
-std::unique_ptr<GlobalRef> duktapeClass;
-std::function<int(double)> getTimeZoneOffset = [](double d) { return 0; };
-
-void initialize(JNIEnv* env, jclass type) {
-  duktapeClass.reset(new GlobalRef(env, type));
-
-  auto tzClass = env->FindClass("java/util/TimeZone");
-  auto getDefaultTimeZone = env->GetStaticMethodID(tzClass, "getDefault", "()Ljava/util/TimeZone;");
-  auto getOffset = env->GetMethodID(tzClass, "getOffset", "(J)I");
-
-  const GlobalRef timeZoneClass(env, tzClass);
-  getTimeZoneOffset = [timeZoneClass, getDefaultTimeZone, getOffset](double time) {
-    auto theEnv = timeZoneClass.getJniEnv();
-    auto timeZone = theEnv->CallStaticObjectMethod(static_cast<jclass>(timeZoneClass.get()),
-                                                   getDefaultTimeZone);
-    const std::chrono::milliseconds offsetMillis(theEnv->CallIntMethod(timeZone, getOffset, time));
-    return static_cast<int>(std::chrono::duration_cast<std::chrono::seconds>(offsetMillis).count());
-  };
-}
-
-} // anonymous namespace
-
 extern "C" {
 
 JNIEXPORT jlong JNICALL
 Java_com_squareup_duktape_Duktape_createContext(JNIEnv* env, jclass type, jobject javaDuktape) {
-  static std::once_flag initialized;
-  std::call_once(initialized, initialize, std::ref(env), type);
-
   JavaVM* javaVM;
   env->GetJavaVM(&javaVM);
   try {
