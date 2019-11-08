@@ -1,7 +1,8 @@
 apply plugin: 'cpp-library'
 
 library {
-    source.from file('../duktape/src/main/jni')
+    source.from file('../duktape/src/main/jni/duktape')
+    source.from file('../duktape/src/main/jni/duktape-jni')
     source.from('src/main/cpp')
     publicHeaders.from file('/Applications/Xcode.app//Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/System/Library/Frameworks/JavaVM.framework/Versions/A/Headers/')
 }

@@ -1,0 +1,10 @@
+{
+    "files.associations": {
+        "quickjs-debugger.h": "c",
+        "__locale": "c",
+        "__string": "c",
+        "string": "c",
+        "string_view": "c",
+        "tuple": "c"
+    }
+}
