@@ -38,4 +38,8 @@ class DuktapeTests {
         duktape.close()
         println("OK")
     }
+    @Test
+    fun testEmpty() {
+
+    }
 }

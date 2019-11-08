@@ -670,8 +670,9 @@ public final class Duktape implements Closeable {
     return duktapeObject.set(key, value);
   }
 
+  private Object[] empty = new Object[0];
   private Object duktapeCallMethod(DuktapeObject duktapeObject, Object thiz, Object... args) {
-    return duktapeObject.callMethod(thiz, args);
+    return duktapeObject.callMethod(thiz, args == null ? empty : args);
   }
 
   private static native long getHeapSize(long context);
