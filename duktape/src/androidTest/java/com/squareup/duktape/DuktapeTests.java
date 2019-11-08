@@ -25,7 +25,7 @@ public class DuktapeTests extends TestCase  {
         JavaScriptObject func = duktape.compileFunction(script, "?");
 
         // should all come back as doubles.
-        List<Object> values = Arrays.asList((byte)0, (short)0, 0, 0l, 0f, 0d);
+        List<Object> values = Arrays.asList((byte)0, (short)0, 0, 0f, 0d);
         for (Object value: values) {
             Object ret = func.call(value);
             assertTrue(ret instanceof Double);
@@ -451,7 +451,7 @@ public class DuktapeTests extends TestCase  {
         JavaScriptObject func = duktape.compileFunction(script, "?");
         RoundtripCallback cb = ((JavaScriptObject)func.call()).proxyInterface(RoundtripCallback.class);
 
-        JavaScriptObject ret = (JavaScriptObject)cb.callback(new DuktapeJsonObject("!{\"meaningOfLife\":42}"));
+        JavaScriptObject ret = (JavaScriptObject)cb.callback(new DuktapeJsonObject("{\"meaningOfLife\":42}"));
         assertEquals(42d, ret.get("meaningOfLife"));
     }
 }
