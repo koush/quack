@@ -23,13 +23,14 @@ extern "C" {
 
 JNIEXPORT jlong JNICALL
 Java_com_squareup_duktape_Duktape_createContext(JNIEnv* env, jclass type, jobject javaDuktape) {
-  JavaVM* javaVM;
-  env->GetJavaVM(&javaVM);
-  try {
-    return reinterpret_cast<jlong>(new QuickJSContext(javaVM, javaDuktape));
-  } catch (std::bad_alloc&) {
-    return 0L;
-  }
+    JavaVM* javaVM;
+        env->GetJavaVM(&javaVM);
+    try {
+        return reinterpret_cast<jlong>(new QuickJSContext(javaVM, javaDuktape));
+    }
+    catch (std::bad_alloc&) {
+        return 0L;
+    }
 }
 
 JNIEXPORT void JNICALL
@@ -75,11 +76,13 @@ JNIEXPORT jobject JNICALL
 Java_com_squareup_duktape_Duktape_call(JNIEnv *env, jclass type,
                                            jlong context, jlong object,
                                            jobjectArray args) {
+          return nullptr;
 }
 
 JNIEXPORT jobject JNICALL
 Java_com_squareup_duktape_Duktape_callMethod(
         JNIEnv *env, jclass type, jlong context, jlong object, jobject thiz, jobjectArray args) {
+          return nullptr;
 }
 
 JNIEXPORT jobject JNICALL
@@ -87,19 +90,23 @@ Java_com_squareup_duktape_Duktape_callProperty(JNIEnv *env, jclass type,
                                            jlong context, jlong object,
                                            jobject property,
                                            jobjectArray args) {
+          return env->NewStringUTF("ijasdijasd");
 }
 
 JNIEXPORT jobject JNICALL
 Java_com_squareup_duktape_Duktape_getKeyObject(JNIEnv *env, jclass type, jlong context,
                                                jlong object, jobject key) {
+          return nullptr;
 }
 
 JNIEXPORT jobject JNICALL
 Java_com_squareup_duktape_Duktape_getKeyInteger(JNIEnv *env, jclass type, jlong context, jlong object, jint index) {
+          return nullptr;
 }
 
 JNIEXPORT jobject JNICALL
 Java_com_squareup_duktape_Duktape_getKeyString(JNIEnv *env, jclass type, jlong context, jlong object, jstring key) {
+          return nullptr;
 }
 
 JNIEXPORT jboolean JNICALL
@@ -124,6 +131,7 @@ Java_com_squareup_duktape_Duktape_compileFunction__JLjava_lang_String_2Ljava_lan
 JNIEXPORT jobject JNICALL
 Java_com_squareup_duktape_Duktape_evaluate__JLjava_lang_String_2Ljava_lang_String_2(
     JNIEnv* env, jclass type, jlong context, jstring code, jstring fname) {
+    return reinterpret_cast<QuickJSContext*>(context)->evaluate(env, code, fname);
 }
 
 JNIEXPORT jlong JNICALL

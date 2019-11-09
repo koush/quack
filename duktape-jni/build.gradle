@@ -1,16 +1,5 @@
 apply plugin: 'cpp-library'
 
-library {
-    // source.from file('../duktape/src/main/jni/duktape')
-    // source.from file('../duktape/src/main/jni/duktape-jni')
-    // source.from('src/main/cpp/duktape.cpp')
-    source.from file('../duktape/src/main/jni/quickjs')
-
-     source.from file('../duktape/src/main/jni/quickjs-jni')
-    // source.from('src/main/cpp/quickjs.cpp')
-    publicHeaders.from file('/Applications/Xcode.app//Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/System/Library/Frameworks/JavaVM.framework/Versions/A/Headers/')
-}
-
 task quickjs(type: Exec) {
     workingDir '../duktape/src/main/jni/quickjs'
     commandLine 'make'
@@ -23,6 +12,25 @@ task quickjs(type: Exec) {
     ext.output = {
         return standardOutput.toString()
     }
+}
+
+
+tasks.whenTaskAdded { task ->
+    if (task.name == 'compileDebugCpp') {
+        task.dependsOn quickjs
+    }
+}
+
+library {
+    // source.from file('../duktape/src/main/jni/duktape')
+    // source.from file('../duktape/src/main/jni/duktape-jni')
+    // source.from('src/main/cpp/duktape.cpp')
+    source.from file('../duktape/src/main/jni/quickjs')
+
+     source.from file('../duktape/src/main/jni/quickjs-jni')
+    // source.from('src/main/cpp/quickjs.cpp')
+    publicHeaders.from file('/Applications/Xcode.app//Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/System/Library/Frameworks/JavaVM.framework/Versions/A/Headers/')
+
 }
 
 
