@@ -13,6 +13,9 @@ file(GLOB_RECURSE duktape_SRC
 add_definitions(-DCONFIG_VERSION="2019-10-27")
 
 file(GLOB quickjs_SRC
+    "quickjs-jni/*.h"
+    "quickjs-jni/*.c"
+    "quickjs-jni/*.cpp"
     "quickjs/*.h"
     "quickjs/quickjs.c"
     "quickjs/quickjs-debugger.c"
@@ -22,6 +25,6 @@ file(GLOB quickjs_SRC
     "quickjs/cutils.c"
 )
 
-add_library(duktape SHARED ${duktape_SRC})
+add_library(duktape SHARED ${quickjs_SRC})
 
 target_link_libraries(duktape)

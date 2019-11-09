@@ -25,10 +25,10 @@ library {
     // source.from file('../duktape/src/main/jni/duktape')
     // source.from file('../duktape/src/main/jni/duktape-jni')
     // source.from('src/main/cpp/duktape.cpp')
-    source.from file('../duktape/src/main/jni/quickjs')
 
-     source.from file('../duktape/src/main/jni/quickjs-jni')
-    // source.from('src/main/cpp/quickjs.cpp')
+    source.from file('../duktape/src/main/jni/quickjs')
+    source.from file('../duktape/src/main/jni/quickjs-jni')
+
     publicHeaders.from file('/Applications/Xcode.app//Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/System/Library/Frameworks/JavaVM.framework/Versions/A/Headers/')
 
 }
@@ -36,7 +36,7 @@ library {
 
 tasks.withType(CppCompile).configureEach {
     compilerArgs.add '-std=c++11'
-    compilerArgs.add '-l../duktape/src/main/jni/quickjs/libquickjs.a'
+    compilerArgs.add '-Werror'
 }
 
 tasks.withType(LinkSharedLibrary).configureEach {

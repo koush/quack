@@ -32,7 +32,7 @@ public:
     : m_context(ctx)
     , m_top(duk_get_top(m_context)) {
   }
-  ~StackChecker() {
+  ~StackChecker() throw(std::runtime_error) {
     if (m_top == duk_get_top(m_context)) {
       return;
     }

@@ -13,7 +13,36 @@ typedef struct CustomFinalizerData {
     QuickJSContext *ctx;
     CustomFinalizer *finalizer;
     void *udata;
+    bool finalized;
 } CustomFinalizerData;
+
+
+class LocalRefHolder {
+public:
+    LocalRefHolder(JNIEnv *env, jobject value):
+        env(env),
+        value(value) {
+    }
+    ~LocalRefHolder() {
+        env->DeleteLocalRef(value);
+    }
+    LocalRefHolder(const LocalRefHolder &other) {
+        env = other.env;
+        value = env->NewLocalRef(other.value);
+    }  
+
+    inline LocalRefHolder& operator=(const LocalRefHolder& other) {
+        throw;
+    }
+
+    inline operator jobject() const {
+        return value;
+    }
+private:
+    JNIEnv *env;
+    jobject value;
+};
+
 
 class JSValueHolder {
 public:
@@ -33,7 +62,7 @@ public:
         throw;
     }
 
-    inline operator JSValue() {
+    inline operator JSValue() const {
         return value;
     }
 private:
@@ -56,15 +85,42 @@ public:
 
     jclass findClass(JNIEnv *env, const char *className);
 
+    std::string toStdString(JSValue value);
     jstring toString(JNIEnv *env, JSValue value);
     JSValue toString(JNIEnv *env, jstring value);
-    jstring stringify(JNIEnv *env, long object);
+    jstring stringify(JNIEnv *env, jlong object);
 
     jobject toObject(JNIEnv *env, JSValue value);
+    JSValue toObject(JNIEnv *env, jobject value);
     
-    jobject evaluate(JNIEnv *env, jstring code, jstring filename);
+    void setFinalizer(JSValue value, CustomFinalizer finalizer, void *udata);
+    void setFinalizerOnFinalizerObject(JSValue finalizerObject, CustomFinalizer finalizer, void *udata);
 
-    void setFinalizer(JavaVM *vm, JSValue value, CustomFinalizer finalizer, void *udata);
+    void finalizeJavaScriptObject(JNIEnv *env, jlong object);
+
+    jobject evaluate(JNIEnv *env, jstring code, jstring filename);
+    jobject compile(JNIEnv* env, jstring code, jstring filename);
+
+    void setGlobalProperty(JNIEnv *env, jobject property, jobject value);
+
+    jobject getKeyString(JNIEnv* env, jlong object, jstring key);
+    jobject getKeyInteger(JNIEnv* env, jlong object, jint index);
+    jobject getKeyObject(JNIEnv* env, jlong object, jobject key);
+    jboolean setKeyString(JNIEnv* env, jlong object, jstring key, jobject value);
+    jboolean setKeyInteger(JNIEnv* env, jlong object, jint index, jobject value);
+    jboolean setKeyInternal(JNIEnv* env, JSValue thiz, jobject key, jobject value);
+    jboolean setKeyObject(JNIEnv* env, jlong object, jobject key, jobject value);
+
+    jobject callInternal(JNIEnv *env, JSValue thiz, JSValue func, jobjectArray args);
+    jobject call(JNIEnv *env, jlong object, jobjectArray args);
+    jobject callProperty(JNIEnv *env, jlong object, jobject property, jobjectArray args);
+    jobject callMethod(JNIEnv *env, jlong method, jobject object, jobjectArray args);
+
+    // DuktapeObject class traps
+    int quickjs_has(jobject object, JSAtom atom);
+    JSValue quickjs_get(jobject object, JSAtom atom, JSValueConst receiver);
+    int quickjs_set(jobject object, JSAtom atom, JSValueConst value, JSValueConst receiver, int flags);
+    JSValue quickjs_apply(jobject func_obj, JSValueConst this_val, int argc, JSValueConst *argv);
 
     JavaVM* javaVM;
     jobject javaDuktape;
@@ -79,9 +135,8 @@ public:
     jclass duktapeObjectClass;
     jclass javaScriptObjectClass;
     jclass javaObjectClass;
-    jmethodID javaObjectGetObject;
-    jclass jsonObjectClass;
-    jclass byteBufferClass;
+    jmethodID duktapeJavaObjectGetObject;
+    jclass duktapejsonObjectClass;
     jmethodID duktapeHasMethod;
     jmethodID duktapeGetMethod;
     jmethodID duktapeSetMethod;
@@ -91,11 +146,20 @@ public:
     jmethodID byteBufferAllocateDirect;
     jfieldID contextField;
     jfieldID pointerField;
-    jfieldID jsonField;
+    jfieldID duktapeJsonField;
+
+    jclass booleanClass;
+    jmethodID booleanValueOf;
+    jclass intClass;
+    jmethodID intValueOf;
+    jclass doubleClass;
+    jmethodID doubleValueOf;
+    jclass stringClass;
+    jclass byteBufferClass;
 
 
-
-    JSAtom javaThisAtom;
+    JSAtom atomHoldsJavaScriptObject;
+    JSAtom atomHoldsJavaObject;
     JSAtom customFinalizerAtom;
 };
 

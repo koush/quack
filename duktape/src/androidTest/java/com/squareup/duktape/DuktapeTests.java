@@ -1,41 +1,59 @@
 package com.squareup.duktape;
 
-import android.net.Uri;
-
-import junit.framework.TestCase;
-
 import org.junit.Assert;
+import org.junit.Test;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
+
+import java.io.File;
 import java.util.Arrays;
 import java.util.List;
 
-public class DuktapeTests extends TestCase  {
+public class DuktapeTests {
     private static class ResultHolder<T> {
         public T result;
     }
-
-    public void testUri() {
-        Uri uri = Uri.parse("rtsp://foo:bar@poopbat.com:5555");
-        System.out.println(uri);
+    
+    static {
+        try {
+            // for non-android jvm
+            System.load(new File("duktape-jni/build/lib/main/debug/libduktape-jni.dylib").getAbsolutePath());
+        }
+        catch (Exception e) {
+        }
     }
 
+    @Test
     public void testRoundtrip() {
         Duktape duktape = Duktape.create();
         String script = "function(ret) { return ret; }";
         JavaScriptObject func = duktape.compileFunction(script, "?");
 
         // should all come back as doubles.
-        List<Object> values = Arrays.asList((byte)0, (short)0, 0, 0f, 0d);
+        List<Object> values = Arrays.asList(new Float(0), new Double(0), 0f, 0d);
         for (Object value: values) {
             Object ret = func.call(value);
             assertTrue(ret instanceof Double);
         }
+
+        // might come back as doubles or ints, depending on runtime.
+        values = Arrays.asList(new Byte((byte)0), new Short((short)0), new Integer(0), (byte)0, (short)0, 0);
+        for (Object value: values) {
+            Object ret = func.call(value);
+            assertTrue(ret instanceof Double || ret instanceof Integer);
+        }
+
+        // longs must be strings, since it loses precision in doubles.
+        assertTrue(func.call(0L) instanceof String);
     }
 
     interface Callback {
         void callback();
     }
 
+    @Test
     public void testMethodCall() {
         ResultHolder<Boolean> resultHolder = new ResultHolder<>();
         Callback cb = () -> resultHolder.result = true;
@@ -49,6 +67,7 @@ public class DuktapeTests extends TestCase  {
         assertTrue(resultHolder.result);
     }
 
+    @Test
     public void testCallback() {
         ResultHolder<Boolean> resultHolder = new ResultHolder<>();
         Callback cb = () -> resultHolder.result = true;
@@ -66,6 +85,7 @@ public class DuktapeTests extends TestCase  {
         Object callback(Object o);
     }
 
+    @Test
     public void testInterface() {
         Duktape duktape = Duktape.create();
         String script = "function() {" +
@@ -97,6 +117,7 @@ public class DuktapeTests extends TestCase  {
         void callback(Callback o);
     }
 
+    @Test
     public void testCallbackInterface() {
         ResultHolder<Boolean> resultHolder = new ResultHolder<>();
         Callback cb = () -> resultHolder.result = true;
@@ -156,6 +177,7 @@ public class DuktapeTests extends TestCase  {
         Baz,
     }
 
+    @Test
     public void testEnumRoundtrip() {
         Duktape duktape = Duktape.create();
         String script = "function(ret) { return ret; }";
@@ -174,6 +196,7 @@ public class DuktapeTests extends TestCase  {
         Foo callback(Foo foo);
     }
 
+    @Test
     public void testEnumInterface() {
         Duktape duktape = Duktape.create();
         String script = "function() {" +
@@ -200,6 +223,7 @@ public class DuktapeTests extends TestCase  {
     }
 
 
+    @Test
     public void testRoundtripEnumInterfaceCallback() {
         ResultHolder<Integer> resultHolder = new ResultHolder<>();
         resultHolder.result = 0;
@@ -229,6 +253,7 @@ public class DuktapeTests extends TestCase  {
         assertTrue(resultHolder.result == 2);
     }
 
+    @Test
     public void testDuktapeException() {
         Duktape duktape = Duktape.create();
         String script = "function() {" +
@@ -290,6 +315,7 @@ public class DuktapeTests extends TestCase  {
         }
     }
 
+    @Test
     public void testDuktapeExceptionMessageFromJava() {
         Duktape duktape = Duktape.create();
         String script = "function(cb, cb2) {" +
@@ -332,6 +358,7 @@ public class DuktapeTests extends TestCase  {
         assertEquals(resultHolder.result, "EvalError: Java Exception java.lang.IllegalArgumentException: java!");
     }
 
+    @Test
     public void testJavaStackInJavaScript() {
         Duktape duktape = Duktape.create();
         String script = "function(cb) {" +
@@ -396,6 +423,7 @@ public class DuktapeTests extends TestCase  {
         void callback(Object o, Boolean B, Short S, Integer I, Long L, Float F, Double D, boolean b, short s, int i, long l, float f, double d, String str);
     }
 
+    @Test
     public void testJavaProxyInDuktapeThreadCrash() {
         Duktape duktape = Duktape.create();
         String script = "function(cb, o, B, S, I, L, F, D, b, s, i, l, f, d, str) {\n" +
@@ -438,6 +466,7 @@ public class DuktapeTests extends TestCase  {
         }
     }
 
+    @Test
     public void testJson() {
         Duktape duktape = Duktape.create();
         String script = "function() {" +
