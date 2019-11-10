@@ -25,6 +25,6 @@ file(GLOB quickjs_SRC
     "quickjs/cutils.c"
 )
 
-add_library(duktape SHARED ${quickjs_SRC})
+add_library(duktape SHARED ${duktape_SRC})
 
 target_link_libraries(duktape)

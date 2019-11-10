@@ -16,6 +16,7 @@
 package com.squareup.duktape;
 
 
+import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Matcher;
@@ -32,7 +33,7 @@ public final class DuktapeException extends RuntimeException {
    * function, since it means the frame is in native code.
    */
   private final static Pattern STACK_TRACE_PATTERN =
-      Pattern.compile("\\s*at ([^\\s^\\[]+) \\(([^\\s]+):(\\d+)\\).*$");
+      Pattern.compile("\\s*at (\\[?)(.*?)]? \\((.*?):?(\\d+)?\\).*$");
   /** Java StackTraceElements require a class name.  We don't have one in JS, so use this. */
   private final static String STACK_TRACE_CLASS_NAME = "JavaScript";
 
@@ -54,10 +55,17 @@ public final class DuktapeException extends RuntimeException {
     List<StackTraceElement> elements = new ArrayList<>();
 
     // Splice the JavaScript stack in right above the call to Duktape.evaluate.
-    StackTraceElement search = new Exception().getStackTrace()[0];
+    StackTraceElement[] selfTrace = new Exception().getStackTrace();
+
+    // depending on the platform, the exception tracem ay add the stack all the way up to the
+    // exception constructor (meaning, this method, and the <init> call).
+    StackTraceElement search0 = selfTrace[0];
+    StackTraceElement search1 = selfTrace[1];
+    StackTraceElement search2 = selfTrace[2];
+
     boolean spliced = false;
     for (StackTraceElement stackTraceElement : throwable.getStackTrace()) {
-      if (!spliced && stackTraceElement.equals(search)) {
+      if (!spliced && (stackTraceElement.equals(search0) || stackTraceElement.equals(search1) || stackTraceElement.equals(search2))) {
         spliced = true;
         for (int i = 1; i < lines.length; ++i) {
           StackTraceElement jsElement = toStackTraceElement(lines[i]);
@@ -78,10 +86,18 @@ public final class DuktapeException extends RuntimeException {
     StringBuilder ret = new StringBuilder(parts[0]);
 
     // Splice the JavaScript stack in right above the call to Duktape.evaluate.
-    StackTraceElement search = new Exception().getStackTrace()[0];
+    StackTraceElement[] selfTrace = new Exception().getStackTrace();
+
+    // Splice the JavaScript stack in right above the call to Duktape.evaluate.
+    // depending on the platform, the exception tracem ay add the stack all the way up to the
+    // exception constructor (meaning, this method, and the <init> call).
+    StackTraceElement search0 = selfTrace[0];
+    StackTraceElement search1 = selfTrace[1];
+    StackTraceElement search2 = selfTrace[2];
+    
     boolean spliced = false;
     for (StackTraceElement stackTraceElement : throwable.getStackTrace()) {
-      if (!spliced && stackTraceElement.equals(search)) {
+      if (!spliced && (stackTraceElement.equals(search0) || stackTraceElement.equals(search1) || stackTraceElement.equals(search2))) {
         spliced = true;
         ret.append(detailMessage);
       }
@@ -103,7 +119,10 @@ public final class DuktapeException extends RuntimeException {
       // Nothing interesting on this line.
       return null;
     }
-    return new StackTraceElement(STACK_TRACE_CLASS_NAME, m.group(1), m.group(2),
-            Integer.parseInt(m.group(3)));
+    int line = m.group(4) != null ? Integer.parseInt(m.group(4)) : 1;
+    String className = m.group(1) == null ? STACK_TRACE_CLASS_NAME : "";
+
+    return new StackTraceElement(className, m.group(2), m.group(3),
+      line);
   }
 }

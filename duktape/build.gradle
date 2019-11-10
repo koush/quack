@@ -29,6 +29,8 @@ android {
         cppFlags '-std=c++11', '-fstrict-aliasing', '-fexceptions', '-Werror'
       }
     }
+
+    testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
   }
   buildTypes {
     release {

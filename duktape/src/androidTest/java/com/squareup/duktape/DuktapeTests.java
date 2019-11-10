@@ -10,19 +10,20 @@ import static org.junit.Assert.assertTrue;
 import java.io.File;
 import java.util.Arrays;
 import java.util.List;
+import java.util.regex.Pattern;
 
 public class DuktapeTests {
-    private static class ResultHolder<T> {
-        public T result;
-    }
-    
     static {
         try {
             // for non-android jvm
             System.load(new File("duktape-jni/build/lib/main/debug/libduktape-jni.dylib").getAbsolutePath());
         }
-        catch (Exception e) {
+        catch (UnsatisfiedLinkError e) {
         }
+    }
+
+    private static class ResultHolder<T> {
+        public T result;
     }
 
     @Test
@@ -103,7 +104,7 @@ public class DuktapeTests {
         List<Object> values = Arrays.asList((byte)0, (short)0, 0, 0f, 0d);
         for (Object value: values) {
             Object ret = cb.callback(value);
-            assertTrue(ret instanceof Double);
+            assertTrue(ret instanceof Double || ret instanceof Integer);
         }
 
         values = Arrays.asList(0L, "0");
@@ -269,8 +270,9 @@ public class DuktapeTests {
                 "func3();" +
                 "}";
         try {
-            JavaScriptObject func = duktape.compileFunction(script, "?");
+            JavaScriptObject func = duktape.compileFunction(script, "test.js");
             func.call();
+            Assert.fail("failure expected");
         }
         catch (Exception e) {
             Assert.assertTrue(e.getMessage().contains("duktape!"));
@@ -280,7 +282,52 @@ public class DuktapeTests {
         }
     }
 
+    @Test
+    public void testDuktapeException2() {
+        Duktape duktape = Duktape.create();
+        String script = "function() {\n" +
+                "function func1() {\n" +
+                "throw new Error('duktape!')\n" +
+                "}\n" +
+                "function func2() {\n" +
+                "func1();\n" +
+                "}" +
+                "function func3() {\n" +
+                "func2();\n" +
+                "}" +
+                "func3();\n" +
+                "}\n";
+        try {
+            JavaScriptObject func = duktape.compileFunction(script, "test.js");
+            func.call();
+            Assert.fail("failure expected");
+        }
+        catch (Exception e) {
+            Assert.assertTrue(e.getMessage().contains("duktape!"));
+            Assert.assertTrue(e.getStackTrace()[0].getMethodName().contains("func1"));
+            Assert.assertTrue(e.getStackTrace()[1].getMethodName().contains("func2"));
+            Assert.assertTrue(e.getStackTrace()[2].getMethodName().contains("func3"));
+        }
+    }
 
+    void findStack(String[] strs, String regex) {
+        Pattern pattern = Pattern.compile(regex);
+        for (String ele: strs) {
+            if (pattern.matcher(ele.toString()).find())
+                return;
+        }
+        Assert.fail("stack not found: " + regex);
+    }
+    void findStack(Exception e, String regex) {
+        Pattern pattern = Pattern.compile(regex);
+        for (StackTraceElement ele: e.getStackTrace()) {
+            if (pattern.matcher(ele.toString()).find())
+                return;
+        }
+        Assert.fail("stack not found: " + regex);
+    }
+
+    @Test
     public void testDuktapeExceptionFromJava() {
         Duktape duktape = Duktape.create();
         String script = "function(cb) {" +
@@ -305,14 +352,16 @@ public class DuktapeTests {
 
             JavaScriptObject func = duktape.compileFunction(script, "?");
             func.call(cb);
+            Assert.fail("failure expected");
         }
         catch (Exception e) {
             Assert.assertTrue(e.getMessage().contains("java!"));
-            Assert.assertTrue(e.getStackTrace()[0].getMethodName().contains("callback"));
-            Assert.assertTrue(e.getStackTrace()[4].getMethodName().contains("func1"));
-            Assert.assertTrue(e.getStackTrace()[5].getMethodName().contains("func2"));
-            Assert.assertTrue(e.getStackTrace()[6].getMethodName().contains("func3"));
+            findStack(e, "callback.*?DuktapeTests");
+            findStack(e, "func1");
+            findStack(e, "func2");
+            findStack(e, "func3");
         }
+        duktape.close();
     }
 
     @Test
@@ -355,7 +404,7 @@ public class DuktapeTests {
         JavaScriptObject func = duktape.compileFunction(script, "?");
         func.call(cb, cb2);
 
-        assertEquals(resultHolder.result, "EvalError: Java Exception java.lang.IllegalArgumentException: java!");
+        assertTrue(resultHolder.result.contains("java.lang.IllegalArgumentException: java!"));
     }
 
     @Test
@@ -387,36 +436,14 @@ public class DuktapeTests {
 
         JavaScriptObject func = duktape.compileFunction(script, "?");
         String ret = func.call(cb).toString();
-        String expected = "EvalError: Java Exception java!\n" +
-                "    at [com.squareup.duktape.DuktapeTests$2.callback] (DuktapeTests.java:303)\n" +
-                "    at [java.lang.reflect.Method.invoke] (Method.java:-2)\n" +
-                "    at [com.squareup.duktape.JavaMethodObject.callMethod] (JavaMethodObject.java:106)\n" +
-                "    at [com.squareup.duktape.Duktape.duktapeCallMethod] (Duktape.java:652)    at [anon] (/Volumes/Dev/Scrypted/duktape-android/duktape/src/main/jni/DuktapeContext.cpp:921) internal\n" +
-                "    at [anon] () native strict preventsyield\n" +
-                "    at [anon] (?:5)\n" +
-                "    at func1 (?:1)\n" +
-                "    at func2 (?:1)\n" +
-                "    at func3 (?:1)\n" +
-                "    at [anon] (?:1) preventsyield\n" +
-                "    at [com.squareup.duktape.Duktape.call] (Duktape.java:-2)\n" +
-                "    at [com.squareup.duktape.Duktape.call] (Duktape.java:601)\n" +
-                "    at [com.squareup.duktape.JavaScriptObject.call] (JavaScriptObject.java:36)\n" +
-                "    at [com.squareup.duktape.DuktapeTests.testJavaStackInJavaScript] (DuktapeTests.java:308)\n" +
-                "    at [java.lang.reflect.Method.invoke] (Method.java:-2)\n" +
-                "    at [junit.framework.TestCase.runTest] (TestCase.java:168)\n" +
-                "    at [junit.framework.TestCase.runBare] (TestCase.java:134)\n" +
-                "    at [junit.framework.TestResult$1.protect] (TestResult.java:115)\n" +
-                "    at [junit.framework.TestResult.runProtected] (TestResult.java:133)\n" +
-                "    at [junit.framework.TestResult.run] (TestResult.java:118)\n" +
-                "    at [junit.framework.TestCase.run] (TestCase.java:124)\n" +
-                "    at [android.test.AndroidTestRunner.runTest] (AndroidTestRunner.java:195)\n" +
-                "    at [android.test.AndroidTestRunner.runTest] (AndroidTestRunner.java:181)\n" +
-                "    at [android.test.InstrumentationTestRunner.onStart] (InstrumentationTestRunner.java:564)\n" +
-                "    at [android.app.Instrumentation$InstrumentationThread.run] (Instrumentation.java:2185)";
 
-        // returned stack trace should have same number of lines as above.
-        // a weak assertion, but it's indicative of correctness because javascript adds 3 lines more than expected.
-        Assert.assertEquals(ret.split("\n").length, expected.split("\n").length);
+        String splits[] = ret.split("\n");
+
+        Assert.assertTrue(ret.contains("java!"));
+        findStack(splits, "callback.*?DuktapeTests");
+        findStack(splits, "func1");
+        findStack(splits, "func2");
+        findStack(splits, "func3");
     }
 
     interface MarshallCallback {
@@ -481,6 +508,7 @@ public class DuktapeTests {
         RoundtripCallback cb = ((JavaScriptObject)func.call()).proxyInterface(RoundtripCallback.class);
 
         JavaScriptObject ret = (JavaScriptObject)cb.callback(new DuktapeJsonObject("{\"meaningOfLife\":42}"));
-        assertEquals(42d, ret.get("meaningOfLife"));
+        Object property = ret.get("meaningOfLife");
+        assertTrue(property.equals(42d) || property.equals(42));
     }
 }

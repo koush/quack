@@ -91,6 +91,7 @@ public:
     jstring stringify(JNIEnv *env, jlong object);
 
     jobject toObject(JNIEnv *env, JSValue value);
+    jobject toObjectCheckQuickJSError(JNIEnv *env, JSValue value);
     JSValue toObject(JNIEnv *env, jobject value);
     
     void setFinalizer(JSValue value, CustomFinalizer finalizer, void *udata);
@@ -122,13 +123,18 @@ public:
     int quickjs_set(jobject object, JSAtom atom, JSValueConst value, JSValueConst receiver, int flags);
     JSValue quickjs_apply(jobject func_obj, JSValueConst this_val, int argc, JSValueConst *argv);
 
+    bool rethrowQuickJSErrorToJava(JNIEnv *env);
+    bool rethrowJavaExceptionToQuickJS(JNIEnv *env);
+
     JavaVM* javaVM;
     jobject javaDuktape;
     JSRuntime *runtime;
     JSContext *ctx;
     JSValue stash;
+    JSValue thrower_function;
 
     jclass objectClass;
+    jmethodID objectToString;
 
     jclass duktapeJavaObject;
     jclass duktapeClass;
@@ -157,10 +163,14 @@ public:
     jclass stringClass;
     jclass byteBufferClass;
 
+    jclass duktapeExceptionClass;
+    jmethodID addDuktapeStack;
+    jmethodID addJavaStack;
 
     JSAtom atomHoldsJavaScriptObject;
     JSAtom atomHoldsJavaObject;
     JSAtom customFinalizerAtom;
+    JSAtom javaExceptionAtom;
 };
 
 #endif
