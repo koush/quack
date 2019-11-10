@@ -74,7 +74,7 @@ public class DuktapeTests {
 
     @Test
     public void testGlobal() {
-        Duktape duktape = Duktape.create();
+        Duktape duktape = Duktape.create(true);
         duktape.setGlobalProperty("hello", "world");
         duktape.setGlobalProperty("thing", new Object());
         duktape.close();

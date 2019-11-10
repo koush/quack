@@ -17,16 +17,21 @@
 #include <mutex>
 #include <chrono>
 #include <jni.h>
-#include "QuickJSContext.h"
+#include "JSContext.h"
+#include "quickjs-jni/QuickJSContext.h"
+#include "duktape-jni/DuktapeContext.h"
 
 extern "C" {
 
 JNIEXPORT jlong JNICALL
-Java_com_squareup_duktape_Duktape_createContext(JNIEnv* env, jclass type, jobject javaDuktape) {
+Java_com_squareup_duktape_Duktape_createContext(JNIEnv* env, jclass type, jobject javaDuktape, jboolean useQuickJS) {
     JavaVM* javaVM;
     env->GetJavaVM(&javaVM);
     try {
-        return reinterpret_cast<jlong>(new QuickJSContext(javaVM, javaDuktape));
+        if (useQuickJS)
+            return reinterpret_cast<jlong>(new QuickJSContext(javaVM, javaDuktape));
+        else
+            return reinterpret_cast<jlong>(new DuktapeContext(javaVM, javaDuktape));
     }
     catch (std::bad_alloc&) {
         return 0L;
@@ -35,7 +40,7 @@ Java_com_squareup_duktape_Duktape_createContext(JNIEnv* env, jclass type, jobjec
 
 JNIEXPORT void JNICALL
 Java_com_squareup_duktape_Duktape_destroyContext(JNIEnv *env, jclass type, jlong context) {
-  delete reinterpret_cast<QuickJSContext*>(context);
+  delete reinterpret_cast<JSContext *>(context);
 }
 
 JNIEXPORT void JNICALL
@@ -59,19 +64,19 @@ Java_com_squareup_duktape_Duktape_debuggerAppNotify(JNIEnv *env, jclass type,
 
 JNIEXPORT jstring JNICALL
 Java_com_squareup_duktape_Duktape_stringify(JNIEnv *env, jclass type, jlong context, jlong object) {
-  return reinterpret_cast<QuickJSContext*>(context)->stringify(env, object);
+  return reinterpret_cast<JSContext *>(context)->stringify(env, object);
 }
 
 JNIEXPORT void JNICALL
 Java_com_squareup_duktape_Duktape_setGlobalProperty(JNIEnv *env, jclass type, jlong context,
                                                     jobject property, jobject value) {
-    return reinterpret_cast<QuickJSContext*>(context)->setGlobalProperty(env, property, value);
+    return reinterpret_cast<JSContext *>(context)->setGlobalProperty(env, property, value);
 }
 
 JNIEXPORT void JNICALL
 Java_com_squareup_duktape_Duktape_finalizeJavaScriptObject__JJ(JNIEnv *env, jclass type,
                                                                jlong context, jlong object) {
-    return reinterpret_cast<QuickJSContext*>(context)->finalizeJavaScriptObject(env, object);
+    return reinterpret_cast<JSContext *>(context)->finalizeJavaScriptObject(env, object);
                                        
 }
 
@@ -79,13 +84,13 @@ JNIEXPORT jobject JNICALL
 Java_com_squareup_duktape_Duktape_call(JNIEnv *env, jclass type,
                                            jlong context, jlong object,
                                            jobjectArray args) {
-    return reinterpret_cast<QuickJSContext *>(context)->call(env, object, args);
+    return reinterpret_cast<JSContext *>(context)->call(env, object, args);
 }
 
 JNIEXPORT jobject JNICALL
 Java_com_squareup_duktape_Duktape_callMethod(
         JNIEnv *env, jclass type, jlong context, jlong object, jobject thiz, jobjectArray args) {
-    return reinterpret_cast<QuickJSContext *>(context)->callMethod(env, object, thiz, args);
+    return reinterpret_cast<JSContext *>(context)->callMethod(env, object, thiz, args);
 }
 
 JNIEXPORT jobject JNICALL
@@ -93,51 +98,51 @@ Java_com_squareup_duktape_Duktape_callProperty(JNIEnv *env, jclass type,
                                            jlong context, jlong object,
                                            jobject property,
                                            jobjectArray args) {
-    return reinterpret_cast<QuickJSContext *>(context)->callProperty(env, object, property, args);
+    return reinterpret_cast<JSContext *>(context)->callProperty(env, object, property, args);
 }
 
 JNIEXPORT jobject JNICALL
 Java_com_squareup_duktape_Duktape_getKeyObject(JNIEnv *env, jclass type, jlong context,
                                                jlong object, jobject key) {
-    return reinterpret_cast<QuickJSContext *>(context)->getKeyObject(env, object, key);
+    return reinterpret_cast<JSContext *>(context)->getKeyObject(env, object, key);
 }
 
 JNIEXPORT jobject JNICALL
 Java_com_squareup_duktape_Duktape_getKeyInteger(JNIEnv *env, jclass type, jlong context, jlong object, jint index) {
-    return reinterpret_cast<QuickJSContext *>(context)->getKeyInteger(env, object, index);
+    return reinterpret_cast<JSContext *>(context)->getKeyInteger(env, object, index);
 }
 
 JNIEXPORT jobject JNICALL
 Java_com_squareup_duktape_Duktape_getKeyString(JNIEnv *env, jclass type, jlong context, jlong object, jstring key) {
-    return reinterpret_cast<QuickJSContext *>(context)->getKeyString(env, object, key);
+    return reinterpret_cast<JSContext *>(context)->getKeyString(env, object, key);
 }
 
 JNIEXPORT jboolean JNICALL
 Java_com_squareup_duktape_Duktape_setKeyObject(JNIEnv *env, jclass type, jlong context,
                                                jlong object, jobject key, jobject value) {
-    return reinterpret_cast<QuickJSContext *>(context)->setKeyObject(env, object, key, value);
+    return reinterpret_cast<JSContext *>(context)->setKeyObject(env, object, key, value);
 }
 
 JNIEXPORT jboolean JNICALL
 Java_com_squareup_duktape_Duktape_setKeyInteger(JNIEnv *env, jclass type, jlong context, jlong object, jint index, jobject value) {
-    return reinterpret_cast<QuickJSContext *>(context)->setKeyInteger(env, object, index, value);
+    return reinterpret_cast<JSContext *>(context)->setKeyInteger(env, object, index, value);
 }
 
 JNIEXPORT jboolean JNICALL
 Java_com_squareup_duktape_Duktape_setKeyString(JNIEnv *env, jclass type, jlong context, jlong object, jstring key, jobject value) {
-    return reinterpret_cast<QuickJSContext *>(context)->setKeyString(env, object, key, value);
+    return reinterpret_cast<JSContext *>(context)->setKeyString(env, object, key, value);
 }
 
 JNIEXPORT jobject JNICALL
 Java_com_squareup_duktape_Duktape_compileFunction__JLjava_lang_String_2Ljava_lang_String_2(
         JNIEnv* env, jclass type, jlong context, jstring code, jstring fname) {
-    return reinterpret_cast<QuickJSContext *>(context)->compile(env, code, fname);
+    return reinterpret_cast<JSContext *>(context)->compile(env, code, fname);
 }
 
 JNIEXPORT jobject JNICALL
 Java_com_squareup_duktape_Duktape_evaluate__JLjava_lang_String_2Ljava_lang_String_2(
     JNIEnv* env, jclass type, jlong context, jstring code, jstring fname) {
-    return reinterpret_cast<QuickJSContext*>(context)->evaluate(env, code, fname);
+    return reinterpret_cast<JSContext *>(context)->evaluate(env, code, fname);
 }
 
 JNIEXPORT jlong JNICALL

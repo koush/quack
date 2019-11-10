@@ -46,19 +46,3 @@ GlobalRef::~GlobalRef() {
 JNIEnv* GlobalRef::getJniEnv() const {
   return getEnvFromJavaVM(m_javaVM);
 }
-
-JNIEnv* getEnvFromJavaVM(JavaVM* javaVM) {
-  if (javaVM == nullptr) {
-    return nullptr;
-  }
-
-  JNIEnv* env;
-  javaVM->AttachCurrentThread(
-#ifdef __ANDROID__
-      &env,
-#else
-      reinterpret_cast<void**>(&env),
-#endif
-      nullptr);
-  return env;
-}

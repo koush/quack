@@ -21,8 +21,9 @@
 #include "../duktape/duktape.h"
 #include "java/JavaType.h"
 #include "../duktape/duk_trans_socket.h"
+#include "../JSContext.h"
 
-class DuktapeContext {
+class DuktapeContext : public JSContext {
 public:
   explicit DuktapeContext(JavaVM* javaVM, jobject javaDuktape);
   ~DuktapeContext();

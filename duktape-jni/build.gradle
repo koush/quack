@@ -22,12 +22,15 @@ tasks.whenTaskAdded { task ->
 }
 
 library {
-    // source.from file('../duktape/src/main/jni/duktape')
-    // source.from file('../duktape/src/main/jni/duktape-jni')
-    // source.from('src/main/cpp/duktape.cpp')
+    source.from file('../duktape/src/main/jni/duktape')
+    source.from file('../duktape/src/main/jni/duktape-jni')
+    source.from('src/main/cpp/duktape.cpp')
 
     source.from file('../duktape/src/main/jni/quickjs')
     source.from file('../duktape/src/main/jni/quickjs-jni')
+
+    source.from('../duktape/src/main/jni/JSContext.h')
+    source.from('../duktape/src/main/jni/context-jni.cpp')
 
     publicHeaders.from file('/Applications/Xcode.app//Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/System/Library/Frameworks/JavaVM.framework/Versions/A/Headers/')
 

@@ -4,22 +4,6 @@
 
 #define JS_IsUndefinedOrNull(value) (JS_IsUndefined(value) || JS_IsNull(value))
 
-JNIEnv* getEnvFromJavaVM(JavaVM* javaVM) {
-  if (javaVM == nullptr) {
-    return nullptr;
-  }
-
-  JNIEnv* env;
-  javaVM->AttachCurrentThread(
-#ifdef __ANDROID__
-      &env,
-#else
-      reinterpret_cast<void**>(&env),
-#endif
-      nullptr);
-  return env;
-}
-
 inline static JSValue toValueAsLocal(jlong object) {
     return JS_MKPTR(JS_TAG_OBJECT, reinterpret_cast<void *>(object));
 }
@@ -698,4 +682,10 @@ void QuickJSContext::runJobs(JNIEnv *env) {
         if (JS_ExecutePendingJob(runtime, &pctx))
             JS_FreeValue(ctx, JS_GetException(ctx));
     }
+}
+
+jlong QuickJSContext::getHeapSize(JNIEnv* env) {
+    JSMemoryUsage usage;
+    JS_ComputeMemoryUsage(runtime, &usage);
+    return (jlong)usage.memory_used_size;
 }

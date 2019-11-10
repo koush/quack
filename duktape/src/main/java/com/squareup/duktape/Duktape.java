@@ -413,15 +413,19 @@ public final class Duktape implements Closeable {
    * Create a new interpreter instance. Calls to this method <strong>must</strong> matched with
    * calls to {@link #close()} on the returned instance to avoid leaking native memory.
    */
-  public static Duktape create() {
+  public static Duktape create(boolean useQuickJS) {
     Duktape duktape = new Duktape();
     // context will hold a weak ref, so this doesn't matter if it fails.
-    long context = createContext(duktape);
+    long context = createContext(duktape, useQuickJS);
     if (context == 0) {
       throw new OutOfMemoryError("Cannot create Duktape instance");
     }
     duktape.context = context;
     return duktape;
+  }
+
+  public static Duktape create() {
+    return create(true);
   }
 
   private long context;
@@ -681,7 +685,7 @@ public final class Duktape implements Closeable {
 
   private static native long getHeapSize(long context);
 
-  private static native long createContext(Duktape duktape);
+  private static native long createContext(Duktape duktape, boolean useQuickJS);
   private static native void destroyContext(long context);
   private static native <T> T evaluate(long context, String sourceCode, String fileName);
   private static native JavaScriptObject compileFunction(long context, String sourceCode, String fileName);

@@ -1,10 +1,11 @@
-#ifndef DUKTAPE_ANDROID_DUKTAPE_CONTEXT_H
-#define DUKTAPE_ANDROID_DUKTAPE_CONTEXT_H
+#ifndef QUICKJS_CONTEXT_H
+#define QUICKJS_CONTEXT_H
 
 #include <jni.h>
 #include <list>
 #include "../quickjs/quickjs.h"
 #include "../quickjs/quickjs-debugger.h"
+#include "../JSContext.h"
 
 class QuickJSContext;
 
@@ -69,7 +70,7 @@ private:
     JSValue value;
 };
 
-class QuickJSContext {
+class QuickJSContext : public JSContext {
 public:
     explicit QuickJSContext(JavaVM* javaVM, jobject javaDuktape);
     ~QuickJSContext();
@@ -87,7 +88,6 @@ public:
     std::string toStdString(JSValue value);
     jstring toString(JNIEnv *env, JSValue value);
     JSValue toString(JNIEnv *env, jstring value);
-    jstring stringify(JNIEnv *env, jlong object);
 
     jobject toObject(JNIEnv *env, JSValue value);
     jobject toObjectCheckQuickJSError(JNIEnv *env, JSValue value);
@@ -96,12 +96,13 @@ public:
     void setFinalizer(JSValue value, CustomFinalizer finalizer, void *udata);
     void setFinalizerOnFinalizerObject(JSValue finalizerObject, CustomFinalizer finalizer, void *udata);
 
+    jlong getHeapSize(JNIEnv* env);
     void finalizeJavaScriptObject(JNIEnv *env, jlong object);
 
     jobject evaluate(JNIEnv *env, jstring code, jstring filename);
     jobject compile(JNIEnv* env, jstring code, jstring filename);
-
     void setGlobalProperty(JNIEnv *env, jobject property, jobject value);
+    jstring stringify(JNIEnv *env, jlong object);
 
     jobject getKeyString(JNIEnv* env, jlong object, jstring key);
     jobject getKeyInteger(JNIEnv* env, jlong object, jint index);
