@@ -125,7 +125,7 @@ public:
     bool rethrowQuickJSErrorToJava(JNIEnv *env);
     bool rethrowJavaExceptionToQuickJS(JNIEnv *env);
 
-    void runJobs();
+    void runJobs(JNIEnv *env);
 
     JavaVM* javaVM;
     jobject javaDuktape;
@@ -168,7 +168,6 @@ public:
     jmethodID addDuktapeStack;
     jmethodID addJavaStack;
 
-    JSAtom atomHoldsJavaScriptObject;
     JSAtom atomHoldsJavaObject;
     JSAtom customFinalizerAtom;
     JSAtom javaExceptionAtom;

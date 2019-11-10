@@ -46,7 +46,7 @@ static JSClassID customFinalizerClassId = 0;
 static JSClassID duktapeObjectProxyClassId = 0;
 
 static void javaWeakRefFinalizer(QuickJSContext *ctx, JSValue val, void *udata) {
-    jobject weakRef = reinterpret_cast<jobject>(udata);
+    auto weakRef = reinterpret_cast<jobject>(udata);
     if (nullptr == weakRef)
         return;
     JNIEnv *env = getEnvFromJavaVM(ctx->javaVM);
@@ -54,11 +54,11 @@ static void javaWeakRefFinalizer(QuickJSContext *ctx, JSValue val, void *udata) 
 }
 
 static void javaRefFinalizer(QuickJSContext *ctx, JSValue val, void *udata) {
-    jobject weakRef = reinterpret_cast<jobject>(udata);
-    if (nullptr == weakRef)
+    auto strongRef = reinterpret_cast<jobject>(udata);
+    if (nullptr == strongRef)
         return;
     JNIEnv *env = getEnvFromJavaVM(ctx->javaVM);
-    env->DeleteGlobalRef(weakRef);
+    env->DeleteGlobalRef(strongRef);
 }
 
 static void customFinalizer(JSRuntime *rt, JSValue val) {
@@ -126,7 +126,6 @@ QuickJSContext::QuickJSContext(JavaVM* javaVM, jobject javaDuktape):
 
     JS_SetContextOpaque(ctx, this);
 
-    atomHoldsJavaScriptObject = privateAtom("javascriptObject");
     atomHoldsJavaObject = privateAtom("javaObject");
     customFinalizerAtom = privateAtom("customFinalizer");
     javaExceptionAtom = privateAtom("javaException");
@@ -206,8 +205,8 @@ void QuickJSContext::finalizeJavaScriptObject(JNIEnv *env, jlong object) {
     // delete them both, and the finalizer will be triggered.
     JSValue value = toValueAsLocal(object);
 
-    // JSValue prop
-    JS_DeleteProperty(ctx, value, atomHoldsJavaScriptObject, 0);
+    // JSValue prop that has the finalizer thats attached to the weak ref of the JavaScriptObject
+    JS_DeleteProperty(ctx, value, customFinalizerAtom, 0);
 
     // delete the entry in the stash that was keeping this alive from the java side.
     auto id = hash((uint64_t)object);
@@ -358,28 +357,28 @@ jobject QuickJSContext::toObject(JNIEnv *env, JSValue value) {
     }
 
     // attempt to find an existing JavaScriptObject that exists on the java side (weak ref)
-    JSValue found = JS_GetProperty(ctx, value, atomHoldsJavaScriptObject);
-    if (!JS_IsUndefinedOrNull(found)) {
-        int64_t javaPtr;
-        JS_ToInt64(ctx, &javaPtr, found);
-        jobject javaThis = reinterpret_cast<jobject>(javaPtr);
+    auto finalizerFound = hold(JS_GetProperty(ctx, value, customFinalizerAtom));
+    if (!JS_IsUndefinedOrNull(finalizerFound)) {
+        auto data = reinterpret_cast<CustomFinalizerData *>(JS_GetOpaque(finalizerFound, customFinalizerClassId));
+        auto javaThis = reinterpret_cast<jobject>(data->udata);
         if (javaThis) {
             // found something, but make sure the weak ref is still alive.
             // if so, return a new local ref, because the global weak ref could be by side effect gc.
             if (!env->IsSameObject(javaThis, nullptr))
                 return env->NewLocalRef(javaThis);
             // it was collected, so clean it up
+            data->udata = nullptr;
             env->DeleteWeakGlobalRef(javaThis);
             // remove the property to prevent double deletes.
-            JS_DeleteProperty(ctx, value, atomHoldsJavaScriptObject, 0);
+            JS_DeleteProperty(ctx, value, customFinalizerAtom, 0);
         }
     }
     else {
         // check if this is a JavaObject that just needs to be unboxed (global ref)
-        found = JS_GetProperty(ctx, value, atomHoldsJavaObject);
-        if (!JS_IsUndefinedOrNull(found)) {
+        auto javaValue = JS_GetProperty(ctx, value, atomHoldsJavaObject);
+        if (!JS_IsUndefinedOrNull(javaValue)) {
             int64_t javaPtr;
-            JS_ToInt64(ctx, &javaPtr, found);
+            JS_ToInt64(ctx, &javaPtr, javaValue);
             return env->NewLocalRef(reinterpret_cast<jobject>(javaPtr));
         }
     }
@@ -388,9 +387,6 @@ jobject QuickJSContext::toObject(JNIEnv *env, JSValue value) {
     void* ptr = JS_VALUE_GET_PTR(value);
     jobject javaThis = env->NewObject(javaScriptObjectClass, javaScriptObjectConstructor, javaDuktape,
         reinterpret_cast<jlong>(this), reinterpret_cast<jlong>(ptr));
-
-    // attach the JavaScriptObject to the JSValue to be able to find it later.
-    JS_SetProperty(ctx, value, atomHoldsJavaScriptObject, JS_NewInt64(ctx, reinterpret_cast<int64_t>(javaThis)));
 
     // stash this to hold a reference, and to free automatically on runtime shutdown.
     auto id = hash(reinterpret_cast<uint64_t>(ptr));
@@ -447,12 +443,18 @@ jobject QuickJSContext::callInternal(JNIEnv *env, JSValue func, JSValue thiz, jo
         }
     }
 
+    int he1 = env->ExceptionCheck();
+
     auto ret = hold(JS_Call(ctx, func, thiz, length, &valueArgs.front()));
     for (int i = 0; i < valueArgs.size(); i++) {
         JS_FreeValue(ctx, valueArgs[i]);
     }
 
-    runJobs();
+    int he2 = env->ExceptionCheck();
+
+    runJobs(env);
+
+    int he3 = env->ExceptionCheck();
 
     return toObjectCheckQuickJSError(env, ret);
 }
@@ -530,7 +532,7 @@ jboolean QuickJSContext::setKeyObject(JNIEnv* env, jlong object, jobject key, jo
 }
 
 int QuickJSContext::quickjs_has(jobject object, JSAtom atom) {
-    if (atom == atomHoldsJavaScriptObject)
+    if (atom == customFinalizerAtom)
         return false;
     if (atom == atomHoldsJavaObject)
         return true;
@@ -544,7 +546,7 @@ int QuickJSContext::quickjs_has(jobject object, JSAtom atom) {
     return has;
 }
 JSValue QuickJSContext::quickjs_get(jobject object, JSAtom atom, JSValueConst receiver) {
-    if (atom == atomHoldsJavaScriptObject)
+    if (atom == customFinalizerAtom)
         return JS_UNDEFINED;
     JNIEnv *env = getEnvFromJavaVM(javaVM);
 
@@ -561,7 +563,7 @@ JSValue QuickJSContext::quickjs_get(jobject object, JSAtom atom, JSValueConst re
     return toObject(env, result);
 }
 int QuickJSContext::quickjs_set(jobject object, JSAtom atom, JSValueConst value, JSValueConst receiver, int flags) {
-    if (atom == atomHoldsJavaScriptObject)
+    if (atom == customFinalizerAtom)
         return false;
     if (atom == atomHoldsJavaObject)
         return false;
@@ -601,6 +603,8 @@ bool QuickJSContext::rethrowQuickJSErrorToJava(JNIEnv *env) {
     if (JS_IsUndefinedOrNull(exception))
         return false;
 
+    int he1 = env->ExceptionCheck();
+
     // try to pull a stack trace out
     if (JS_IsError(ctx, exception)) {
 
@@ -618,19 +622,27 @@ bool QuickJSContext::rethrowQuickJSErrorToJava(JNIEnv *env) {
             env->Throw(ex);
         }
         else {
+            auto errorMessage = hold(JS_ToString(ctx, exception));
+            int he2 = env->ExceptionCheck();
+            auto stack = hold(JS_GetPropertyStr(ctx, exception, "stack"));
+            int he3 = env->ExceptionCheck();
+
 //            env->ThrowNew(duktapeExceptionClass, (toStdString(errorMessage) + "\n" + toStdString(stack)).c_str());
-//             std::string str = "";
-//             if (!JS_IsUndefinedOrNull(errorMessage))
-//                 str += toStdString(errorMessage);
-//             else
-//                 str = "QuickJS Java unknown Error";
-//             str += "\n";
-//             if (!JS_IsUndefinedOrNull(stack))
-//                 str += toStdString(stack);
-//             else
-//                 str += "    at unknown (unknown)\n";
-//             env->ThrowNew(duktapeExceptionClass, str.c_str());
-            env->ThrowNew(duktapeExceptionClass, "");
+
+            std::string str = "";
+            if (!JS_IsUndefinedOrNull(errorMessage))
+                str += toStdString(errorMessage);
+            else
+                str = "QuickJS Java unknown Error";
+            str += "\n";
+            if (!JS_IsUndefinedOrNull(stack))
+                str += toStdString(stack);
+            else
+                str += "    at unknown (unknown)\n";
+            env->ThrowNew(duktapeExceptionClass, str.c_str());
+
+
+//            env->ThrowNew(duktapeExceptionClass, "");
 
         }
     }
@@ -680,9 +692,10 @@ bool QuickJSContext::rethrowJavaExceptionToQuickJS(JNIEnv *env) {
     return true;
 }
 
-void QuickJSContext::runJobs() {
+void QuickJSContext::runJobs(JNIEnv *env) {
     while (JS_IsJobPending(runtime)) {
         JSContext *pctx;
-        JS_ExecutePendingJob(runtime, &pctx);
+        if (JS_ExecutePendingJob(runtime, &pctx))
+            JS_FreeValue(ctx, JS_GetException(ctx));
     }
 }
