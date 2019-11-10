@@ -13,7 +13,6 @@ typedef struct CustomFinalizerData {
     QuickJSContext *ctx;
     CustomFinalizer *finalizer;
     void *udata;
-    bool finalized;
 } CustomFinalizerData;
 
 
@@ -125,6 +124,8 @@ public:
 
     bool rethrowQuickJSErrorToJava(JNIEnv *env);
     bool rethrowJavaExceptionToQuickJS(JNIEnv *env);
+
+    void runJobs();
 
     JavaVM* javaVM;
     jobject javaDuktape;

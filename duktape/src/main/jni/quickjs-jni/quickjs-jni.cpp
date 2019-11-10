@@ -24,7 +24,7 @@ extern "C" {
 JNIEXPORT jlong JNICALL
 Java_com_squareup_duktape_Duktape_createContext(JNIEnv* env, jclass type, jobject javaDuktape) {
     JavaVM* javaVM;
-        env->GetJavaVM(&javaVM);
+    env->GetJavaVM(&javaVM);
     try {
         return reinterpret_cast<jlong>(new QuickJSContext(javaVM, javaDuktape));
     }
@@ -71,6 +71,8 @@ Java_com_squareup_duktape_Duktape_setGlobalProperty(JNIEnv *env, jclass type, jl
 JNIEXPORT void JNICALL
 Java_com_squareup_duktape_Duktape_finalizeJavaScriptObject__JJ(JNIEnv *env, jclass type,
                                                                jlong context, jlong object) {
+    return reinterpret_cast<QuickJSContext*>(context)->finalizeJavaScriptObject(env, object);
+                                       
 }
 
 JNIEXPORT jobject JNICALL

@@ -20,8 +20,11 @@ JNIEnv* getEnvFromJavaVM(JavaVM* javaVM) {
   return env;
 }
 
-inline static JSValue toValue(jlong object) {
+inline static JSValue toValueAsLocal(jlong object) {
     return JS_MKPTR(JS_TAG_OBJECT, reinterpret_cast<void *>(object));
+}
+inline static JSValue toValueAsDup(JSContext *ctx, jlong object) {
+    return JS_DupValue(ctx, JS_MKPTR(JS_TAG_OBJECT, reinterpret_cast<void *>(object)));
 }
 
 inline static jvalue toValue(jobject object) {
@@ -61,18 +64,12 @@ static void javaRefFinalizer(QuickJSContext *ctx, JSValue val, void *udata) {
 static void customFinalizer(JSRuntime *rt, JSValue val) {
     CustomFinalizerData *data = reinterpret_cast<CustomFinalizerData *>(JS_GetOpaque(val, customFinalizerClassId));
     // prevent double finalization from when the java side dies
-    if (data->finalized)
-        return;
-    data->finalized = true;
     data->finalizer(data->ctx, val, data->udata);
     free(data);
 }
 
 static void duktapeObjectFinalizer(JSRuntime *rt, JSValue val) {
     CustomFinalizerData *data = reinterpret_cast<CustomFinalizerData *>(JS_GetOpaque(val, duktapeObjectProxyClassId));
-    if (data->finalized)
-        return;
-    data->finalized = true;
     data->finalizer(data->ctx, val, data->udata);
     free(data);
 }
@@ -121,6 +118,7 @@ QuickJSContext::QuickJSContext(JavaVM* javaVM, jobject javaDuktape):
     javaVM(javaVM) {
     runtime = JS_NewRuntime();
     ctx = JS_NewContext(runtime);
+    JS_SetMaxStackSize(ctx, 1024 * 1024 * 4);
     stash = JS_NewObject(ctx);
     // thrower_function = JS_NewCFunction(ctx, stacktrace_getter, nullptr, 0);
     const char *thrower_str = "(function() { try { throw new Error(); } catch (e) { return e; } })";
@@ -203,17 +201,18 @@ JSAtom QuickJSContext::privateAtom(const char *str) {
 // the object may continue living in the QuickJS side, but clean up all references
 // to the java side.
 void QuickJSContext::finalizeJavaScriptObject(JNIEnv *env, jlong object) {
-    JSValue value = toValue(object);
-    JSValue finalizer = JS_GetProperty(ctx, value, atomHoldsJavaScriptObject);
-    if (JS_IsUndefinedOrNull(finalizer))
-        return;
-    // manually trigger the finalizer, is not allowed to run twice
-    customFinalizer(runtime, finalizer);
-    // this triggers finalizer again maybe, but it no ops.
+    // the JavaScriptObject is referenced in two spots:
+    // on the private atom for the JSValue and also in the stash.
+    // delete them both, and the finalizer will be triggered.
+    JSValue value = toValueAsLocal(object);
+
+    // JSValue prop
     JS_DeleteProperty(ctx, value, atomHoldsJavaScriptObject, 0);
+
     // delete the entry in the stash that was keeping this alive from the java side.
-    auto prop = JS_NewAtomUInt32(ctx, hash((uint64_t)object));
-    JS_DeleteProperty(ctx, stash, prop, 0);
+    auto id = hash((uint64_t)object);
+    auto prop = JS_NewAtomUInt32(ctx, id);
+    assert(JS_DeleteProperty(ctx, stash, prop, 0));
     JS_FreeAtom(ctx, prop);
 }
 
@@ -222,9 +221,9 @@ void QuickJSContext::setFinalizerOnFinalizerObject(JSValue finalizerObject, Cust
     *data = {
         this,
         finalizer,
-        udata,
-        false,
+        udata
     };
+    assert(JS_IsObject(finalizerObject));
     JS_SetOpaque(finalizerObject, data);
 }
 
@@ -265,7 +264,7 @@ JSValue QuickJSContext::toString(JNIEnv *env, jstring value) {
 }
 
 jstring QuickJSContext::stringify(JNIEnv *env, jlong object) {
-    return toString(env, js_debugger_json_stringify(ctx, toValue(object)));
+    return toString(env, js_debugger_json_stringify(ctx, toValueAsLocal(object)));
 }
 
 
@@ -297,7 +296,7 @@ JSValue QuickJSContext::toObject(JNIEnv *env, jobject value) {
         QuickJSContext *context = reinterpret_cast<QuickJSContext *>(env->GetLongField(value, contextField));
         // matching context, grab the native JSValue
         if (context == this)
-            return toValue(env->GetLongField(value, pointerField));
+            return toValueAsDup(ctx, env->GetLongField(value, pointerField));
         // a proxy already exists, but not for the correct DuktapeContext, so native javascript heap
         // pointer can't be used.
     }
@@ -335,7 +334,7 @@ jobject QuickJSContext::toObject(JNIEnv *env, JSValue value) {
         return box(env, doubleClass, doubleValueOf, ret);
     }
     else if (JS_IsBool(value)) {
-        ret.z = JS_ToBool(ctx, value);
+        ret.z = (jboolean)(JS_ToBool(ctx, value) ? true : false);
         return box(env, booleanClass, booleanValueOf, ret);
     }
     else if (JS_IsString(value)) {
@@ -347,9 +346,6 @@ jobject QuickJSContext::toObject(JNIEnv *env, JSValue value) {
         jobject byteBuffer = env->CallStaticObjectMethod(byteBufferClass, byteBufferAllocateDirect, (jint)size);
         memcpy(env->GetDirectBufferAddress(byteBuffer), ptr, size);
         return byteBuffer;
-    }
-    else if (JS_IsFunction(ctx, value)) {
-
     }
     else if (JS_IsException(value)) {
         const auto exception = JS_GetException(ctx);
@@ -384,7 +380,7 @@ jobject QuickJSContext::toObject(JNIEnv *env, JSValue value) {
         if (!JS_IsUndefinedOrNull(found)) {
             int64_t javaPtr;
             JS_ToInt64(ctx, &javaPtr, found);
-            return reinterpret_cast<jobject>(javaPtr);
+            return env->NewLocalRef(reinterpret_cast<jobject>(javaPtr));
         }
     }
 
@@ -393,10 +389,14 @@ jobject QuickJSContext::toObject(JNIEnv *env, JSValue value) {
     jobject javaThis = env->NewObject(javaScriptObjectClass, javaScriptObjectConstructor, javaDuktape,
         reinterpret_cast<jlong>(this), reinterpret_cast<jlong>(ptr));
 
+    // attach the JavaScriptObject to the JSValue to be able to find it later.
+    JS_SetProperty(ctx, value, atomHoldsJavaScriptObject, JS_NewInt64(ctx, reinterpret_cast<int64_t>(javaThis)));
+
     // stash this to hold a reference, and to free automatically on runtime shutdown.
     auto id = hash(reinterpret_cast<uint64_t>(ptr));
     value = JS_DupValue(ctx, value);
-    JS_SetPropertyUint32(ctx, stash, id, value);
+    auto prop = JS_NewAtomUInt32(ctx, id);
+    JS_SetProperty(ctx, stash, prop, value);
 
     setFinalizer(value, javaWeakRefFinalizer, env->NewWeakGlobalRef(javaThis));
 
@@ -425,7 +425,7 @@ jobject QuickJSContext::compile(JNIEnv* env, jstring code, jstring filename) {
 }
 
 void QuickJSContext::setGlobalProperty(JNIEnv *env, jobject property, jobject value) {
-    const auto global = JS_GetGlobalObject(ctx);
+    const auto global = hold(JS_GetGlobalObject(ctx));
     setKeyInternal(env, global, property, value);
     rethrowQuickJSErrorToJava(env);
 }
@@ -441,28 +441,30 @@ jobject QuickJSContext::callInternal(JNIEnv *env, JSValue func, JSValue thiz, jo
                 JSValue argValue = toObject(env, arg);
                 /// is it possible to fail during marshalling? would be catastrophic.
                 if (rethrowQuickJSErrorToJava(env))
-                    return nullptr;
+                    assert(false);
                 valueArgs.push_back(argValue);
             }
         }
     }
 
-    auto ret = JS_Call(ctx, func, thiz, length, &valueArgs.front());
+    auto ret = hold(JS_Call(ctx, func, thiz, length, &valueArgs.front()));
     for (int i = 0; i < valueArgs.size(); i++) {
         JS_FreeValue(ctx, valueArgs[i]);
     }
+
+    runJobs();
 
     return toObjectCheckQuickJSError(env, ret);
 }
 
 jobject QuickJSContext::call(JNIEnv *env, jlong object, jobjectArray args) {
     auto global = hold(JS_GetGlobalObject(ctx));
-    auto func = toValue(object);
+    auto func = toValueAsLocal(object);
     return callInternal(env, func, global, args);
 }
 
 jobject QuickJSContext::callProperty(JNIEnv *env, jlong object, jobject property, jobjectArray args) {
-    auto thiz = toValue(object);
+    auto thiz = toValueAsLocal(object);
     auto propertyJSValue = hold(toObject(env, property));
     auto propertyAtom = JS_ValueToAtom(ctx, propertyJSValue);
     auto func = hold(JS_GetProperty(ctx, thiz, propertyAtom));
@@ -473,43 +475,43 @@ jobject QuickJSContext::callProperty(JNIEnv *env, jlong object, jobject property
 
 jobject QuickJSContext::callMethod(JNIEnv *env, jlong method, jobject object, jobjectArray args) {
     auto thiz = hold(toObject(env, object));
-    auto func = toValue(method);
+    auto func = toValueAsLocal(method);
     return callInternal(env, func, thiz, args);
 }
 
 jobject QuickJSContext::getKeyString(JNIEnv* env, jlong object, jstring key) {
-    return toObjectCheckQuickJSError(env, JS_GetPropertyStr(ctx, toValue(object), env->GetStringUTFChars(key, 0)));
+    return toObjectCheckQuickJSError(env, hold(JS_GetPropertyStr(ctx, toValueAsLocal(object), env->GetStringUTFChars(key, 0))));
 }
 
 jobject QuickJSContext::getKeyInteger(JNIEnv* env, jlong object, jint index) {
-    return toObjectCheckQuickJSError(env, JS_GetPropertyUint32(ctx, toValue(object), (uint32_t)index));
+    return toObjectCheckQuickJSError(env, hold(JS_GetPropertyUint32(ctx, toValueAsLocal(object), (uint32_t)index)));
 }
 
 jobject QuickJSContext::getKeyObject(JNIEnv* env, jlong object, jobject key) {
-    auto thiz = toValue(object);
+    auto thiz = toValueAsLocal(object);
     auto propertyJSValue = hold(toObject(env, key));
     auto propertyAtom = JS_ValueToAtom(ctx, propertyJSValue);
-    auto ret = toObjectCheckQuickJSError(env, JS_GetProperty(ctx, thiz, propertyAtom));
+    auto ret = toObjectCheckQuickJSError(env, hold(JS_GetProperty(ctx, thiz, propertyAtom)));
     JS_FreeAtom(ctx, propertyAtom);
     return ret;
 }
 
 jboolean QuickJSContext::setKeyString(JNIEnv* env, jlong object, jstring key, jobject value) {
-    auto thiz = toValue(object);
+    auto thiz = toValueAsLocal(object);
     auto set = hold(toObject(env, value));
     int ret = JS_SetPropertyStr(ctx, thiz, env->GetStringUTFChars(key, 0), JS_DupValue(ctx, set));
     if (rethrowQuickJSErrorToJava(env))
-        return false;
-    return ret;
+        return JNI_FALSE;
+    return (jboolean)(ret ? JNI_TRUE : JNI_FALSE);
 }
 
 jboolean QuickJSContext::setKeyInteger(JNIEnv* env, jlong object, jint index, jobject value) {
-    auto thiz = toValue(object);
+    auto thiz = toValueAsLocal(object);
     auto set = hold(toObject(env, value));
     int ret = JS_SetPropertyUint32(ctx, thiz, (uint32_t)index, JS_DupValue(ctx, set));
     if (rethrowQuickJSErrorToJava(env))
-        return false;
-    return ret;
+        return JNI_FALSE;
+    return (jboolean)(ret ? JNI_TRUE : JNI_FALSE);
 }
 
 jboolean QuickJSContext::setKeyInternal(JNIEnv* env, JSValue thiz, jobject key, jobject value) {
@@ -518,13 +520,13 @@ jboolean QuickJSContext::setKeyInternal(JNIEnv* env, JSValue thiz, jobject key, 
     auto propertyAtom = JS_ValueToAtom(ctx, propertyJSValue);
     int ret = JS_SetProperty(ctx, thiz, propertyAtom, JS_DupValue(ctx, set));
     if (rethrowQuickJSErrorToJava(env))
-        return false;
+        return JNI_FALSE;
     JS_FreeAtom(ctx, propertyAtom);
-    return ret;
+    return (jboolean)(ret ? JNI_TRUE : JNI_FALSE);
 }
 
 jboolean QuickJSContext::setKeyObject(JNIEnv* env, jlong object, jobject key, jobject value) {
-    return setKeyInternal(env, toValue(object), key, value);
+    return setKeyInternal(env, toValueAsLocal(object), key, value);
 }
 
 int QuickJSContext::quickjs_has(jobject object, JSAtom atom) {
@@ -567,7 +569,8 @@ int QuickJSContext::quickjs_set(jobject object, JSAtom atom, JSValueConst value,
     auto prop = hold(JS_AtomToValue(ctx, atom));
     JNIEnv *env = getEnvFromJavaVM(javaVM);
     const auto jprop = LocalRefHolder(env, toObject(env, prop));
-    jboolean ret = env->CallBooleanMethod(javaDuktape, duktapeSetMethod, object, (jobject)jprop, value);
+    const auto jvalue = LocalRefHolder(env, toObject(env, value));
+    jboolean ret = env->CallBooleanMethod(javaDuktape, duktapeSetMethod, object, (jobject)jprop, (jobject)jvalue);
 
     if (rethrowJavaExceptionToQuickJS(env))
         return -1;
@@ -600,21 +603,35 @@ bool QuickJSContext::rethrowQuickJSErrorToJava(JNIEnv *env) {
 
     // try to pull a stack trace out
     if (JS_IsError(ctx, exception)) {
-        auto errorMessage = hold(JS_ToString(ctx, exception));
-        auto stack = hold(JS_GetPropertyStr(ctx, exception, "stack"));
 
         // this might actually be a native java exception, which propagated from in which case
         // the js and java call stacks need merging.
         auto javaException = hold(JS_GetProperty(ctx, exception, javaExceptionAtom));
 
         if (!JS_IsUndefinedOrNull(javaException)) {
+//            auto errorMessage = hold(JS_ToString(ctx, exception));
+            auto stack = hold(JS_GetPropertyStr(ctx, exception, "stack"));
+
             jobject unwrappedException = toObject(env, javaException);
             jthrowable ex = (jthrowable)env->CallObjectMethod(unwrappedException, duktapeJavaObjectGetObject, nullptr);
             env->CallStaticVoidMethod(duktapeExceptionClass, addDuktapeStack, ex, toString(env, stack));
             env->Throw(ex);
         }
         else {
-            env->ThrowNew(duktapeExceptionClass, (toStdString(errorMessage) + "\n" + toStdString(stack)).c_str());
+//            env->ThrowNew(duktapeExceptionClass, (toStdString(errorMessage) + "\n" + toStdString(stack)).c_str());
+//             std::string str = "";
+//             if (!JS_IsUndefinedOrNull(errorMessage))
+//                 str += toStdString(errorMessage);
+//             else
+//                 str = "QuickJS Java unknown Error";
+//             str += "\n";
+//             if (!JS_IsUndefinedOrNull(stack))
+//                 str += toStdString(stack);
+//             else
+//                 str += "    at unknown (unknown)\n";
+//             env->ThrowNew(duktapeExceptionClass, str.c_str());
+            env->ThrowNew(duktapeExceptionClass, "");
+
         }
     }
     else {
@@ -661,4 +678,11 @@ bool QuickJSContext::rethrowJavaExceptionToQuickJS(JNIEnv *env) {
 
     JS_Throw(ctx, error);
     return true;
+}
+
+void QuickJSContext::runJobs() {
+    while (JS_IsJobPending(runtime)) {
+        JSContext *pctx;
+        JS_ExecutePendingJob(runtime, &pctx);
+    }
 }

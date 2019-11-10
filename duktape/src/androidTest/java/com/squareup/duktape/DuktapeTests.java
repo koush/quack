@@ -8,6 +8,7 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
 import java.io.File;
+import java.io.PrintStream;
 import java.util.Arrays;
 import java.util.List;
 import java.util.regex.Pattern;
@@ -22,8 +23,69 @@ public class DuktapeTests {
         }
     }
 
+    public class Console {
+        Duktape duktape;
+        PrintStream out;
+        PrintStream err;
+        public Console(Duktape duktape, PrintStream out, PrintStream err) {
+            this.duktape = duktape;
+            this.out = out;
+            this.err = err;
+        }
+
+        String getLog(Object... objects) {
+            StringBuilder b = new StringBuilder();
+            for (Object o: objects) {
+                if (o == null)
+                    b.append("null");
+                else
+                    b.append(o.toString());
+                b.append("fff\n");
+            }
+            return b.toString();
+        }
+
+        public void log(Object... objects) {
+            out.println(getLog(objects));
+        }
+        public void error(Object... objects) {
+            err.println(getLog(objects));
+        }
+        public void warn(Object... objects) {
+            err.println(getLog(objects));
+        }
+        public void debug(Object... objects) {
+            err.println(getLog(objects));
+        }
+        public void info(Object... objects) {
+            err.println(getLog(objects));
+        }
+
+        @DuktapeMethodName(name = "assert")
+        public void assert_(Object... objects) {
+            err.println(getLog(objects));
+        }
+    }
+
+
     private static class ResultHolder<T> {
         public T result;
+    }
+
+    @Test
+    public void testGlobal() {
+        Duktape duktape = Duktape.create();
+        duktape.setGlobalProperty("hello", "world");
+        duktape.setGlobalProperty("thing", new Object());
+        duktape.close();
+    }
+
+    @Test
+    public void testConsole() {
+        Duktape duktape = Duktape.create();
+        duktape.setGlobalProperty("console", new Console(duktape, System.out, System.err));
+        duktape.evaluate("console.log('hello.');");
+        duktape.close();
     }
 
     @Test
@@ -48,6 +110,7 @@ public class DuktapeTests {
 
         // longs must be strings, since it loses precision in doubles.
         assertTrue(func.call(0L) instanceof String);
+        duktape.close();
     }
 
     interface Callback {
@@ -66,6 +129,7 @@ public class DuktapeTests {
         func.call(cb);
 
         assertTrue(resultHolder.result);
+        duktape.close();
     }
 
     @Test
@@ -80,10 +144,29 @@ public class DuktapeTests {
         func.call(duktape.coerceJavaToJavaScript(Callback.class, cb));
 
         assertTrue(resultHolder.result);
+        duktape.close();
     }
+    
 
     interface RoundtripCallback {
         Object callback(Object o);
+    }
+
+    @Test
+    public void testInterfaceReturn() {
+        Duktape duktape = Duktape.create();
+        String script = "function() {" +
+                "function RoundtripCallback() {" +
+                "}" +
+                "RoundtripCallback.prototype.callback = function(o) {" +
+                "return o;" +
+                "};" +
+                "return new RoundtripCallback();" +
+                "}";
+        JavaScriptObject func = duktape.compileFunction(script, "?");
+        RoundtripCallback cb = ((JavaScriptObject)func.call()).proxyInterface(RoundtripCallback.class);
+
+        duktape.close();
     }
 
     @Test
@@ -112,6 +195,7 @@ public class DuktapeTests {
             Object ret = cb.callback(value);
             assertTrue(ret instanceof String);
         }
+        duktape.close();
     }
 
     interface InterfaceCallback {
@@ -137,18 +221,20 @@ public class DuktapeTests {
         iface.callback(cb);
 
         assertTrue(resultHolder.result);
+        duktape.close();
     }
 
     interface RoundtripInterfaceCallback {
         Object callback(Object val, RoundtripCallback o);
     }
 
+    @Test
     public void testRoundtripInterfaceCallback() {
         ResultHolder<Integer> resultHolder = new ResultHolder<>();
         resultHolder.result = 0;
         RoundtripCallback cb = o -> {
             resultHolder.result++;
-            assertTrue(o instanceof Double);
+            assertTrue(o instanceof Double || o instanceof Integer);
             return o;
         };
 
@@ -168,9 +254,44 @@ public class DuktapeTests {
         List<Object> values = Arrays.asList((byte)0, (short)0, 0, 0f, 0d);
         for (Object value: values) {
             Object ret = iface.callback(value, cb);
-            assertTrue(ret instanceof Double);
+            assertTrue(ret instanceof Double || ret instanceof Integer);
         }
         assertTrue(resultHolder.result == 5);
+        duktape.close();
+    }
+
+    @Test
+    public void testRoundtripInterfaceCallbackGC() {
+        ResultHolder<Integer> resultHolder = new ResultHolder<>();
+        resultHolder.result = 0;
+        RoundtripCallback cb = o -> {
+            resultHolder.result++;
+            assertTrue(o instanceof Double || o instanceof Integer);
+            return o;
+        };
+
+        Duktape duktape = Duktape.create();
+        String script = "function() {" +
+                "function RoundtripCallback() {" +
+                "}" +
+                "RoundtripCallback.prototype.callback = function(o, cb) {" +
+                "return cb(o);" +
+                "};" +
+                "return new RoundtripCallback();" +
+                "}";
+        JavaScriptObject func = duktape.compileFunction(script, "?");
+        for (int i = 0; i < 100; i++) {
+            RoundtripInterfaceCallback iface = ((JavaScriptObject)func.call()).proxyInterface(RoundtripInterfaceCallback.class);
+
+            // should all come back as doubles.
+            List<Object> values = Arrays.asList((byte)0);
+            for (Object value: values) {
+                Object ret = iface.callback(value, cb);
+                assertTrue(ret instanceof Double || ret instanceof Integer);
+            }
+            System.gc();
+        }
+        duktape.close();
     }
 
     enum Foo {
@@ -191,6 +312,7 @@ public class DuktapeTests {
             assertTrue(ret instanceof String);
             assertTrue(duktape.coerceJavaScriptToJava(Foo.class, ret) instanceof Foo);
         }
+        duktape.close();
     }
 
     interface EnumInterface {
@@ -217,6 +339,7 @@ public class DuktapeTests {
             Object ret = cb.callback(value);
             assertNotNull(ret);
         }
+        duktape.close();
     }
 
     interface RoundtripEnumInterfaceCallback {
@@ -252,6 +375,7 @@ public class DuktapeTests {
             assertNotNull(ret);
         }
         assertTrue(resultHolder.result == 2);
+        duktape.close();
     }
 
     @Test
@@ -280,6 +404,7 @@ public class DuktapeTests {
             Assert.assertTrue(e.getStackTrace()[1].getMethodName().contains("func2"));
             Assert.assertTrue(e.getStackTrace()[2].getMethodName().contains("func3"));
         }
+        duktape.close();
     }
 
     @Test
@@ -308,6 +433,7 @@ public class DuktapeTests {
             Assert.assertTrue(e.getStackTrace()[1].getMethodName().contains("func2"));
             Assert.assertTrue(e.getStackTrace()[2].getMethodName().contains("func3"));
         }
+        duktape.close();
     }
 
     void findStack(String[] strs, String regex) {
@@ -405,6 +531,7 @@ public class DuktapeTests {
         func.call(cb, cb2);
 
         assertTrue(resultHolder.result.contains("java.lang.IllegalArgumentException: java!"));
+        duktape.close();
     }
 
     @Test
@@ -444,6 +571,7 @@ public class DuktapeTests {
         findStack(splits, "func1");
         findStack(splits, "func2");
         findStack(splits, "func3");
+        duktape.close();
     }
 
     interface MarshallCallback {
@@ -491,6 +619,7 @@ public class DuktapeTests {
         catch (Exception e) {
             Assert.assertTrue(e.getMessage().contains("java!"));
         }
+        duktape.close();
     }
 
     @Test
@@ -510,5 +639,6 @@ public class DuktapeTests {
         JavaScriptObject ret = (JavaScriptObject)cb.callback(new DuktapeJsonObject("{\"meaningOfLife\":42}"));
         Object property = ret.get("meaningOfLife");
         assertTrue(property.equals(42d) || property.equals(42));
+        duktape.close();
     }
 }

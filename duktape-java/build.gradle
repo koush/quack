@@ -45,3 +45,9 @@ compileJava {
 //         jvmTarget = "1.8"
 //     }
 // }
+
+ 
+// task testJar(type: Jar) {
+//     classifier = 'tests'
+//     from sourceSets.test.output
+// }
