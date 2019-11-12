@@ -381,14 +381,20 @@ jobject QuickJSContext::toObject(JNIEnv *env, JSValue value) {
 }
 
 jobject QuickJSContext::toObjectCheckQuickJSError(JNIEnv *env, JSValue value) {
-    if (rethrowQuickJSErrorToJava(env))
-        return nullptr;
-    return toObject(env, value);
+    if (!JS_IsException(value))
+        return toObject(env, value);
+    auto exception = hold(JS_GetException(ctx));
+    rethrowQuickJSErrorToJava(env, exception);
+    return nullptr;
 }
 
 jobject QuickJSContext::evaluate(JNIEnv *env, jstring code, jstring filename) {
     auto codeStr = env->GetStringUTFChars(code, 0);
-    auto result = hold(JS_Eval(ctx, codeStr, strlen(codeStr), env->GetStringUTFChars(filename, 0), JS_EVAL_TYPE_GLOBAL));
+    int len = strlen(codeStr);
+    char* mem = (char*)js_malloc(ctx, len + 1);
+    mem[len] = '\0';
+    memcpy(mem, codeStr, len);
+    auto result = hold(JS_Eval(ctx, mem, len, env->GetStringUTFChars(filename, 0), JS_EVAL_TYPE_GLOBAL));
     return toObjectCheckQuickJSError(env, result);
 }
 
@@ -403,8 +409,7 @@ jobject QuickJSContext::compile(JNIEnv* env, jstring code, jstring filename) {
 
 void QuickJSContext::setGlobalProperty(JNIEnv *env, jobject property, jobject value) {
     const auto global = hold(JS_GetGlobalObject(ctx));
-    setKeyInternal(env, global, property, value);
-    rethrowQuickJSErrorToJava(env);
+    checkQuickJSErrorAndThrow(env, setKeyInternal(env, global, property, value));
 }
 
 jobject QuickJSContext::callInternal(JNIEnv *env, JSValue func, JSValue thiz, jobjectArray args) {
@@ -417,7 +422,7 @@ jobject QuickJSContext::callInternal(JNIEnv *env, JSValue func, JSValue thiz, jo
                 const auto arg = LocalRefHolder(env, env->GetObjectArrayElement(args, i));
                 JSValue argValue = toObject(env, arg);
                 /// is it possible to fail during marshalling? would be catastrophic.
-                if (rethrowQuickJSErrorToJava(env))
+                if (JS_IsException(argValue))
                     assert(false);
                 valueArgs.push_back(argValue);
             }
@@ -475,30 +480,20 @@ jobject QuickJSContext::getKeyObject(JNIEnv* env, jlong object, jobject key) {
 jboolean QuickJSContext::setKeyString(JNIEnv* env, jlong object, jstring key, jobject value) {
     auto thiz = toValueAsLocal(object);
     auto set = hold(toObject(env, value));
-    int ret = JS_SetPropertyStr(ctx, thiz, env->GetStringUTFChars(key, 0), JS_DupValue(ctx, set));
-    if (rethrowQuickJSErrorToJava(env))
-        return JNI_FALSE;
-    return (jboolean)(ret ? JNI_TRUE : JNI_FALSE);
+    return checkQuickJSErrorAndThrow(env, JS_SetPropertyStr(ctx, thiz, env->GetStringUTFChars(key, 0), JS_DupValue(ctx, set)));
 }
 
 jboolean QuickJSContext::setKeyInteger(JNIEnv* env, jlong object, jint index, jobject value) {
     auto thiz = toValueAsLocal(object);
     auto set = hold(toObject(env, value));
-    int ret = JS_SetPropertyUint32(ctx, thiz, (uint32_t)index, JS_DupValue(ctx, set));
-    if (rethrowQuickJSErrorToJava(env))
-        return JNI_FALSE;
-    return (jboolean)(ret ? JNI_TRUE : JNI_FALSE);
+    return checkQuickJSErrorAndThrow(env, JS_SetPropertyUint32(ctx, thiz, (uint32_t)index, JS_DupValue(ctx, set)));
 }
 
 jboolean QuickJSContext::setKeyInternal(JNIEnv* env, JSValue thiz, jobject key, jobject value) {
     auto set = hold(toObject(env, value));
     auto propertyJSValue = hold(toObject(env, key));
     auto propertyAtom = JS_ValueToAtom(ctx, propertyJSValue);
-    int ret = JS_SetProperty(ctx, thiz, propertyAtom, JS_DupValue(ctx, set));
-    if (rethrowQuickJSErrorToJava(env))
-        return JNI_FALSE;
-    JS_FreeAtom(ctx, propertyAtom);
-    return (jboolean)(ret ? JNI_TRUE : JNI_FALSE);
+    return checkQuickJSErrorAndThrow(env, JS_SetProperty(ctx, thiz, propertyAtom, JS_DupValue(ctx, set)));
 }
 
 jboolean QuickJSContext::setKeyObject(JNIEnv* env, jlong object, jobject key, jobject value) {
@@ -572,13 +567,17 @@ JSValue QuickJSContext::quickjs_apply(jobject func_obj, JSValueConst this_val, i
     return toObject(env, result);
 }
 
-bool QuickJSContext::rethrowQuickJSErrorToJava(JNIEnv *env) {
+jboolean QuickJSContext::checkQuickJSErrorAndThrow(JNIEnv *env, int maybeException) {
+    if (maybeException >= 0)
+        return maybeException ? JNI_TRUE : JNI_FALSE;
+
     auto exception = hold(JS_GetException(ctx));
-    if (JS_IsUndefinedOrNull(exception))
-        return false;
+    assert(JS_IsException(exception));
+    rethrowQuickJSErrorToJava(env, exception);
+    return JNI_FALSE;
+}
 
-    int he1 = env->ExceptionCheck();
-
+void QuickJSContext::rethrowQuickJSErrorToJava(JNIEnv *env, JSValue exception) {
     // try to pull a stack trace out
     if (JS_IsError(ctx, exception)) {
 
@@ -597,9 +596,7 @@ bool QuickJSContext::rethrowQuickJSErrorToJava(JNIEnv *env) {
         }
         else {
             auto errorMessage = hold(JS_ToString(ctx, exception));
-            int he2 = env->ExceptionCheck();
             auto stack = hold(JS_GetPropertyStr(ctx, exception, "stack"));
-            int he3 = env->ExceptionCheck();
 
 //            env->ThrowNew(duktapeExceptionClass, (toStdString(errorMessage) + "\n" + toStdString(stack)).c_str());
 
@@ -614,10 +611,6 @@ bool QuickJSContext::rethrowQuickJSErrorToJava(JNIEnv *env) {
             else
                 str += "    at unknown (unknown)\n";
             env->ThrowNew(duktapeExceptionClass, str.c_str());
-
-
-//            env->ThrowNew(duktapeExceptionClass, "");
-
         }
     }
     else {
@@ -626,8 +619,6 @@ bool QuickJSContext::rethrowQuickJSErrorToJava(JNIEnv *env) {
         auto string = hold(JS_ToString(ctx, exception));
         env->ThrowNew(duktapeExceptionClass, toStdString(string).c_str());
     }
-
-    return true;
 }
 
 bool QuickJSContext::rethrowJavaExceptionToQuickJS(JNIEnv *env) {

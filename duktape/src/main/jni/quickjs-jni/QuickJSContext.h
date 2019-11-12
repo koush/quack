@@ -128,7 +128,9 @@ public:
     int quickjs_set(jobject object, JSAtom atom, JSValueConst value, JSValueConst receiver, int flags);
     JSValue quickjs_apply(jobject func_obj, JSValueConst this_val, int argc, JSValueConst *argv);
 
-    bool rethrowQuickJSErrorToJava(JNIEnv *env);
+    bool checkQuickJSErrorAndThrow(JNIEnv *env, JSValue maybeException);
+    jboolean checkQuickJSErrorAndThrow(JNIEnv *env, int maybeException);
+    void rethrowQuickJSErrorToJava(JNIEnv *env, JSValue exception);
     bool rethrowJavaExceptionToQuickJS(JNIEnv *env);
 
     void runJobs(JNIEnv *env);

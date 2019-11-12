@@ -14,6 +14,7 @@ import java.util.List;
 import java.util.regex.Pattern;
 
 public class DuktapeTests {
+    private static boolean useQuickJS = false;
     static {
         try {
             // for non-android jvm
@@ -21,6 +22,13 @@ public class DuktapeTests {
         }
         catch (UnsatisfiedLinkError e) {
         }
+    }
+
+    @Test
+    public void testQuickJSExceptionWithTemplateArgs() {
+        Duktape duktape = Duktape.create(true);
+        duktape.evaluate("(function(){function tcp(str) {return `_${str}._tcp`;}})", "script.js");
+        duktape.close();
     }
 
     public class Console {
@@ -82,7 +90,7 @@ public class DuktapeTests {
 
     @Test
     public void testConsole() {
-        Duktape duktape = Duktape.create();
+        Duktape duktape = Duktape.create(useQuickJS);
         duktape.setGlobalProperty("console", new Console(duktape, System.out, System.err));
         duktape.evaluate("console.log('hello.');");
         duktape.close();
@@ -90,22 +98,30 @@ public class DuktapeTests {
 
     @Test
     public void testRoundtrip() {
-        Duktape duktape = Duktape.create();
+        Duktape duktape = Duktape.create(false);
         String script = "function(ret) { return ret; }";
         JavaScriptObject func = duktape.compileFunction(script, "?");
 
-        // should all come back as doubles.
+        // should all come back as numbers.
         List<Object> values = Arrays.asList(new Float(0), new Double(0), 0f, 0d);
         for (Object value: values) {
             Object ret = func.call(value);
-            assertTrue(ret instanceof Double);
+            assertTrue(ret instanceof Number);
         }
 
-        // might come back as doubles or ints, depending on runtime.
+        // should all come back as numbers.
+        values = Arrays.asList(new Float(3.14), new Double(3.14), 3.14f, 3.14d);
+        for (Object value: values) {
+            Object ret = func.call(value);
+            double d = ((Number)ret).doubleValue();
+            assertTrue(d < 3.15 && d > 3.13);
+        }
+
+        // should all come back as ints.
         values = Arrays.asList(new Byte((byte)0), new Short((short)0), new Integer(0), (byte)0, (short)0, 0);
         for (Object value: values) {
             Object ret = func.call(value);
-            assertTrue(ret instanceof Double || ret instanceof Integer);
+            assertTrue(ret instanceof Integer || ret instanceof Double);
         }
 
         // longs must be strings, since it loses precision in doubles.
@@ -122,7 +138,7 @@ public class DuktapeTests {
         ResultHolder<Boolean> resultHolder = new ResultHolder<>();
         Callback cb = () -> resultHolder.result = true;
 
-        Duktape duktape = Duktape.create();
+        Duktape duktape = Duktape.create(useQuickJS);
         String script = "function(cb) { cb.callback() }";
         JavaScriptObject func = duktape.compileFunction(script, "?");
 
@@ -137,7 +153,7 @@ public class DuktapeTests {
         ResultHolder<Boolean> resultHolder = new ResultHolder<>();
         Callback cb = () -> resultHolder.result = true;
 
-        Duktape duktape = Duktape.create();
+        Duktape duktape = Duktape.create(useQuickJS);
         String script = "function(cb) { cb() }";
         JavaScriptObject func = duktape.compileFunction(script, "?");
 
@@ -154,7 +170,7 @@ public class DuktapeTests {
 
     @Test
     public void testInterfaceReturn() {
-        Duktape duktape = Duktape.create();
+        Duktape duktape = Duktape.create(useQuickJS);
         String script = "function() {" +
                 "function RoundtripCallback() {" +
                 "}" +
@@ -171,7 +187,7 @@ public class DuktapeTests {
 
     @Test
     public void testInterface() {
-        Duktape duktape = Duktape.create();
+        Duktape duktape = Duktape.create(useQuickJS);
         String script = "function() {" +
                 "function RoundtripCallback() {" +
                 "}" +
@@ -207,7 +223,7 @@ public class DuktapeTests {
         ResultHolder<Boolean> resultHolder = new ResultHolder<>();
         Callback cb = () -> resultHolder.result = true;
 
-        Duktape duktape = Duktape.create();
+        Duktape duktape = Duktape.create(useQuickJS);
         String script = "function() {" +
                 "function RoundtripCallback() {" +
                 "}" +
@@ -238,7 +254,7 @@ public class DuktapeTests {
             return o;
         };
 
-        Duktape duktape = Duktape.create();
+        Duktape duktape = Duktape.create(useQuickJS);
         String script = "function() {" +
                 "function RoundtripCallback() {" +
                 "}" +
@@ -270,7 +286,7 @@ public class DuktapeTests {
             return o;
         };
 
-        Duktape duktape = Duktape.create();
+        Duktape duktape = Duktape.create(useQuickJS);
         String script = "function() {" +
                 "function RoundtripCallback() {" +
                 "}" +
@@ -301,7 +317,7 @@ public class DuktapeTests {
 
     @Test
     public void testEnumRoundtrip() {
-        Duktape duktape = Duktape.create();
+        Duktape duktape = Duktape.create(useQuickJS);
         String script = "function(ret) { return ret; }";
         JavaScriptObject func = duktape.compileFunction(script, "?");
 
@@ -321,7 +337,7 @@ public class DuktapeTests {
 
     @Test
     public void testEnumInterface() {
-        Duktape duktape = Duktape.create();
+        Duktape duktape = Duktape.create(useQuickJS);
         String script = "function() {" +
                 "function RoundtripCallback() {" +
                 "}" +
@@ -356,7 +372,7 @@ public class DuktapeTests {
             return o;
         };
 
-        Duktape duktape = Duktape.create();
+        Duktape duktape = Duktape.create(useQuickJS);
         String script = "function() {" +
                 "function RoundtripCallback() {" +
                 "}" +
@@ -380,7 +396,7 @@ public class DuktapeTests {
 
     @Test
     public void testDuktapeException() {
-        Duktape duktape = Duktape.create();
+        Duktape duktape = Duktape.create(useQuickJS);
         String script = "function() {" +
                 "function func1() {" +
                 "throw new Error('duktape!')" +
@@ -409,7 +425,7 @@ public class DuktapeTests {
 
     @Test
     public void testDuktapeException2() {
-        Duktape duktape = Duktape.create();
+        Duktape duktape = Duktape.create(useQuickJS);
         String script = "function() {\n" +
                 "function func1() {\n" +
                 "throw new Error('duktape!')\n" +
@@ -455,7 +471,7 @@ public class DuktapeTests {
 
     @Test
     public void testDuktapeExceptionFromJava() {
-        Duktape duktape = Duktape.create();
+        Duktape duktape = Duktape.create(useQuickJS);
         String script = "function(cb) {" +
                 "function func1() {" +
                 "cb.callback();" +
@@ -492,7 +508,7 @@ public class DuktapeTests {
 
     @Test
     public void testDuktapeExceptionMessageFromJava() {
-        Duktape duktape = Duktape.create();
+        Duktape duktape = Duktape.create(useQuickJS);
         String script = "function(cb, cb2) {" +
                 "function func1() {" +
                 "try {" +
@@ -536,7 +552,7 @@ public class DuktapeTests {
 
     @Test
     public void testJavaStackInJavaScript() {
-        Duktape duktape = Duktape.create();
+        Duktape duktape = Duktape.create(useQuickJS);
         String script = "function(cb) {" +
                 "function func1() {" +
                 "cb.callback();" +
@@ -580,7 +596,7 @@ public class DuktapeTests {
 
     @Test
     public void testJavaProxyInDuktapeThreadCrash() {
-        Duktape duktape = Duktape.create();
+        Duktape duktape = Duktape.create(false);
         String script = "function(cb, o, B, S, I, L, F, D, b, s, i, l, f, d, str) {\n" +
                 "function yielder() {\n" +
                 "\tcb.callback(o, B, S, I, L, F, D, b, s, i, l, f, d, str);\n" +
@@ -624,7 +640,7 @@ public class DuktapeTests {
 
     @Test
     public void testJson() {
-        Duktape duktape = Duktape.create();
+        Duktape duktape = Duktape.create(useQuickJS);
         String script = "function() {" +
                 "function RoundtripCallback() {" +
                 "}" +
