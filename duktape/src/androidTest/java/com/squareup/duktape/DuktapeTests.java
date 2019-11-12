@@ -8,6 +8,9 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.IOException;
 import java.io.PrintStream;
 import java.util.Arrays;
 import java.util.List;
@@ -22,6 +25,25 @@ public class DuktapeTests {
         }
         catch (UnsatisfiedLinkError e) {
         }
+    }
+
+    // takes a long time. Duktape does not pass due to a const limit. quickjs works.
+    // @Test
+    public void testOctane() throws IOException {
+        Duktape duktape = Duktape.create(false);
+        File files[] = new File("/Volumes/Dev/Scrypted/duktape-android/tests/src/main/assets/octane").listFiles();
+        Arrays.sort(files, (a, b) -> {
+            return a.getAbsolutePath().compareTo(b.getAbsolutePath());            
+        });
+        for (File file: files) {
+            String script = StreamUtility.readFile(file);
+            duktape.evaluate(script, file.getAbsolutePath());
+        }
+        String script = StreamUtility.readFile("/Volumes/Dev/Scrypted/duktape-android/tests/src/main/assets/octane.js");
+        duktape.evaluate(script);
+        String ret = duktape.evaluateForJavaScriptObject("getResults").call().toString();
+        System.out.println(ret);
+        duktape.close();
     }
 
     @Test
