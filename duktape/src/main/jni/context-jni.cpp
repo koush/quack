@@ -44,22 +44,25 @@ Java_com_squareup_duktape_Duktape_destroyContext(JNIEnv *env, jclass type, jlong
 }
 
 JNIEXPORT void JNICALL
-Java_com_squareup_duktape_Duktape_waitForDebugger(JNIEnv *env, jclass type, jlong context) {
+Java_com_squareup_duktape_Duktape_waitForDebugger(JNIEnv *env, jclass type, jlong context, jstring connectionString) {
+    reinterpret_cast<JSContext *>(context)->waitForDebugger(env, connectionString);
 }
 
 JNIEXPORT void JNICALL
 Java_com_squareup_duktape_Duktape_cooperateDebugger(JNIEnv *env, jclass type, jlong context) {
+    reinterpret_cast<JSContext *>(context)->cooperateDebugger();
 }
 
 JNIEXPORT jboolean JNICALL
 Java_com_squareup_duktape_Duktape_isDebugging(JNIEnv *env, jclass type, jlong context) {
-  return false;
+  return reinterpret_cast<JSContext *>(context)->isDebugging();
 }
 
 JNIEXPORT void JNICALL
 Java_com_squareup_duktape_Duktape_debuggerAppNotify(JNIEnv *env, jclass type,
                                            jlong context,
                                            jobjectArray args) {
+    reinterpret_cast<JSContext *>(context)->debuggerAppNotify(env, args);
 }
 
 JNIEXPORT jstring JNICALL
@@ -134,20 +137,20 @@ Java_com_squareup_duktape_Duktape_setKeyString(JNIEnv *env, jclass type, jlong c
 }
 
 JNIEXPORT jobject JNICALL
-Java_com_squareup_duktape_Duktape_compileFunction__JLjava_lang_String_2Ljava_lang_String_2(
+Java_com_squareup_duktape_Duktape_compileFunction(
         JNIEnv* env, jclass type, jlong context, jstring code, jstring fname) {
     return reinterpret_cast<JSContext *>(context)->compile(env, code, fname);
 }
 
 JNIEXPORT jobject JNICALL
-Java_com_squareup_duktape_Duktape_evaluate__JLjava_lang_String_2Ljava_lang_String_2(
+Java_com_squareup_duktape_Duktape_evaluate(
     JNIEnv* env, jclass type, jlong context, jstring code, jstring fname) {
     return reinterpret_cast<JSContext *>(context)->evaluate(env, code, fname);
 }
 
 JNIEXPORT jlong JNICALL
 Java_com_squareup_duktape_Duktape_getHeapSize__J(JNIEnv *env, jclass type, jlong context) {
-  return 0;
+    return reinterpret_cast<JSContext *>(context)->getHeapSize(env);
 }
 
 } // extern "C"

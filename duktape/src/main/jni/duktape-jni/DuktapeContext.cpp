@@ -251,7 +251,7 @@ DuktapeContext::DuktapeContext(JavaVM* javaVM, jobject javaDuktape)
   duk_pop(m_context);
 }
 
-jlong DuktapeContext::getHeapSize() {
+jlong DuktapeContext::getHeapSize(JNIEnv *env) {
   return m_heapSize;
 }
 
@@ -880,7 +880,7 @@ jobject DuktapeContext::compile(JNIEnv* env, jstring code, jstring fname) {
   return popObject(env);
 }
 
-void DuktapeContext::waitForDebugger() {
+void DuktapeContext::waitForDebugger(JNIEnv *env, jstring connectionString) {
   duk_trans_socket_init();
   duk_trans_socket_waitconn(&m_DebuggerSocket);
 
@@ -900,8 +900,8 @@ void DuktapeContext::cooperateDebugger() {
   duk_gc(m_context, 0);
 }
 
-bool DuktapeContext::isDebugging() {
-    return m_DebuggerSocket.client_sock > 0;
+jboolean DuktapeContext::isDebugging() {
+    return (jboolean)(m_DebuggerSocket.client_sock > 0 ? JNI_TRUE : JNI_FALSE);
 }
 
 void DuktapeContext::debuggerAppNotify(JNIEnv *env, jobjectArray args) {

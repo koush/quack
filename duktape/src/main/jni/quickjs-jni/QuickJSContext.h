@@ -96,7 +96,6 @@ public:
     void setFinalizer(JSValue value, CustomFinalizer finalizer, void *udata);
     void setFinalizerOnFinalizerObject(JSValue finalizerObject, CustomFinalizer finalizer, void *udata);
 
-    jlong getHeapSize(JNIEnv* env);
     void finalizeJavaScriptObject(JNIEnv *env, jlong object);
 
     jobject evaluate(JNIEnv *env, jstring code, jstring filename);
@@ -116,6 +115,12 @@ public:
     jobject call(JNIEnv *env, jlong object, jobjectArray args);
     jobject callProperty(JNIEnv *env, jlong object, jobject property, jobjectArray args);
     jobject callMethod(JNIEnv *env, jlong method, jobject object, jobjectArray args);
+
+    void waitForDebugger(JNIEnv *env, jstring connectionString);
+    void cooperateDebugger();
+    jboolean isDebugging();
+    void debuggerAppNotify(JNIEnv *env, jobjectArray args) {}
+    jlong getHeapSize(JNIEnv* env);
 
     // DuktapeObject class traps
     int quickjs_has(jobject object, JSAtom atom);
@@ -158,10 +163,13 @@ public:
 
     jclass booleanClass;
     jmethodID booleanValueOf;
+    jmethodID booleanValue;
     jclass intClass;
     jmethodID intValueOf;
+    jmethodID intValue;
     jclass doubleClass;
     jmethodID doubleValueOf;
+    jmethodID doubleValue;
     jclass stringClass;
     jclass byteBufferClass;
 

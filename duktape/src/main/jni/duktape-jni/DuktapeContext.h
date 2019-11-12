@@ -31,11 +31,11 @@ public:
   DuktapeContext & operator=(const DuktapeContext &) = delete;
 
   jobject evaluate(JNIEnv* env, jstring sourceCode, jstring fileName);
-  jobject compile(JNIEnv* env, jstring sourceCode, jstring fileName);
+  jobject compile(JNIEnv* env, jstring code, jstring fileName);
 
   void cooperateDebugger();
-  void waitForDebugger();
-  bool isDebugging();
+  void waitForDebugger(JNIEnv *env, jstring connectionString);
+  jboolean isDebugging();
   void debuggerAppNotify(JNIEnv* env, jobjectArray args);
 
   void pushObject(JNIEnv* env, jobject object, bool deleteLocalRef = true);
@@ -52,7 +52,7 @@ public:
   void setGlobalProperty(JNIEnv *env, jobject property, jobject value);
   jstring stringify(JNIEnv *env, jlong object);
   void finalizeJavaScriptObject(JNIEnv *env, jlong object);
-  jlong getHeapSize();
+  jlong getHeapSize(JNIEnv *env);
 
   duk_ret_t duktapeHas();
   duk_ret_t duktapeGet();

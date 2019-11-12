@@ -584,8 +584,8 @@ public final class Duktape implements Closeable {
   /**
    * Wait for a debugging connection on port 9091.
    */
-  public void waitForDebugger() {
-    waitForDebugger(context);
+  public void waitForDebugger(String connectionString) {
+    waitForDebugger(context, connectionString);
   }
 
   /**
@@ -688,10 +688,10 @@ public final class Duktape implements Closeable {
   private static native long createContext(Duktape duktape, boolean useQuickJS);
   private static native void destroyContext(long context);
   private static native <T> T evaluate(long context, String sourceCode, String fileName);
-  private static native JavaScriptObject compileFunction(long context, String sourceCode, String fileName);
+  private static native JavaScriptObject compileFunction(long context, String script, String fileName);
 
   private static native void cooperateDebugger(long context);
-  private static native void waitForDebugger(long context);
+  private static native void waitForDebugger(long context, String connectionString);
   private static native boolean isDebugging(long context);
   private static native void debuggerAppNotify(long context, Object... args);
   private static native Object getKeyObject(long context, long object, Object key);

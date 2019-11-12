@@ -11,12 +11,6 @@ inline static JSValue toValueAsDup(JSContext *ctx, jlong object) {
     return JS_DupValue(ctx, JS_MKPTR(JS_TAG_OBJECT, reinterpret_cast<void *>(object)));
 }
 
-inline static jvalue toValue(jobject object) {
-    jvalue ret;
-    ret.l = object;
-    return ret;
-}
-
 inline uint32_t hash(uint64_t v) {
     return ((v >> 32) & 0x00000000FFFFFFFF) ^ (v & 0x00000000FFFFFFFF);
 }
@@ -127,10 +121,13 @@ QuickJSContext::QuickJSContext(JavaVM* javaVM, jobject javaDuktape):
     objectToString = env->GetMethodID(objectClass, "toString", "()Ljava/lang/String;");
     booleanClass = findClass(env, "java/lang/Boolean");
     booleanValueOf = env->GetStaticMethodID(booleanClass, "valueOf", "(Z)Ljava/lang/Boolean;");
+    booleanValue = env->GetMethodID(booleanClass, "booleanValue", "()Z");
     intClass = findClass(env, "java/lang/Integer");
     intValueOf = env->GetStaticMethodID(intClass, "valueOf", "(I)Ljava/lang/Integer;");
+    intValue = env->GetMethodID(intClass, "intValue", "()I");
     doubleClass = findClass(env, "java/lang/Double");
     doubleValueOf = env->GetStaticMethodID(doubleClass, "valueOf", "(D)Ljava/lang/Double;");
+    doubleValue = env->GetMethodID(doubleClass, "doubleValue", "()D");
     stringClass = findClass(env, "java/lang/String");
 
     // ByteBuffer
@@ -259,11 +256,11 @@ JSValue QuickJSContext::toObject(JNIEnv *env, jobject value) {
     const auto clazzHolder = LocalRefHolder(env, clazz);
 
     if (env->IsAssignableFrom(clazz, booleanClass))
-        return JS_NewBool(ctx, toValue(value).z);
+        return JS_NewBool(ctx, env->CallBooleanMethodA(value, booleanValue, nullptr));
     else if (env->IsAssignableFrom(clazz, intClass))
-        return JS_NewInt32(ctx, toValue(value).i);
+        return JS_NewInt32(ctx, env->CallIntMethod(value, intValue, nullptr));
     else if (env->IsAssignableFrom(clazz, doubleClass))
-        return JS_NewFloat64(ctx, toValue(value).d);
+        return JS_NewFloat64(ctx, env->CallDoubleMethodA(value, doubleValue, nullptr));
     else if (env->IsAssignableFrom(clazz, stringClass))
         return toString(env, reinterpret_cast<jstring>(value));
     else if (env->IsAssignableFrom(clazz, byteBufferClass)) {
@@ -336,7 +333,7 @@ jobject QuickJSContext::toObject(JNIEnv *env, JSValue value) {
         return nullptr;
     }
     else if (!JS_IsObject(value)) {
-        assert(false);
+        // todo: symbol?
         return nullptr;
     }
 
@@ -427,19 +424,12 @@ jobject QuickJSContext::callInternal(JNIEnv *env, JSValue func, JSValue thiz, jo
         }
     }
 
-    int he1 = env->ExceptionCheck();
-
     auto ret = hold(JS_Call(ctx, func, thiz, length, &valueArgs.front()));
-    for (int i = 0; i < valueArgs.size(); i++) {
-        JS_FreeValue(ctx, valueArgs[i]);
+    for (JSValue & valueArg : valueArgs) {
+        JS_FreeValue(ctx, valueArg);
     }
 
-    int he2 = env->ExceptionCheck();
-
     runJobs(env);
-
-    int he3 = env->ExceptionCheck();
-
     return toObjectCheckQuickJSError(env, ret);
 }
 
@@ -679,8 +669,13 @@ bool QuickJSContext::rethrowJavaExceptionToQuickJS(JNIEnv *env) {
 void QuickJSContext::runJobs(JNIEnv *env) {
     while (JS_IsJobPending(runtime)) {
         JSContext *pctx;
-        if (JS_ExecutePendingJob(runtime, &pctx))
-            JS_FreeValue(ctx, JS_GetException(ctx));
+//        if (JS_ExecutePendingJob(runtime, &pctx))
+//            JS_FreeValue(ctx, JS_GetException(ctx));
+
+
+
+        if (JS_ExecutePendingJob(runtime, &pctx) < 0)
+            printf("uhhh\n");
     }
 }
 
@@ -688,4 +683,16 @@ jlong QuickJSContext::getHeapSize(JNIEnv* env) {
     JSMemoryUsage usage;
     JS_ComputeMemoryUsage(runtime, &usage);
     return (jlong)usage.memory_used_size;
+}
+
+void QuickJSContext::waitForDebugger(JNIEnv *env, jstring connectionString) {
+    js_debugger_wait_connection(ctx, ::toStdString(env, connectionString).c_str());
+}
+
+jboolean QuickJSContext::isDebugging() {
+    return (jboolean)(js_debugger_is_transport_connected(ctx) ? JNI_TRUE : JNI_FALSE);
+}
+
+void QuickJSContext::cooperateDebugger() {
+    js_debugger_cooperate(ctx);
 }
