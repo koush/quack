@@ -511,7 +511,7 @@ public final class Duktape implements Closeable {
    *
    * @throws DuktapeException if there is an error evaluating the script.
    */
-  public synchronized <T> T evaluate(String script, String fileName) {
+  public synchronized Object evaluate(String script, String fileName) {
     if (context == 0)
       return null;
     long start = System.nanoTime() / 1000000;
@@ -528,28 +528,28 @@ public final class Duktape implements Closeable {
    *
    * @throws DuktapeException if there is an error evaluating the script.
    */
-  public synchronized <T> T evaluate(String script) {
+  public synchronized Object evaluate(String script) {
     return evaluate(script, "?");
   }
 
   /**
-   * Evaluate {@code script} and return a result. {@code fileName} will be used in error
-   * reporting. {@code fileName} will be used in error reporting.
-   *
-   * @throws DuktapeException if there is an error evaluating the script.
+   * Evaluate {@code script} and return the expected result of a specific type.
+   * @param script
+   * @param clazz
+   * @param <T>
+   * @return
    */
-  public synchronized JavaScriptObject evaluateForJavaScriptObject(String script, String fileName) {
-    return evaluate(script, fileName);
+  public synchronized <T> T evaluate(String script, Class<T> clazz) {
+      return (T)coerceJavaScriptToJava(clazz, evaluate(script));
   }
 
   /**
-   * Evaluate {@code script} and return a result. The result must be a JavaScript object
-   * or a ClassCastException will be thrown.
-   *
-   * @throws DuktapeException if there is an error evaluating the script.
+   * Evaluate {@code script} and return the expected result of a JavaScriptObject.
+   * @param script
+   * @return
    */
   public synchronized JavaScriptObject evaluateForJavaScriptObject(String script) {
-    return evaluateForJavaScriptObject(script, "?");
+    return evaluate(script, JavaScriptObject.class);
   }
 
   /**
@@ -754,7 +754,7 @@ public final class Duktape implements Closeable {
 
   private static native long createContext(Duktape duktape, boolean useQuickJS);
   private static native void destroyContext(long context);
-  private static native <T> T evaluate(long context, String sourceCode, String fileName);
+  private static native Object evaluate(long context, String sourceCode, String fileName);
   private static native JavaScriptObject compileFunction(long context, String script, String fileName);
 
   private static native void cooperateDebugger(long context);
