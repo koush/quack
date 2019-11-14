@@ -675,6 +675,9 @@ void DuktapeContext::pushObject(JNIEnv *env, jobject object, bool deleteLocalRef
     jlong capacity = env->GetDirectBufferCapacity(object);
     void *p = duk_push_fixed_buffer(m_context, (duk_size_t)capacity);
     memcpy(p, env->GetDirectBufferAddress(object), (size_t)capacity);
+    // duk_push_buffer_object(m_context, -1, 0, capacity, DUK_BUFOBJ_ARRAYBUFFER);
+    // duk_swap_top(m_context, -2);
+    // duk_pop(m_context);
 
     if (deleteLocalRef)
       env->DeleteLocalRef(object);

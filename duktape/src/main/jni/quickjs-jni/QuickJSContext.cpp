@@ -98,7 +98,11 @@ QuickJSContext::QuickJSContext(JavaVM* javaVM, jobject javaDuktape):
     ctx = JS_NewContext(runtime);
     JS_SetMaxStackSize(ctx, 1024 * 1024 * 4);
     stash = JS_NewObject(ctx);
-    // thrower_function = JS_NewCFunction(ctx, stacktrace_getter, nullptr, 0);
+
+    auto global = hold(JS_GetGlobalObject(ctx));
+    uint8ArrayConstructor = JS_GetPropertyStr(ctx, global, "Uint8Array");
+    uint8ArrayPrototype = JS_GetPropertyStr(ctx, uint8ArrayConstructor, "prototype");
+
     const char *thrower_str = "(function() { try { throw new Error(); } catch (e) { return e; } })";
     thrower_function = JS_Eval(ctx, thrower_str, strlen(thrower_str), "<thrower>", JS_EVAL_TYPE_GLOBAL);
 
@@ -167,6 +171,8 @@ QuickJSContext::QuickJSContext(JavaVM* javaVM, jobject javaDuktape):
 }
 
 QuickJSContext::~QuickJSContext() {
+    JS_FreeValue(ctx, uint8ArrayPrototype);
+    JS_FreeValue(ctx, uint8ArrayConstructor);
     JS_FreeValue(ctx, stash);
     JS_FreeValue(ctx, thrower_function);
     JS_FreeContext(ctx);
@@ -265,7 +271,9 @@ JSValue QuickJSContext::toObject(JNIEnv *env, jobject value) {
         return toString(env, reinterpret_cast<jstring>(value));
     else if (env->IsAssignableFrom(clazz, byteBufferClass)) {
         jlong capacity = env->GetDirectBufferCapacity(value);
-        return JS_NewArrayBufferCopy(ctx, reinterpret_cast<uint8_t *>(env->GetDirectBufferAddress(value)), (size_t)capacity);
+        auto buffer = hold(JS_NewArrayBufferCopy(ctx, reinterpret_cast<uint8_t *>(env->GetDirectBufferAddress(value)), (size_t)capacity));
+        JSValue args[] = { (JSValue)buffer };
+        return JS_CallConstructor(ctx, uint8ArrayConstructor, 1, args);
     }
     else if (env->IsAssignableFrom(clazz, duktapejsonObjectClass)) {
         jstring json = (jstring)env->GetObjectField(value, duktapeJsonField);
@@ -335,6 +343,22 @@ jobject QuickJSContext::toObject(JNIEnv *env, JSValue value) {
     else if (!JS_IsObject(value)) {
         // todo: symbol?
         return nullptr;
+    }
+
+    // this does not seem to be dup'd, so don't hold it.
+    auto prototype = JS_GetPrototype(ctx, value);
+    if (JS_VALUE_GET_PTR((JSValue)prototype) == JS_VALUE_GET_PTR(uint8ArrayPrototype)) {
+        size_t offset;
+        size_t size;
+        size_t bpe;
+        auto ab = hold(JS_GetTypedArrayBuffer(ctx, value, &offset, &size, &bpe));
+
+        size_t ab_size;
+        uint8_t *ptr = JS_GetArrayBuffer(ctx, &ab_size, ab);
+
+        jobject byteBuffer = env->CallStaticObjectMethod(byteBufferClass, byteBufferAllocateDirect, (jint)size);
+        memcpy(env->GetDirectBufferAddress(byteBuffer), ptr + offset, size);
+        return byteBuffer;
     }
 
     // attempt to find an existing JavaScriptObject that exists on the java side (weak ref)
@@ -434,7 +458,6 @@ jobject QuickJSContext::callInternal(JNIEnv *env, JSValue func, JSValue thiz, jo
         JS_FreeValue(ctx, valueArg);
     }
 
-    runJobs(env);
     return toObjectCheckQuickJSError(env, ret);
 }
 

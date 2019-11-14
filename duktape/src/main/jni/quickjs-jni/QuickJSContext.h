@@ -111,7 +111,7 @@ public:
     jboolean setKeyInternal(JNIEnv* env, JSValue thiz, jobject key, jobject value);
     jboolean setKeyObject(JNIEnv* env, jlong object, jobject key, jobject value);
 
-    jobject callInternal(JNIEnv *env, JSValue thiz, JSValue func, jobjectArray args);
+    jobject callInternal(JNIEnv *env, JSValue func, JSValue thiz, jobjectArray args);
     jobject call(JNIEnv *env, jlong object, jobjectArray args);
     jobject callProperty(JNIEnv *env, jlong object, jobject property, jobjectArray args);
     jobject callMethod(JNIEnv *env, jlong method, jobject object, jobjectArray args);
@@ -182,6 +182,8 @@ public:
     JSAtom atomHoldsJavaObject;
     JSAtom customFinalizerAtom;
     JSAtom javaExceptionAtom;
+    JSValue uint8ArrayConstructor;
+    JSValue uint8ArrayPrototype;
 };
 
 #endif

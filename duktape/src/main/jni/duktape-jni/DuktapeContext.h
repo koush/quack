@@ -53,6 +53,7 @@ public:
   jstring stringify(JNIEnv *env, jlong object);
   void finalizeJavaScriptObject(JNIEnv *env, jlong object);
   jlong getHeapSize(JNIEnv *env);
+  void runJobs(JNIEnv *env) {}
 
   duk_ret_t duktapeHas();
   duk_ret_t duktapeGet();

@@ -42,6 +42,8 @@ public:
     virtual jobject callProperty(JNIEnv *env, jlong object, jobject property, jobjectArray args) = 0;
     virtual jobject callMethod(JNIEnv *env, jlong method, jobject object, jobjectArray args) = 0;
 
+    virtual void runJobs(JNIEnv *env) = 0;
+
     virtual void waitForDebugger(JNIEnv *env, jstring connectionString) = 0;
     virtual void cooperateDebugger() = 0;
     virtual jboolean isDebugging() = 0;

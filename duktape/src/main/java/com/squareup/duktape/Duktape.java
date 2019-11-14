@@ -23,6 +23,8 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.lang.reflect.UndeclaredThrowableException;
+import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.logging.Logger;
@@ -442,14 +444,14 @@ public final class Duktape implements Closeable {
     JavaScriptToJavaCoercions.put(Byte.class, (clazz, o) -> o instanceof Number ? ((Number)o).byteValue() : o instanceof String ? Byte.parseByte(o.toString()) : o);
     JavaScriptToJavaCoercions.put(byte.class, (clazz, o) -> o instanceof Number ? ((Number)o).byteValue() : o instanceof String ? Byte.parseByte(o.toString()) : o);
     // bytes become ints
-    JavaToJavascriptCoercions.put(byte.class, (DuktapeCoercion<Integer, Byte>) (clazz, o) -> o.intValue());
-    JavaToJavascriptCoercions.put(Byte.class, (DuktapeCoercion<Integer, Byte>) (clazz, o) -> o.intValue());
+    putJavaToJavaScriptCoercion(byte.class, (clazz, o) -> o.intValue());
+    putJavaToJavaScriptCoercion(Byte.class, (clazz, o) -> o.intValue());
 
     JavaScriptToJavaCoercions.put(Short.class, (clazz, o) -> o instanceof Number ? ((Number)o).shortValue() : o instanceof String ? Short.parseShort(o.toString()) : o);
     JavaScriptToJavaCoercions.put(short.class, (clazz, o) -> o instanceof Number ? ((Number)o).shortValue() : o instanceof String ? Short.parseShort(o.toString()) : o);
     // shorts become ints
-    JavaToJavascriptCoercions.put(short.class, (DuktapeCoercion<Integer, Short>) (clazz, o) -> o.intValue());
-    JavaToJavascriptCoercions.put(Short.class, (DuktapeCoercion<Integer, Short>) (clazz, o) -> o.intValue());
+    putJavaToJavaScriptCoercion(short.class, (clazz, o) -> o.intValue());
+    putJavaToJavaScriptCoercion(Short.class, (clazz, o) -> o.intValue());
 
     JavaScriptToJavaCoercions.put(Integer.class, (clazz, o) -> o instanceof Number ? ((Number)o).intValue() : o instanceof String ? Integer.parseInt(o.toString()) : o);
     JavaScriptToJavaCoercions.put(int.class, (clazz, o) -> o instanceof Number ? ((Number)o).intValue() : o instanceof String ? Integer.parseInt(o.toString()) : o);
@@ -458,20 +460,31 @@ public final class Duktape implements Closeable {
     JavaScriptToJavaCoercions.put(long.class, (clazz, o) -> o instanceof Number ? ((Number)o).longValue() : o instanceof String ? Long.parseLong(o.toString()) : o);
     // by default longs become strings, precision loss going to double. that's no good.
     // coercions can be used to get numbers if necessary.
-    JavaToJavascriptCoercions.put(long.class, (DuktapeCoercion<String, Long>) (clazz, o) -> o.toString());
-    JavaToJavascriptCoercions.put(Long.class, (DuktapeCoercion<String, Long>) (clazz, o) -> o.toString());
+    putJavaToJavaScriptCoercion(long.class, (clazz, o) -> o.toString());
+    putJavaToJavaScriptCoercion(Long.class, (clazz, o) -> o.toString());
 
     JavaScriptToJavaCoercions.put(Float.class, (clazz, o) -> o instanceof Number ? ((Number)o).floatValue() : o instanceof String ? Float.parseFloat(o.toString()) : o);
     JavaScriptToJavaCoercions.put(float.class, (clazz, o) -> o instanceof Number ? ((Number)o).floatValue() : o instanceof String ? Float.parseFloat(o.toString()) : o);
     // floats become doubles
-    JavaToJavascriptCoercions.put(float.class, (DuktapeCoercion<Double, Float>) (clazz, o) -> o.doubleValue());
-    JavaToJavascriptCoercions.put(Float.class, (DuktapeCoercion<Double, Float>) (clazz, o) -> o.doubleValue());
+    putJavaToJavaScriptCoercion(float.class, (clazz, o) -> o.doubleValue());
+    putJavaToJavaScriptCoercion(Float.class, (clazz, o) -> o.doubleValue());
 
     JavaScriptToJavaCoercions.put(Double.class, (clazz, o) -> o instanceof Number ? ((Number)o).doubleValue() : o instanceof String ? Double.parseDouble(o.toString()) : o);
     JavaScriptToJavaCoercions.put(double.class, (clazz, o) -> o instanceof Number ? ((Number)o).doubleValue() : o instanceof String ? Double.parseDouble(o.toString()) : o);
 
     // coercing a java enum into javascript string
-    JavaToJavascriptCoercions.put(Enum.class, (DuktapeCoercion<Object, Enum>) (clazz, o) -> o.toString());
+    putJavaToJavaScriptCoercion(Enum.class, (clazz, o) -> o.toString());
+
+    // buffers are transferred one way
+    putJavaToJavaScriptCoercion(ByteBuffer.class, (clazz, o) -> {
+      // can send as is if sending whole buffers.
+      if (o.isDirect() && o.remaining() == o.capacity())
+        return o;
+      ByteBuffer direct = ByteBuffer.allocateDirect(o.remaining());
+      direct.put(o);
+      direct.flip();
+      return direct;
+    });
   }
 
   private long totalElapsedScriptExecutionMs;
@@ -499,6 +512,8 @@ public final class Duktape implements Closeable {
    * @throws DuktapeException if there is an error evaluating the script.
    */
   public synchronized <T> T evaluate(String script, String fileName) {
+    if (context == 0)
+      return null;
     long start = System.nanoTime() / 1000000;
     try {
       return evaluate(context, script, fileName);
@@ -569,6 +584,8 @@ public final class Duktape implements Closeable {
   }
 
   public synchronized void setGlobalProperty(Object property, Object value) {
+    if (context == 0)
+      return;
     setGlobalProperty(context, property, value);
   }
 
@@ -578,6 +595,8 @@ public final class Duktape implements Closeable {
    * the Duktape during that time.
    */
   public synchronized void cooperateDebugger() {
+    if (context == 0)
+      return;
     cooperateDebugger(context);
   }
 
@@ -585,6 +604,8 @@ public final class Duktape implements Closeable {
    * Wait for a debugging connection on port 9091.
    */
   public void waitForDebugger(String connectionString) {
+    if (context == 0)
+      return;
     waitForDebugger(context, connectionString);
   }
 
@@ -608,56 +629,102 @@ public final class Duktape implements Closeable {
   }
 
   synchronized Object getKeyObject(long object, Object key) {
+    if (context == 0)
+      return null;
     return getKeyObject(context, object, key);
   }
   synchronized Object getKeyString(long object, String key) {
+    if (context == 0)
+      return null;
     return getKeyString(context, object, key);
   }
   synchronized Object getKeyInteger(long object, int index) {
+    if (context == 0)
+      return null;
     return getKeyInteger(context, object, index);
   }
   synchronized boolean setKeyObject(long object, Object key, Object value) {
+    if (context == 0)
+      return false;
     return setKeyObject(context, object, key, value);
   }
   synchronized boolean setKeyString(long object, String key, Object value) {
+    if (context == 0)
+      return false;
     return setKeyString(context, object, key, value);
   }
   synchronized boolean setKeyInteger(long object, int index, Object value) {
+    if (context == 0)
+      return false;
     return setKeyInteger(context, object, index, value);
   }
   synchronized Object call(long object, Object... args) {
+    if (context == 0)
+      return null;
     long start = System.nanoTime() / 1000000;
     try {
       return call(context, object, args);
     }
     finally {
       totalElapsedScriptExecutionMs += System.nanoTime() / 1000000 - start;
+      postInvocationLocked();
     }
   }
   synchronized Object callMethod(long object, Object thiz, Object... args) {
+    if (context == 0)
+      return null;
     long start = System.nanoTime() / 1000000;
     try {
       return callMethod(context, object, thiz, args);
     }
     finally {
       totalElapsedScriptExecutionMs += System.nanoTime() / 1000000 - start;
+      postInvocationLocked();
     }
   }
   synchronized Object callProperty(long object, Object property, Object... args) {
+    if (context == 0)
+      return null;
     long start = System.nanoTime() / 1000000;
     try {
       return callProperty(context, object, property, args);
     }
     finally {
       totalElapsedScriptExecutionMs += System.nanoTime() / 1000000 - start;
+      postInvocationLocked();
     }
   }
   synchronized String stringify(long object) {
+      if (context == 0)
+        return null;
       return stringify(context, object);
   }
-  synchronized void finalizeJavaScriptObject(long object) {
-    if (context != 0)
-      finalizeJavaScriptObject(context, object);
+  final ArrayList<Long> finalizationQueue = new ArrayList<>();
+  void finalizeJavaScriptObject(long object) {
+    if (context == 0)
+      return;
+    synchronized (finalizationQueue) {
+      finalizationQueue.add(object);
+    }
+  }
+  private void finalizeObjectsLocked() {
+    ArrayList<Long> copy;
+    synchronized (finalizationQueue) {
+      if (finalizationQueue.isEmpty())
+        return;
+      copy = new ArrayList<>();
+      copy.addAll(finalizationQueue);
+      finalizationQueue.clear();
+    }
+    if (context == 0)
+      return;
+    for (Long object: finalizationQueue) {
+      finalizeJavaScriptObject(object);
+    }
+  }
+  private void postInvocationLocked() {
+    finalizeObjectsLocked();
+    runJobs(context);
   }
 
   public long getHeapSize() {
@@ -706,4 +773,5 @@ public final class Duktape implements Closeable {
   private static native void setGlobalProperty(long context, Object property, Object value);
   private static native String stringify(long context, long object);
   private static native void finalizeJavaScriptObject(long context, long object);
+  private static native void runJobs(long context);
 }

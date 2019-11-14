@@ -44,7 +44,14 @@ public interface DuktapeMethodObject extends DuktapeObject {
                     return self.callMethod(thisArg, newArgs);
                 }
             };
-
+        }
+        else if ("toString".equals(key)) {
+            return new DuktapeMethodObject() {
+                @Override
+                public Object callMethod(Object thiz, Object... args) {
+                    return "function";
+                }
+            };
         }
 
         return null;

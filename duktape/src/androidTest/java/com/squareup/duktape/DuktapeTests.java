@@ -1,23 +1,22 @@
 package com.squareup.duktape;
 
-import org.junit.Assert;
-import org.junit.Test;
-
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.PrintStream;
+import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.List;
 import java.util.regex.Pattern;
 
+import org.junit.Assert;
+import org.junit.Test;
+
 public class DuktapeTests {
-    private static boolean useQuickJS = false;
+    private static boolean useQuickJS = true;
     static {
         try {
             // for non-android jvm
@@ -677,6 +676,49 @@ public class DuktapeTests {
         JavaScriptObject ret = (JavaScriptObject)cb.callback(new DuktapeJsonObject("{\"meaningOfLife\":42}"));
         Object property = ret.get("meaningOfLife");
         assertTrue(property.equals(42d) || property.equals(42));
+        duktape.close();
+    }
+
+    @Test
+    public void testBufferIn() {
+        Duktape duktape = Duktape.create(useQuickJS);
+
+        String script = "function testBuffer(buf) {\n" +
+                "\tif (buf.constructor.name !== 'Uint8Array') throw new Error('unexpected type ' + buf.constructor.name);\n" +
+                // "\tvar u = new Uint8Array(buf);\n" +
+                "\tvar u = buf\n" +
+                "\tfor (var i = 0; i < 10; i++) {\n" +
+                "\t\tif (u[i] != i)\n" +
+                "\t\t\tthrow new Error('expected ' + i);\n" +
+                "\t}\n" +
+                "\treturn 'done'\n" +
+                "}";
+
+        ByteBuffer b = ByteBuffer.allocate(10);
+        for (int i = 0; i < 10; i++) {
+            b.put(i, (byte)i);
+        }
+        assertEquals("done", duktape.compileFunction(script, "?").call(b));
+
+        duktape.close();
+    }
+    @Test
+    public void testBufferOut() {
+        Duktape duktape = Duktape.create(useQuickJS);
+
+        String script = "function testBuffer(buf) {\n" +
+                "\tvar u = new Uint8Array(10);\n" +
+                "\tfor (var i = 0; i < 10; i++) {\n" +
+                "\t\tu[i] = i;\n" +
+                "\t}\n" +
+                "\treturn u;\n" +
+                "}";
+
+        ByteBuffer b = (ByteBuffer)duktape.coerceJavaScriptToJava(ByteBuffer.class, duktape.compileFunction(script, "?").call());
+        for (int i = 0; i < 10; i++) {
+            assertEquals(i, b.get(i));
+        }
+
         duktape.close();
     }
 }

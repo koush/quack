@@ -153,4 +153,9 @@ Java_com_squareup_duktape_Duktape_getHeapSize__J(JNIEnv *env, jclass type, jlong
     return reinterpret_cast<JSContext *>(context)->getHeapSize(env);
 }
 
+JNIEXPORT void JNICALL
+Java_com_squareup_duktape_Duktape_runJobs(JNIEnv *env, jclass type, jlong context) {
+    reinterpret_cast<JSContext *>(context)->runJobs(env);
+}
+
 } // extern "C"
