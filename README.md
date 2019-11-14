@@ -1,1 +1,1 @@
-Rewritten version of Square's duktape-android. Look at the tests. Docs coming soon.
+Forked Square's duktape-android and then totally rewritten, so those docs will not apply. Look at the tests. Docs coming soon.
