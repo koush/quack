@@ -32,7 +32,17 @@ public:
     }  
 
     inline LocalRefHolder& operator=(const LocalRefHolder& other) {
-        throw;
+        if (&other != this) {
+            // grab the new reference before decrementing the old, as they may be the same.
+            auto oldEnv = env;
+            auto oldValue = value;
+
+            env = other.env;
+            value = env->NewLocalRef(other.value);
+
+            oldEnv->DeleteLocalRef(oldValue);
+        }
+        return *this;
     }
 
     inline operator jobject() const {
@@ -59,7 +69,17 @@ public:
     }  
 
     inline JSValueHolder& operator=(const JSValueHolder& other) {
-        throw;
+        if (&other != this) {
+            // grab the new reference before decrementing the old, as they may be the same.
+            auto oldCtx = ctx;
+            auto oldValue = value;
+
+            ctx = other.ctx;
+            value = JS_DupValue(ctx, other.value);
+
+            JS_FreeValue(ctx, oldValue);
+        }
+        return *this;
     }
 
     inline operator JSValue() const {
