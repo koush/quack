@@ -196,13 +196,13 @@ quack.evaluate(javascriptString);
 Types need to be marshalled when passing between the runtimes. The class specifier and parameter types
 are used to determine the behavior when being marshalled. The following builtin types are marshalled as follows:
 
-JavaScript (In) | Java (Out)
+JavaScript (Input) | Java (Output)
 |---|---|
 number | Integer or Double
 Uint8Array | ByteBuffer (direct, deep copy)
 undefined | null
 
-Java (In) | JavaScript (Out)
+Java (Input) | JavaScript (Output)
 |---|---|
 long | string (otherwise precision is lost)
 ByteBuffer (direct or byte array backed) | Uint8Array (deep copy)
