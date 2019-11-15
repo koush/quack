@@ -2,6 +2,10 @@
 
 Quack provides Java (Android and desktop) bindings to JavaScript engines. 
 
+## Runtimes
+
+Quack supports both the Duktape and QuickJS runtimes.
+
 ## Features
 
 * Share objects between runtimes seamlessly.
@@ -236,6 +240,21 @@ JavaScript runtimes are single threaded. All execution in the JavaScript runtime
 
 When a Java object is passed to the JavaScript runtime, a hard reference is held by the JavaScript proxy counterpart. This reference is removed when the JavaScriptObject is finalized. And same for when a Java object is passed to the JavaScript runtime.
 JavaScriptObjects sent to the Java runtime will be deduped, so the same proxy instance is always used. JavaObjects sent to JavaScript will marshall a new Proxy object every time.
+
+## Debugging
+
+### JavaScript
+```javascript
+System.out.println('set a breakpoint here!');
+```
+
+### Java
+```java
+QuackContext quack = QuackContext.create();
+quack.setGlobalProperty("System", System.class);
+quack.waitForDebugger("0.0.0.0:9091")
+quack.evaluate(javascriptString);
+```
 
 ## Square Duktape-Android
 
