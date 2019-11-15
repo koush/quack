@@ -187,6 +187,44 @@ quack.evaluate(javascriptString);
 // prints "hello world"
 ```
 
+## Marshalling
+
+Types need to be marshalled when passing between the runtimes. The class specifier and parameter types
+are used to determine the behavior when being marshalled. The following builtin types are marshalled as follows:
+
+JavaScript (In) | Java (Out)
+|---|---|
+number | Integer or Double
+Uint8Array | ByteBuffer (direct)
+undefined | null
+
+Java (In) | JavaScript (Out)
+|---|---|
+long | string (otherwise precision is lost)
+byte, short, int, float, double | number
+null | null
+
+
+### Coercions
+
+Types and methods can be coerced between runtimes.
+
+#### Java to JavaScript Type Coercion
+```javascript
+(function(data) {
+  return data;
+})
+```
+```java
+class Foo {}
+
+QuackContext quack = QuackContext.create();
+// all instances of Foo sent to JavaScript get coerced into the String "hello world"
+quack.putJavaToJavaScriptCoercion(Foo.class, (clazz, o) -> "hello world");
+System.out.println(quack.evaluate(new Foo()));
+// prints "hello world"
+```
+
 ## Concurrency
 
 JavaScript runtimes are single threaded. All execution in the JavaScript runtime is gauranteed thread safe, by way of Java synchronization.
