@@ -120,6 +120,7 @@ public:
 
     jobject evaluate(JNIEnv *env, jstring code, jstring filename);
     jobject compile(JNIEnv* env, jstring code, jstring filename);
+
     void setGlobalProperty(JNIEnv *env, jobject property, jobject value);
     jstring stringify(JNIEnv *env, jlong object);
 
@@ -136,6 +137,9 @@ public:
     jobject callProperty(JNIEnv *env, jlong object, jobject property, jobjectArray args);
     jobject callMethod(JNIEnv *env, jlong method, jobject object, jobjectArray args);
 
+    jboolean hasPendingJobs(JNIEnv *env);
+    void runJobs(JNIEnv *env);
+
     void waitForDebugger(JNIEnv *env, jstring connectionString);
     void cooperateDebugger();
     jboolean isDebugging();
@@ -149,12 +153,9 @@ public:
     JSValue quickjs_apply(jobject func_obj, JSValueConst this_val, int argc, JSValueConst *argv);
     int quickjs_construct(JSValue func_obj, JSValueConst this_val, int argc, JSValueConst *argv);
 
-    bool checkQuickJSErrorAndThrow(JNIEnv *env, JSValue maybeException);
     jboolean checkQuickJSErrorAndThrow(JNIEnv *env, int maybeException);
     void rethrowQuickJSErrorToJava(JNIEnv *env, JSValue exception);
     bool rethrowJavaExceptionToQuickJS(JNIEnv *env);
-
-    void runJobs(JNIEnv *env);
 
     JavaVM* javaVM;
     jobject javaQuack;

@@ -153,6 +153,11 @@ Java_com_koushikdutta_quack_QuackContext_getHeapSize__J(JNIEnv *env, jclass type
     return reinterpret_cast<JSContext *>(context)->getHeapSize(env);
 }
 
+JNIEXPORT jboolean  JNICALL
+Java_com_koushikdutta_quack_QuackContext_hasPendingJobs(JNIEnv *env, jclass type, jlong context) {
+    return reinterpret_cast<JSContext *>(context)->hasPendingJobs(env);
+}
+
 JNIEXPORT void JNICALL
 Java_com_koushikdutta_quack_QuackContext_runJobs(JNIEnv *env, jclass type, jlong context) {
     reinterpret_cast<JSContext *>(context)->runJobs(env);

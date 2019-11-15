@@ -703,6 +703,10 @@ bool QuickJSContext::rethrowJavaExceptionToQuickJS(JNIEnv *env) {
     return true;
 }
 
+jboolean QuickJSContext::hasPendingJobs(JNIEnv *env) {
+    return (jboolean)(JS_IsJobPending(JS_GetRuntime(ctx)) ? JNI_TRUE : JNI_FALSE);
+}
+
 void QuickJSContext::runJobs(JNIEnv *env) {
     while (JS_IsJobPending(runtime)) {
         JSContext *pctx;

@@ -40,9 +40,7 @@ public class QuackTests {
     public void testOctane() throws IOException {
         QuackContext quack = QuackContext.create(false);
         File files[] = new File("/Volumes/Dev/Scrypted/quack.android/tests/src/main/assets/octane").listFiles();
-        Arrays.sort(files, (a, b) -> {
-            return a.getAbsolutePath().compareTo(b.getAbsolutePath());            
-        });
+        Arrays.sort(files, (a, b) -> a.getAbsolutePath().compareTo(b.getAbsolutePath()));
         for (File file: files) {
             String script = StreamUtility.readFile(file);
             quack.evaluate(script, file.getAbsolutePath());
@@ -352,7 +350,7 @@ public class QuackTests {
         JavaScriptObject func = quack.compileFunction(script, "?");
 
         // should all come back as strings.
-        List<Object> values = Arrays.asList(Foo.values());
+        Object[] values = Foo.values();
         for (Object value: values) {
             Object ret = func.call(value);
             assertTrue(ret instanceof String);

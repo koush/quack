@@ -28,6 +28,7 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.concurrent.Executor;
 import java.util.logging.Logger;
 
 /** A simple EMCAScript (Javascript) interpreter. */
@@ -669,7 +670,7 @@ public final class QuackContext implements Closeable {
     }
     finally {
       totalElapsedScriptExecutionMs += System.nanoTime() / 1000000 - start;
-      postInvocationLocked();
+      handlePostInvocation();
     }
   }
   synchronized Object callMethod(long object, Object thiz, Object... args) {
@@ -681,7 +682,7 @@ public final class QuackContext implements Closeable {
     }
     finally {
       totalElapsedScriptExecutionMs += System.nanoTime() / 1000000 - start;
-      postInvocationLocked();
+      handlePostInvocation();
     }
   }
   synchronized Object callProperty(long object, Object property, Object... args) {
@@ -693,7 +694,7 @@ public final class QuackContext implements Closeable {
     }
     finally {
       totalElapsedScriptExecutionMs += System.nanoTime() / 1000000 - start;
-      postInvocationLocked();
+      handlePostInvocation();
     }
   }
   synchronized String stringify(long object) {
@@ -710,6 +711,7 @@ public final class QuackContext implements Closeable {
   // to prevent from blocking the JavaScriptObject finalizer, create
   // a finalization queue for the JS side.
   final ArrayList<Long> finalizationQueue = new ArrayList<>();
+  // this method should NOT be synchronized at the QuackContext level, so it never blocks a finalizer
   void finalizeJavaScriptObject(long object) {
     if (context == 0)
       return;
@@ -717,7 +719,7 @@ public final class QuackContext implements Closeable {
       finalizationQueue.add(object);
     }
   }
-  private void finalizeObjectsLocked() {
+  synchronized private void finalizeJavaScriptObjects() {
     ArrayList<Long> copy;
     synchronized (finalizationQueue) {
       if (finalizationQueue.isEmpty())
@@ -728,12 +730,34 @@ public final class QuackContext implements Closeable {
     if (context == 0)
       return;
     for (Long object: copy) {
-      finalizeJavaScriptObject(object);
+      finalizeJavaScriptObject(context, object);
     }
   }
-  private void postInvocationLocked() {
-    finalizeObjectsLocked();
+  synchronized private boolean hasPostInvocationTasks() {
+    synchronized (finalizationQueue) {
+       if (!finalizationQueue.isEmpty())
+         return true;
+    }
+    // this should be called outside of the queue check to prevent weird blocking.
+    return hasPendingJobs(context);
+  }
+  synchronized private void handlePostInvocation() {
+    if (!hasPostInvocationTasks())
+        return;
+    if (jobExecutor == null) {
+      runPostInvocation();
+      return;
+    }
+
+    jobExecutor.execute(this::runPostInvocation);
+  }
+  synchronized void runPostInvocation() {
+    finalizeJavaScriptObjects();
     runJobs(context);
+  }
+  private Executor jobExecutor;
+  synchronized public void setJobExecutor(Executor executor) {
+    jobExecutor = executor;
   }
 
   // hooks from js/jni to java
@@ -777,5 +801,6 @@ public final class QuackContext implements Closeable {
   private static native void setGlobalProperty(long context, Object property, Object value);
   private static native String stringify(long context, long object);
   private static native void finalizeJavaScriptObject(long context, long object);
+  private static native boolean hasPendingJobs(long context);
   private static native void runJobs(long context);
 }
