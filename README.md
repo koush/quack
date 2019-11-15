@@ -22,7 +22,7 @@ Quack provides Java (Android and desktop) bindings to JavaScript engines.
 
 Calling QuackContext.evaluate will return a Java Object with the evaluation result.
 
-```
+```java
 QuackContext quack = QuackContext.create();
 Object result = quack.evaluate(javascriptString);
 System.out.println(result);
