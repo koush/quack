@@ -169,6 +169,11 @@ quack.evaluate(javascriptString);
 // prints "hello world"
 ```
 
+## Garbage Collection
+
+When a Java object is passed to the JavaScript runtime, a hard reference is held by the JavaScript proxy counterpart. This reference is removed when the JavaScriptObject is finalized. And same for when a Java object is passed to the JavaScript runtime.
+JavaScriptObjects sent to the Java runtime will be deduped, so the same proxy instance is always used. JavaObjects sent to JavaScript will marshall a new Proxy object every time.
+
 ## Square Duktape-Android
 
 Quack was initially forked from Square's Duktape Android library. But it has been totally rewritten to suit different needs.
