@@ -117,7 +117,7 @@ Runnable runnable = () -> {
 
 QuackContext quack = QuackContext.create();
 JavaScriptObject result = quack.evaluateForJavaScriptObject(javascriptString);
-quack.call(runnable);
+result.call(runnable);
 // prints "hello world"
 ```
 
