@@ -122,6 +122,32 @@ quack.call(runnable);
 // prints "hello world"
 ```
 
+### Passing Interfaces back to Java
+
+```javascript
+(function() {
+  return {
+    hello: function(printer) {
+      printer('hello world');
+    }
+  }
+});
+```
+
+```java
+interface Foo {
+  void hello(Printer printer);
+}
+
+interface Printer {
+  print(String str);
+}
+
+QuackContext quack = QuackContext.create();
+Foo result = quack.evaluate(javascriptString, Foo.class);  
+result.hello((str) -> System.out.println(str));
+// prints "hello world"
+```
 
 
 ## Square Duktape-Android
