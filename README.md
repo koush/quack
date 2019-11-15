@@ -73,7 +73,7 @@ System.out.println('hello world');
 #### Java
 ```java
 QuackContext quack = QuackContext.create();
-quack.setGlobalProperty(System.class);
+quack.setGlobalProperty("System", System.class);
 quack.evaluate(javascriptString);
 // prints "hello world"
 ```
@@ -149,6 +149,25 @@ result.hello(str -> System.out.println(str));
 // prints "hello world"
 ```
 
+### Creating Java Objects in JavaScript
+#### JavaScript
+```javascript
+var foo = new Foo();
+foo.hello('hello world');
+```
+#### Java
+```java
+class Foo {
+  public void hello(String str) {
+    System.out.println(str);
+  }
+}
+
+QuackContext quack = QuackContext.create();
+quack.setGlobalProperty("Foo", Foo.class);
+quack.evaluate(javascriptString);
+// prints "hello world"
+```
 
 ## Square Duktape-Android
 
