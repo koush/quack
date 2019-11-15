@@ -105,7 +105,7 @@ quack.call(new Foo());
 #### JavaScript
 ```javascript
 (function(func) {
-  // notice that it is not func.run.
+  // notice that it is not func.run()
   // single method interfaces (lambdas) are automatically coerced into functions!
   func();
 })
@@ -168,6 +168,10 @@ quack.setGlobalProperty("Foo", Foo.class);
 quack.evaluate(javascriptString);
 // prints "hello world"
 ```
+
+## Concurrency
+
+JavaScript runtimes are single threaded. All execution in the JavaScript runtime is gauranteed thread safe, by way of Java synchronization.
 
 ## Garbage Collection
 
