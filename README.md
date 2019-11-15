@@ -123,7 +123,7 @@ quack.call(runnable);
 ```
 
 ### Passing Interfaces back to Java
-
+#### JavaScript
 ```javascript
 (function() {
   return {
@@ -133,7 +133,7 @@ quack.call(runnable);
   }
 });
 ```
-
+#### Java
 ```java
 interface Foo {
   void hello(Printer printer);
@@ -145,7 +145,7 @@ interface Printer {
 
 QuackContext quack = QuackContext.create();
 Foo result = quack.evaluate(javascriptString, Foo.class);  
-result.hello((str) -> System.out.println(str));
+result.hello(str -> System.out.println(str));
 // prints "hello world"
 ```
 
