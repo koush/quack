@@ -209,12 +209,14 @@ null | null
 
 Types and methods can be coerced between runtimes.
 
-#### Java to JavaScript Type Coercion
+### Java to JavaScript Type Coercion
+#### JavaScript
 ```javascript
 (function(data) {
   return data;
 })
 ```
+#### Java
 ```java
 class Foo {}
 
