@@ -12,12 +12,7 @@ inline static JSValue toValueAsDup(JSContext *ctx, jlong object) {
 }
 
 inline uint32_t hash(uint64_t v) {
-    return ((v >> 32) & 0x00000000FFFFFFFF) ^ (v & 0x00000000FFFFFFFF);
-}
-
-static JSValue stacktrace_getter(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv) {
-    // JS_Throw(ctx, JS_NewError(ctx));
-    return JS_EXCEPTION;
+    return (uint32_t)(((v >> 32) & 0x00000000FFFFFFFF) ^ (v & 0x00000000FFFFFFFF));
 }
 
 static JSClassID customFinalizerClassId = 0;
@@ -285,7 +280,7 @@ JSValue QuickJSContext::toObject(JNIEnv *env, jobject value) {
     else if (env->IsAssignableFrom(clazz, quackjsonObjectClass)) {
         jstring json = (jstring)env->GetObjectField(value, quackJsonField);
         const char *jsonPtr = env->GetStringUTFChars(json, 0);
-        return JS_ParseJSON(ctx, jsonPtr, env->GetStringUTFLength(json), "<QuackJsonObject>");
+        return JS_ParseJSON(ctx, jsonPtr, (size_t)env->GetStringUTFLength(json), "<QuackJsonObject>");
     }
     else if (env->IsAssignableFrom(clazz, javaScriptObjectClass)) {
         QuickJSContext *context = reinterpret_cast<QuickJSContext *>(env->GetLongField(value, contextField));
@@ -421,7 +416,7 @@ jobject QuickJSContext::toObjectCheckQuickJSError(JNIEnv *env, JSValue value) {
 
 jobject QuickJSContext::evaluate(JNIEnv *env, jstring code, jstring filename) {
     auto codeStr = env->GetStringUTFChars(code, 0);
-    int len = strlen(codeStr);
+    size_t len = strlen(codeStr);
     char* mem = (char*)js_malloc(ctx, len + 1);
     mem[len] = '\0';
     memcpy(mem, codeStr, len);
@@ -620,7 +615,7 @@ int QuickJSContext::quickjs_construct(JSValue func_obj, JSValueConst this_val, i
 
 jboolean QuickJSContext::checkQuickJSErrorAndThrow(JNIEnv *env, int maybeException) {
     if (maybeException >= 0)
-        return maybeException ? JNI_TRUE : JNI_FALSE;
+        return (jboolean)(maybeException ? JNI_TRUE : JNI_FALSE);
 
     auto exception = hold(JS_GetException(ctx));
     assert(JS_IsException(exception));
@@ -651,9 +646,9 @@ void QuickJSContext::rethrowQuickJSErrorToJava(JNIEnv *env, JSValue exception) {
 
 //            env->ThrowNew(quackExceptionClass, (toStdString(errorMessage) + "\n" + toStdString(stack)).c_str());
 
-            std::string str = "";
+            std::string str;
             if (!JS_IsUndefinedOrNull(errorMessage))
-                str += toStdString(errorMessage);
+                str = toStdString(errorMessage);
             else
                 str = "QuickJS Java unknown Error";
             str += "\n";
