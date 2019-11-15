@@ -56,4 +56,16 @@ public interface DuktapeObject {
     default Object callProperty(Object property, Object... args) {
         throw new UnsupportedOperationException();
     }
+
+    /**
+     * Construct this object with the expectation that it is a function. The this argument
+     * is provided.
+     * @param thiz
+     * @param args
+     * @return
+     */
+    default Object construct(Object... args) {
+        throw new UnsupportedOperationException();
+    }
+
 }

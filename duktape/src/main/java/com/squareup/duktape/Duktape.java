@@ -17,6 +17,7 @@ package com.squareup.duktape;
 
 import java.io.Closeable;
 import java.lang.reflect.Array;
+import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.InvocationTargetException;
@@ -284,6 +285,7 @@ public final class Duktape implements Closeable {
   static Memoize<Method> javaObjectGetter = new Memoize<>();
   static Memoize<Method> javaObjectSetter = new Memoize<>();
   static Memoize<Method> javaObjectMethodCandidates = new Memoize<>();
+  static Memoize<Constructor> javaObjectConstructorCandidates = new Memoize<>();
   static Memoize<Method> interfaceMethods = new Memoize<>();
   static Method getInterfaceMethod(Method method) {
     return interfaceMethods.memoize(() -> {
@@ -746,8 +748,12 @@ public final class Duktape implements Closeable {
   }
 
   private Object[] empty = new Object[0];
-  private Object duktapeCallMethod(DuktapeObject duktapeObject, Object thiz, Object... args) {
+  private Object duktapeApply(DuktapeObject duktapeObject, Object thiz, Object... args) {
     return duktapeObject.callMethod(thiz, args == null ? empty : args);
+  }
+  
+  private Object duktapeConstruct(DuktapeObject duktapeObject, Object... args) {
+    return duktapeObject.construct(args == null ? empty : args);
   }
 
   private static native long getHeapSize(long context);

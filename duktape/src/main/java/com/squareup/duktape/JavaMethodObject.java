@@ -138,7 +138,7 @@ public class JavaMethodObject implements DuktapeMethodObject {
         }
     }
 
-    static private <T> T[] toArray(Class<T> varargType, ArrayList<T> varargs) {
+    static <T> T[] toArray(Class<T> varargType, ArrayList<T> varargs) {
         return varargs.toArray((T[])Array.newInstance(varargType, 0));
     }
 }

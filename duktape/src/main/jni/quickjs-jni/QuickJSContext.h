@@ -127,6 +127,7 @@ public:
     JSValue quickjs_get(jobject object, JSAtom atom, JSValueConst receiver);
     int quickjs_set(jobject object, JSAtom atom, JSValueConst value, JSValueConst receiver, int flags);
     JSValue quickjs_apply(jobject func_obj, JSValueConst this_val, int argc, JSValueConst *argv);
+    int quickjs_construct(JSValue func_obj, JSValueConst this_val, int argc, JSValueConst *argv);
 
     bool checkQuickJSErrorAndThrow(JNIEnv *env, JSValue maybeException);
     jboolean checkQuickJSErrorAndThrow(JNIEnv *env, int maybeException);
@@ -155,7 +156,8 @@ public:
     jmethodID duktapeHasMethod;
     jmethodID duktapeGetMethod;
     jmethodID duktapeSetMethod;
-    jmethodID duktapeCallMethodMethod;
+    jmethodID duktapeApply;
+    jmethodID duktapeConstruct;
     jmethodID javaScriptObjectConstructor;
     jmethodID javaObjectConstructor;
     jmethodID byteBufferAllocateDirect;

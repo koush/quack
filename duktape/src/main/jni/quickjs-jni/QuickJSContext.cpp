@@ -48,7 +48,8 @@ static void customFinalizer(JSRuntime *rt, JSValue val) {
 
 static void duktapeObjectFinalizer(JSRuntime *rt, JSValue val) {
     CustomFinalizerData *data = reinterpret_cast<CustomFinalizerData *>(JS_GetOpaque(val, duktapeObjectProxyClassId));
-    data->finalizer(data->ctx, val, data->udata);
+    if (data)
+        data->finalizer(data->ctx, val, data->udata);
     free(data);
 }
 
@@ -78,11 +79,16 @@ JSValue quickjs_apply(JSContext *ctx, JSValueConst func_obj, JSValueConst this_v
     jobject object = reinterpret_cast<jobject>(data->udata);
     return data->ctx->quickjs_apply(object, this_val, argc, argv);
 }
+int quickjs_construct(JSContext *ctx, JSValue func_obj, JSValueConst this_val, int argc, JSValueConst *argv) {
+    QuickJSContext *qctx = reinterpret_cast<QuickJSContext *>(JS_GetContextOpaque(ctx));
+    return qctx->quickjs_construct(func_obj, this_val, argc, argv);
+}
 
 struct JSClassExoticMethods duktapeObjectProxyMethods = {
     .has_property = quickjs_has,
     .get_property = quickjs_get,
     .set_property = quickjs_set,
+    .construct = quickjs_construct,
 };
 
 static struct JSClassDef duktapeObjectProxyClassDef = {
@@ -143,7 +149,8 @@ QuickJSContext::QuickJSContext(JavaVM* javaVM, jobject javaDuktape):
     duktapeHasMethod = env->GetMethodID(duktapeClass, "duktapeHas", "(Lcom/squareup/duktape/DuktapeObject;Ljava/lang/Object;)Z");
     duktapeGetMethod = env->GetMethodID(duktapeClass, "duktapeGet", "(Lcom/squareup/duktape/DuktapeObject;Ljava/lang/Object;)Ljava/lang/Object;");
     duktapeSetMethod = env->GetMethodID(duktapeClass, "duktapeSet", "(Lcom/squareup/duktape/DuktapeObject;Ljava/lang/Object;Ljava/lang/Object;)Z");
-    duktapeCallMethodMethod = env->GetMethodID(duktapeClass, "duktapeCallMethod", "(Lcom/squareup/duktape/DuktapeObject;Ljava/lang/Object;[Ljava/lang/Object;)Ljava/lang/Object;");
+    duktapeApply = env->GetMethodID(duktapeClass, "duktapeApply", "(Lcom/squareup/duktape/DuktapeObject;Ljava/lang/Object;[Ljava/lang/Object;)Ljava/lang/Object;");
+    duktapeConstruct = env->GetMethodID(duktapeClass, "duktapeConstruct", "(Lcom/squareup/duktape/DuktapeObject;[Ljava/lang/Object;)Ljava/lang/Object;");
     duktapeObjectClass = findClass(env, "com/squareup/duktape/DuktapeObject");
 
     // DuktapeJsonObject
@@ -581,13 +588,34 @@ JSValue QuickJSContext::quickjs_apply(jobject func_obj, JSValueConst this_val, i
     }
 
     const auto thiz = LocalRefHolder(env, toObject(env, this_val));
-    jobject result = env->CallObjectMethod(javaDuktape, duktapeCallMethodMethod, func_obj, (jobject)thiz, javaArgs);
+    jobject result = env->CallObjectMethod(javaDuktape, duktapeApply, func_obj, (jobject)thiz, javaArgs);
     env->DeleteLocalRef(javaArgs);
 
     if (rethrowJavaExceptionToQuickJS(env))
         return JS_EXCEPTION;
 
     return toObject(env, result);
+}
+int QuickJSContext::quickjs_construct(JSValue func_obj, JSValueConst this_val, int argc, JSValueConst *argv) {
+    JNIEnv *env = getEnvFromJavaVM(javaVM);
+
+    // unpack the arguments
+    jobjectArray javaArgs = env->NewObjectArray((jsize)argc, objectClass, nullptr);
+    for (int i = 0; i < argc; i++) {
+        env->SetObjectArrayElement(javaArgs, (jsize)i, toObject(env, argv[i]));
+    }
+
+    const auto thiz = LocalRefHolder(env, toObject(env, func_obj));
+    auto result = LocalRefHolder(env, env->CallObjectMethod(javaDuktape, duktapeConstruct, (jobject)thiz, javaArgs));
+    env->DeleteLocalRef(javaArgs);
+
+    if (rethrowJavaExceptionToQuickJS(env))
+        return -1;
+
+    auto value = LocalRefHolder(env, env->NewObject(javaObjectClass, javaObjectConstructor, javaDuktape, (jobject)result));
+
+    setFinalizerOnFinalizerObject(this_val, javaRefFinalizer, env->NewGlobalRef(value));
+    return 1;
 }
 
 jboolean QuickJSContext::checkQuickJSErrorAndThrow(JNIEnv *env, int maybeException) {

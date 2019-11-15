@@ -1,10 +1,13 @@
 package com.squareup.duktape;
 
 import java.lang.reflect.Array;
+import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.Proxy;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -96,9 +99,17 @@ public final class JavaObject implements DuktapeJavaObject {
             Field f = Duktape.javaObjectFields.memoize(() -> {
                 // try to get fields
                 for (Field field : clazz.getFields()) {
-                    if (field.getName().equals(key))
+                    if (field.getName().equals(key) && ((field.getModifiers() & Modifier.STATIC) == 0))
                         return field;
                 }
+
+                if (target instanceof Class) {
+                    for (Field field : ((Class)target).getFields()) {
+                        if (field.getName().equals(key) && ((field.getModifiers() & Modifier.STATIC) != 0))
+                            return field;
+                    }
+                }
+
                 return null;
             }, key, clazz.getFields());
 
@@ -258,5 +269,92 @@ public final class JavaObject implements DuktapeJavaObject {
         if (property instanceof DuktapeObject)
             return ((DuktapeObject)property).callMethod(this, args);
         throw new UnsupportedOperationException("can not call " + target);
+    }
+
+    @Override
+    public Object construct(Object... args) {
+        if (!(target instanceof Class))
+            return DuktapeJavaObject.super.construct(args);
+
+        Class clazz = (Class)target;
+        Constructor[] constructors = clazz.getConstructors();
+        ArrayList<Class> argTypes = new ArrayList<>();
+        for (Object arg: args) {
+            if (arg == null)
+                argTypes.add(null);
+            else
+                argTypes.add(arg.getClass());
+        }
+        Constructor best = Duktape.javaObjectConstructorCandidates.memoize(() -> {
+            Constructor ret = null;
+            int bestScore = Integer.MAX_VALUE;
+            for (Constructor constructor: constructors) {
+                // parameter count is most important
+                int score = Math.abs(argTypes.size() - constructor.getParameterTypes().length) * 1000;
+                // tiebreak by checking parameter types
+                for (int i = 0; i < Math.min(constructor.getParameterTypes().length, argTypes.size()); i++) {
+                    // check if the class is assignable or both parameters are numbers
+                    Class<?> argType = argTypes.get(i);
+                    Class<?> paramType = constructor.getParameterTypes()[i];
+                    if (paramType == argType) {
+                        score -= 4;
+                    }
+                    if (Duktape.isNumberClass(paramType) && Duktape.isNumberClass(argType)) {
+                        score -= 3;
+                    }
+                    else if ((paramType == Long.class || paramType == long.class) && argType == String.class) {
+                        score -= 2;
+                    }
+                    else if (argType == null || paramType.isAssignableFrom(argType)) {
+                        score -= 1;
+                    }
+                }
+                if (score < bestScore) {
+                    bestScore = score;
+                    ret = constructor;
+                }
+            }
+            return ret;
+        }, target, constructors, argTypes.toArray());
+
+        try {
+            int numParameters = best.getParameterTypes().length;
+            if (best.isVarArgs())
+                numParameters--;
+            ArrayList<Object> coerced = new ArrayList<>();
+            int i = 0;
+            for (; i < numParameters; i++) {
+                if (i < args.length)
+                    coerced.add(duktape.coerceJavaScriptToJava(best.getParameterTypes()[i], args[i]));
+                else
+                    coerced.add(null);
+            }
+            if (best.isVarArgs()) {
+                Class varargType = best.getParameterTypes()[numParameters].getComponentType();
+                ArrayList<Object> varargs = new ArrayList<>();
+                for (; i < args.length; i++) {
+                    varargs.add(duktape.coerceJavaScriptToJava(varargType, args[i]));
+                }
+                coerced.add(JavaMethodObject.toArray(varargType, varargs));
+            }
+            else if (i < args.length) {
+//                Log.w("Duktape", "dropping javascript to java arguments on the floor: " + (args.length - i));
+            }
+            return duktape.coerceJavaToJavaScript(best.newInstance(coerced.toArray()));
+        }
+        catch (IllegalAccessException e) {
+            throw new IllegalArgumentException(best.toString(), e);
+        }
+        catch (InvocationTargetException e) {
+            if (e.getTargetException() instanceof RuntimeException)
+                throw (RuntimeException)e.getTargetException();
+            throw new IllegalArgumentException(best.toString(), e);
+        }
+        catch (InstantiationException e) {
+            throw new IllegalArgumentException(best.toString(), e);
+        }
+        catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException(best.toString(), e);
+        }
     }
 }

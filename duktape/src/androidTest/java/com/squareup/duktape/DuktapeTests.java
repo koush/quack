@@ -721,4 +721,36 @@ public class DuktapeTests {
 
         duktape.close();
     }
+
+    @Test
+    public void testSystemOut() {
+        Duktape duktape = Duktape.create(useQuickJS);
+        duktape.setGlobalProperty("System", System.class);
+        duktape.evaluate("System.out.println('hello world');");
+        duktape.close();
+    }
+
+    public static class RandomObject {
+        public RandomObject() {
+        }
+        public int foo;
+        public void setFoo(int foo) {
+            this.foo = foo;
+        }
+
+        public static int bar;
+        public static void setBar(int bar) {
+            RandomObject.bar = bar;
+        }
+    }
+
+    @Test
+    public void testNewObject() {
+        Duktape duktape = Duktape.create(useQuickJS);
+        duktape.setGlobalProperty("RandomObject", RandomObject.class);
+        RandomObject ret = duktape.evaluate("var r = new RandomObject(); RandomObject.setBar(5); r.setFoo(3); r;", RandomObject.class);
+        assertTrue(ret.foo == 3);
+        assertTrue(RandomObject.bar == 5);
+        duktape.close();
+    }
 }
