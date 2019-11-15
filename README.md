@@ -243,7 +243,7 @@ JavaScriptObjects sent to the Java runtime will be deduped, so the same proxy in
 
 ## Debugging
 
-Install the appropriate [QuickJS Debug Extension](https://marketplace.visualstudio.com/items?itemName=koush.quickjs-debug) or [Duktape Debugger](https://marketplace.visualstudio.com/items?itemName=HaroldBrenes.duk-debug) for VS Code. QuickJS is the default runtime used by Quack.
+Install the appropriate [QuickJS Debugger](https://marketplace.visualstudio.com/items?itemName=koush.quickjs-debug) or [Duktape Debugger](https://marketplace.visualstudio.com/items?itemName=HaroldBrenes.duk-debug) for VS Code. QuickJS is the default runtime used by Quack.
 
 ### JavaScript
 ```javascript
