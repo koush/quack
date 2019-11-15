@@ -124,13 +124,11 @@ quack.call(runnable);
 ### Passing Interfaces back to Java
 #### JavaScript
 ```javascript
-(function() {
-  return {
-    hello: function(printer) {
-      printer('hello world');
-    }
+return {
+  hello: function(printer) {
+    printer('hello world');
   }
-});
+}
 ```
 #### Java
 ```java
