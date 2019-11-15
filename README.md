@@ -7,7 +7,6 @@ Quack provides Java (Android and desktop) bindings to JavaScript engines.
 * Share objects between runtimes seamlessly.
 * Javascript Debugging support
 * Invocations can be intercepted and coerced both in and out of the JavaScript runtime.
-* Custom
 
 ## Examples
 
