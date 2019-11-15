@@ -243,6 +243,8 @@ JavaScriptObjects sent to the Java runtime will be deduped, so the same proxy in
 
 ## Debugging
 
+Install the [QuickJS Debug Extension](https://marketplace.visualstudio.com/items?itemName=koush.quickjs-debug) for VS Code.
+
 ### JavaScript
 ```javascript
 System.out.println('set a breakpoint here!');
@@ -253,6 +255,7 @@ System.out.println('set a breakpoint here!');
 QuackContext quack = QuackContext.create();
 quack.setGlobalProperty("System", System.class);
 quack.waitForDebugger("0.0.0.0:9091")
+// attach using VS Code
 quack.evaluate(javascriptString);
 ```
 
