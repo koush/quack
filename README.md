@@ -223,7 +223,7 @@ class Foo {}
 QuackContext quack = QuackContext.create();
 // all instances of Foo sent to JavaScript get coerced into the String "hello world"
 quack.putJavaToJavaScriptCoercion(Foo.class, (clazz, o) -> "hello world");
-System.out.println(quack.evaluate(new Foo()));
+System.out.println(quack.evaluateForJavaScriptObject.call(new Foo()));
 // prints "hello world"
 ```
 
