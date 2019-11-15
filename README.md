@@ -195,12 +195,13 @@ are used to determine the behavior when being marshalled. The following builtin 
 JavaScript (In) | Java (Out)
 |---|---|
 number | Integer or Double
-Uint8Array | ByteBuffer (direct)
+Uint8Array | ByteBuffer (direct, deep copy)
 undefined | null
 
 Java (In) | JavaScript (Out)
 |---|---|
 long | string (otherwise precision is lost)
+ByteBuffer (direct or byte array backed) | Uint8Array (deep copy)
 byte, short, int, float, double | number
 null | null
 
