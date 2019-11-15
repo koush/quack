@@ -166,6 +166,27 @@ quack.evaluate(javascriptString);
 // prints "hello world"
 ```
 
+### Creating Java Objects in JavaScript (simplified)
+#### JavaScript
+```javascript
+var Foo = JavaClass.forName("com.whatever.Foo");
+var foo = new Foo();
+foo.hello('hello world');
+```
+#### Java
+```java
+class Foo {
+  public void hello(String str) {
+    System.out.println(str);
+  }
+}
+
+QuackContext quack = QuackContext.create();
+quack.setGlobalProperty("JavaClass", Class.class);
+quack.evaluate(javascriptString);
+// prints "hello world"
+```
+
 ## Concurrency
 
 JavaScript runtimes are single threaded. All execution in the JavaScript runtime is gauranteed thread safe, by way of Java synchronization.
