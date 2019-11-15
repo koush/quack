@@ -1,8 +1,7 @@
 package com.koushikdutta.quack;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
+import org.junit.Assert;
+import org.junit.Test;
 
 import java.io.File;
 import java.io.IOException;
@@ -12,15 +11,25 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.regex.Pattern;
 
-import org.junit.Assert;
-import org.junit.Test;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
 
 public class QuackTests {
     private static boolean useQuickJS = true;
     static {
+        // for non-android jvm
         try {
-            // for non-android jvm
-            System.load(new File("quack.jni/build/lib/main/debug/libquack.jni.dylib").getAbsolutePath());
+            System.load(new File("quack-jni/build/lib/main/debug/libquack.jni-dylib").getCanonicalPath());
+        }
+        catch (IOException e) {
+        }
+        catch (UnsatisfiedLinkError e) {
+        }
+        try {
+            System.load(new File("../quack-jni/build/lib/main/debug/libquack-jni.dylib").getCanonicalPath());
+        }
+        catch (IOException e) {
         }
         catch (UnsatisfiedLinkError e) {
         }
@@ -752,5 +761,11 @@ public class QuackTests {
         assertTrue(ret.foo == 3);
         assertTrue(RandomObject.bar == 5);
         quack.close();
+    }
+
+    @Test
+    public void testCoercion() {
+        QuackContext quack = QuackContext.create(useQuickJS);
+        quack.putJavaToJavaScriptCoercion(Foo.class, (clazz, o) -> "hello world");
     }
 }

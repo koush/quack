@@ -1,7 +1,7 @@
 apply plugin: 'cpp-library'
 
 task quickjs(type: Exec) {
-    workingDir '../duktape/src/main/jni/quickjs'
+    workingDir 'src/main/jni/quickjs'
     commandLine 'make'
     args ( '-j32','libquickjs.a')
 
@@ -22,15 +22,15 @@ tasks.whenTaskAdded { task ->
 }
 
 library {
-    source.from file('../duktape/src/main/jni/duktape')
-    source.from file('../duktape/src/main/jni/duktape-jni')
+    source.from file('src/main/jni/duktape')
+    source.from file('src/main/jni/duktape-jni')
     source.from('src/main/cpp/duktape.cpp')
 
-    source.from file('../duktape/src/main/jni/quickjs')
-    source.from file('../duktape/src/main/jni/quickjs-jni')
+    source.from file('src/main/jni/quickjs')
+    source.from file('src/main/jni/quickjs-jni')
 
-    source.from('../duktape/src/main/jni/JSContext.h')
-    source.from('../duktape/src/main/jni/context-jni.cpp')
+    source.from('src/main/jni/JSContext.h')
+    source.from('src/main/jni/context-jni.cpp')
 
     publicHeaders.from file('/Applications/Xcode.app//Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/System/Library/Frameworks/JavaVM.framework/Versions/A/Headers/')
 
@@ -43,6 +43,6 @@ tasks.withType(CppCompile).configureEach {
 }
 
 tasks.withType(LinkSharedLibrary).configureEach {
-    linkerArgs.add '-L../duktape/src/main/jni/quickjs/'
+    linkerArgs.add '-Lsrc/main/jni/quickjs/'
     linkerArgs.add '-lquickjs'
 }

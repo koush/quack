@@ -701,6 +701,14 @@ public final class QuackContext implements Closeable {
         return null;
       return stringify(context, object);
   }
+  public synchronized long getHeapSize() {
+    if (context == 0)
+      return 0;
+    return getHeapSize(context);
+  }
+
+  // to prevent from blocking the JavaScriptObject finalizer, create
+  // a finalization queue for the JS side.
   final ArrayList<Long> finalizationQueue = new ArrayList<>();
   void finalizeJavaScriptObject(long object) {
     if (context == 0)
@@ -714,13 +722,12 @@ public final class QuackContext implements Closeable {
     synchronized (finalizationQueue) {
       if (finalizationQueue.isEmpty())
         return;
-      copy = new ArrayList<>();
-      copy.addAll(finalizationQueue);
+      copy = new ArrayList<>(finalizationQueue);
       finalizationQueue.clear();
     }
     if (context == 0)
       return;
-    for (Long object: finalizationQueue) {
+    for (Long object: copy) {
       finalizeJavaScriptObject(object);
     }
   }
@@ -729,29 +736,20 @@ public final class QuackContext implements Closeable {
     runJobs(context);
   }
 
-  public long getHeapSize() {
-    if (context == 0)
-      return 0;
-    return getHeapSize(context);
-  }
-
+  // hooks from js/jni to java
   private Object quackGet(QuackObject quackObject, Object key) {
     return quackObject.get(key);
   }
-
   private boolean quackHas(QuackObject quackObject, Object key) {
     return quackObject.has(key);
   }
-
   private boolean quackSet(QuackObject quackObject, Object key, Object value) {
     return quackObject.set(key, value);
   }
-
   private Object[] empty = new Object[0];
   private Object quackApply(QuackObject quackObject, Object thiz, Object... args) {
     return quackObject.callMethod(thiz, args == null ? empty : args);
   }
-  
   private Object quackConstruct(QuackObject quackObject, Object... args) {
     return quackObject.construct(args == null ? empty : args);
   }
