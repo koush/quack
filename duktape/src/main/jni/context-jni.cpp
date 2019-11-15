@@ -24,7 +24,7 @@
 extern "C" {
 
 JNIEXPORT jlong JNICALL
-Java_com_squareup_duktape_Duktape_createContext(JNIEnv* env, jclass type, jobject javaDuktape, jboolean useQuickJS) {
+Java_com_koushikdutta_quack_QuackContext_createContext(JNIEnv* env, jclass type, jobject javaDuktape, jboolean useQuickJS) {
     JavaVM* javaVM;
     env->GetJavaVM(&javaVM);
     try {
@@ -39,65 +39,65 @@ Java_com_squareup_duktape_Duktape_createContext(JNIEnv* env, jclass type, jobjec
 }
 
 JNIEXPORT void JNICALL
-Java_com_squareup_duktape_Duktape_destroyContext(JNIEnv *env, jclass type, jlong context) {
+Java_com_koushikdutta_quack_QuackContext_destroyContext(JNIEnv *env, jclass type, jlong context) {
   delete reinterpret_cast<JSContext *>(context);
 }
 
 JNIEXPORT void JNICALL
-Java_com_squareup_duktape_Duktape_waitForDebugger(JNIEnv *env, jclass type, jlong context, jstring connectionString) {
+Java_com_koushikdutta_quack_QuackContext_waitForDebugger(JNIEnv *env, jclass type, jlong context, jstring connectionString) {
     reinterpret_cast<JSContext *>(context)->waitForDebugger(env, connectionString);
 }
 
 JNIEXPORT void JNICALL
-Java_com_squareup_duktape_Duktape_cooperateDebugger(JNIEnv *env, jclass type, jlong context) {
+Java_com_koushikdutta_quack_QuackContext_cooperateDebugger(JNIEnv *env, jclass type, jlong context) {
     reinterpret_cast<JSContext *>(context)->cooperateDebugger();
 }
 
 JNIEXPORT jboolean JNICALL
-Java_com_squareup_duktape_Duktape_isDebugging(JNIEnv *env, jclass type, jlong context) {
+Java_com_koushikdutta_quack_QuackContext_isDebugging(JNIEnv *env, jclass type, jlong context) {
   return reinterpret_cast<JSContext *>(context)->isDebugging();
 }
 
 JNIEXPORT void JNICALL
-Java_com_squareup_duktape_Duktape_debuggerAppNotify(JNIEnv *env, jclass type,
+Java_com_koushikdutta_quack_QuackContext_debuggerAppNotify(JNIEnv *env, jclass type,
                                            jlong context,
                                            jobjectArray args) {
     reinterpret_cast<JSContext *>(context)->debuggerAppNotify(env, args);
 }
 
 JNIEXPORT jstring JNICALL
-Java_com_squareup_duktape_Duktape_stringify(JNIEnv *env, jclass type, jlong context, jlong object) {
+Java_com_koushikdutta_quack_QuackContext_stringify(JNIEnv *env, jclass type, jlong context, jlong object) {
   return reinterpret_cast<JSContext *>(context)->stringify(env, object);
 }
 
 JNIEXPORT void JNICALL
-Java_com_squareup_duktape_Duktape_setGlobalProperty(JNIEnv *env, jclass type, jlong context,
+Java_com_koushikdutta_quack_QuackContext_setGlobalProperty(JNIEnv *env, jclass type, jlong context,
                                                     jobject property, jobject value) {
     return reinterpret_cast<JSContext *>(context)->setGlobalProperty(env, property, value);
 }
 
 JNIEXPORT void JNICALL
-Java_com_squareup_duktape_Duktape_finalizeJavaScriptObject__JJ(JNIEnv *env, jclass type,
+Java_com_koushikdutta_quack_QuackContext_finalizeJavaScriptObject__JJ(JNIEnv *env, jclass type,
                                                                jlong context, jlong object) {
     return reinterpret_cast<JSContext *>(context)->finalizeJavaScriptObject(env, object);
                                        
 }
 
 JNIEXPORT jobject JNICALL
-Java_com_squareup_duktape_Duktape_call(JNIEnv *env, jclass type,
+Java_com_koushikdutta_quack_QuackContext_call(JNIEnv *env, jclass type,
                                            jlong context, jlong object,
                                            jobjectArray args) {
     return reinterpret_cast<JSContext *>(context)->call(env, object, args);
 }
 
 JNIEXPORT jobject JNICALL
-Java_com_squareup_duktape_Duktape_callMethod(
+Java_com_koushikdutta_quack_QuackContext_callMethod(
         JNIEnv *env, jclass type, jlong context, jlong object, jobject thiz, jobjectArray args) {
     return reinterpret_cast<JSContext *>(context)->callMethod(env, object, thiz, args);
 }
 
 JNIEXPORT jobject JNICALL
-Java_com_squareup_duktape_Duktape_callProperty(JNIEnv *env, jclass type,
+Java_com_koushikdutta_quack_QuackContext_callProperty(JNIEnv *env, jclass type,
                                            jlong context, jlong object,
                                            jobject property,
                                            jobjectArray args) {
@@ -105,56 +105,56 @@ Java_com_squareup_duktape_Duktape_callProperty(JNIEnv *env, jclass type,
 }
 
 JNIEXPORT jobject JNICALL
-Java_com_squareup_duktape_Duktape_getKeyObject(JNIEnv *env, jclass type, jlong context,
+Java_com_koushikdutta_quack_QuackContext_getKeyObject(JNIEnv *env, jclass type, jlong context,
                                                jlong object, jobject key) {
     return reinterpret_cast<JSContext *>(context)->getKeyObject(env, object, key);
 }
 
 JNIEXPORT jobject JNICALL
-Java_com_squareup_duktape_Duktape_getKeyInteger(JNIEnv *env, jclass type, jlong context, jlong object, jint index) {
+Java_com_koushikdutta_quack_QuackContext_getKeyInteger(JNIEnv *env, jclass type, jlong context, jlong object, jint index) {
     return reinterpret_cast<JSContext *>(context)->getKeyInteger(env, object, index);
 }
 
 JNIEXPORT jobject JNICALL
-Java_com_squareup_duktape_Duktape_getKeyString(JNIEnv *env, jclass type, jlong context, jlong object, jstring key) {
+Java_com_koushikdutta_quack_QuackContext_getKeyString(JNIEnv *env, jclass type, jlong context, jlong object, jstring key) {
     return reinterpret_cast<JSContext *>(context)->getKeyString(env, object, key);
 }
 
 JNIEXPORT jboolean JNICALL
-Java_com_squareup_duktape_Duktape_setKeyObject(JNIEnv *env, jclass type, jlong context,
+Java_com_koushikdutta_quack_QuackContext_setKeyObject(JNIEnv *env, jclass type, jlong context,
                                                jlong object, jobject key, jobject value) {
     return reinterpret_cast<JSContext *>(context)->setKeyObject(env, object, key, value);
 }
 
 JNIEXPORT jboolean JNICALL
-Java_com_squareup_duktape_Duktape_setKeyInteger(JNIEnv *env, jclass type, jlong context, jlong object, jint index, jobject value) {
+Java_com_koushikdutta_quack_QuackContext_setKeyInteger(JNIEnv *env, jclass type, jlong context, jlong object, jint index, jobject value) {
     return reinterpret_cast<JSContext *>(context)->setKeyInteger(env, object, index, value);
 }
 
 JNIEXPORT jboolean JNICALL
-Java_com_squareup_duktape_Duktape_setKeyString(JNIEnv *env, jclass type, jlong context, jlong object, jstring key, jobject value) {
+Java_com_koushikdutta_quack_QuackContext_setKeyString(JNIEnv *env, jclass type, jlong context, jlong object, jstring key, jobject value) {
     return reinterpret_cast<JSContext *>(context)->setKeyString(env, object, key, value);
 }
 
 JNIEXPORT jobject JNICALL
-Java_com_squareup_duktape_Duktape_compileFunction(
+Java_com_koushikdutta_quack_QuackContext_compileFunction(
         JNIEnv* env, jclass type, jlong context, jstring code, jstring fname) {
     return reinterpret_cast<JSContext *>(context)->compile(env, code, fname);
 }
 
 JNIEXPORT jobject JNICALL
-Java_com_squareup_duktape_Duktape_evaluate(
+Java_com_koushikdutta_quack_QuackContext_evaluate(
     JNIEnv* env, jclass type, jlong context, jstring code, jstring fname) {
     return reinterpret_cast<JSContext *>(context)->evaluate(env, code, fname);
 }
 
 JNIEXPORT jlong JNICALL
-Java_com_squareup_duktape_Duktape_getHeapSize__J(JNIEnv *env, jclass type, jlong context) {
+Java_com_koushikdutta_quack_QuackContext_getHeapSize__J(JNIEnv *env, jclass type, jlong context) {
     return reinterpret_cast<JSContext *>(context)->getHeapSize(env);
 }
 
 JNIEXPORT void JNICALL
-Java_com_squareup_duktape_Duktape_runJobs(JNIEnv *env, jclass type, jlong context) {
+Java_com_koushikdutta_quack_QuackContext_runJobs(JNIEnv *env, jclass type, jlong context) {
     reinterpret_cast<JSContext *>(context)->runJobs(env);
 }
 

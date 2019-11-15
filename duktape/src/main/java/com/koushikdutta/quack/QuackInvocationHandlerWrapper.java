@@ -1,7 +1,7 @@
-package com.squareup.duktape;
+package com.koushikdutta.quack;
 
 import java.lang.reflect.InvocationHandler;
 
-public interface DuktapeInvocationHandlerWrapper {
+public interface QuackInvocationHandlerWrapper {
     InvocationHandler wrapInvocationHandler(JavaScriptObject javaScriptObject, InvocationHandler handler);
 }

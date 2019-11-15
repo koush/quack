@@ -1,6 +1,6 @@
-package com.squareup.duktape;
+package com.koushikdutta.quack;
 
-public interface DuktapeObject {
+public interface QuackObject {
     default Object get(String key) {
         return null;
     };

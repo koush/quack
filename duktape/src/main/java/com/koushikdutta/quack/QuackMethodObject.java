@@ -1,14 +1,14 @@
-package com.squareup.duktape;
+package com.koushikdutta.quack;
 
 import java.util.ArrayList;
 import java.util.Collections;
 
-public interface DuktapeMethodObject extends DuktapeObject {
+public interface QuackMethodObject extends QuackObject {
     @Override
     default Object get(Object key) {
-        DuktapeMethodObject self = this;
+        QuackMethodObject self = this;
         if ("call".equals(key)) {
-            return new DuktapeMethodObject() {
+            return new QuackMethodObject() {
                 @Override
                 public Object callMethod(Object thiz, Object... args) {
                     ArrayList<Object> a = new ArrayList<>();
@@ -21,7 +21,7 @@ public interface DuktapeMethodObject extends DuktapeObject {
             };
         }
         else if ("apply".equals(key)) {
-            return new DuktapeMethodObject() {
+            return new QuackMethodObject() {
                 @Override
                 public Object callMethod(Object thiz, Object... args) {
                     ArrayList<Object> a = new ArrayList<>();
@@ -46,7 +46,7 @@ public interface DuktapeMethodObject extends DuktapeObject {
             };
         }
         else if ("toString".equals(key)) {
-            return new DuktapeMethodObject() {
+            return new QuackMethodObject() {
                 @Override
                 public Object callMethod(Object thiz, Object... args) {
                     return "function";

@@ -1,4 +1,4 @@
-package com.squareup.duktape;
+package com.koushikdutta.quack;
 
 import java.lang.reflect.Array;
 import java.lang.reflect.Constructor;
@@ -11,15 +11,15 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-import static com.squareup.duktape.Duktape.isEmpty;
+import static com.koushikdutta.quack.QuackContext.isEmpty;
 
 @SuppressWarnings({"unchecked", "rawtypes"})
-public final class JavaObject implements DuktapeJavaObject {
+public final class JavaObject implements QuackJavaObject {
     private final Object target;
-    private final Duktape duktape;
+    private final QuackContext quackContext;
 
-    public JavaObject(Duktape duktape, Object target) {
-        this.duktape = duktape;
+    public JavaObject(QuackContext quackContext, Object target) {
+        this.quackContext = quackContext;
         this.target = target;
     }
     @Override
@@ -28,17 +28,17 @@ public final class JavaObject implements DuktapeJavaObject {
     }
 
     public static Method getGetterMethod(String key, Method[] methods) {
-        return Duktape.javaObjectGetter.memoize(() -> {
+        return QuackContext.javaObjectGetter.memoize(() -> {
             for (Method method : methods) {
                 // name match, no args, and a return type
                 if (method.getParameterTypes().length != 0)
                     continue;
                 if (method.getReturnType() == void.class || method.getReturnType() == Void.class)
                     continue;
-                DuktapeProperty duktapeProperty = method.getAnnotation(DuktapeProperty.class);
-                if (duktapeProperty == null)
+                QuackProperty property = method.getAnnotation(QuackProperty.class);
+                if (property == null)
                     continue;
-                String propName = duktapeProperty.name();
+                String propName = property.name();
                 if (isEmpty(propName))
                     propName = method.getName();
                 if (propName.equals(key))
@@ -49,17 +49,17 @@ public final class JavaObject implements DuktapeJavaObject {
     }
 
     public static Method getSetterMethod(String key, Method[] methods) {
-        return Duktape.javaObjectSetter.memoize(() -> {
+        return QuackContext.javaObjectSetter.memoize(() -> {
             for (Method method : methods) {
                 // name match, no args, and a return type
                 if (method.getParameterTypes().length != 1)
                     continue;
                 if (method.getReturnType() != void.class && method.getReturnType() != Void.class)
                     continue;
-                DuktapeProperty duktapeProperty = method.getAnnotation(DuktapeProperty.class);
-                if (duktapeProperty == null)
+                QuackProperty property = method.getAnnotation(QuackProperty.class);
+                if (property == null)
                     continue;
-                String propName = duktapeProperty.name();
+                String propName = property.name();
                 if (isEmpty(propName))
                     propName = method.getName();
                 if (propName.equals(key))
@@ -76,7 +76,7 @@ public final class JavaObject implements DuktapeJavaObject {
                 continue;
             if (method.getName().equals(key))
                 return true;
-            DuktapeMethodName annotation = method.getAnnotation(DuktapeMethodName.class);
+            QuackMethodName annotation = method.getAnnotation(QuackMethodName.class);
             if (annotation != null && annotation.name().equals(key))
                 return true;
         }
@@ -96,7 +96,7 @@ public final class JavaObject implements DuktapeJavaObject {
             if (clazz.isArray() && "length".equals(key))
                 return Array.getLength(target);
 
-            Field f = Duktape.javaObjectFields.memoize(() -> {
+            Field f = QuackContext.javaObjectFields.memoize(() -> {
                 // try to get fields
                 for (Field field : clazz.getFields()) {
                     if (field.getName().equals(key) && ((field.getModifiers() & Modifier.STATIC) == 0))
@@ -115,7 +115,7 @@ public final class JavaObject implements DuktapeJavaObject {
 
             if (f != null) {
                 try {
-                    return duktape.coerceJavaToJavaScript(f.get(target));
+                    return quackContext.coerceJavaToJavaScript(f.get(target));
                 } catch (IllegalAccessException e) {
                     throw new IllegalArgumentException(e);
                 }
@@ -125,14 +125,14 @@ public final class JavaObject implements DuktapeJavaObject {
         Method g = getGetterMethod(key, clazz.getMethods());
         if (g != null) {
             try {
-                return duktape.coerceJavaToJavaScript(g.invoke(target));
+                return quackContext.coerceJavaToJavaScript(g.invoke(target));
             }
             catch (Exception e) {
                 throw new IllegalArgumentException(e);
             }
         }
 
-        Boolean m = Duktape.javaObjectMethods.memoize(() -> {
+        Boolean m = QuackContext.javaObjectMethods.memoize(() -> {
             if (hasMethod(clazz, key, false))
                 return true;
             if (target instanceof Class)
@@ -141,7 +141,7 @@ public final class JavaObject implements DuktapeJavaObject {
         }, key, clazz.getMethods());
 
         if (m)
-            return new JavaMethodObject(duktape, key);
+            return new JavaMethodObject(quackContext, key);
 
         return null;
     }
@@ -157,11 +157,10 @@ public final class JavaObject implements DuktapeJavaObject {
 
     private Object getMap(Object key) {
         if (target instanceof Map)
-            return duktape.coerceJavaToJavaScript(((Map)target).get(key));
+            return quackContext.coerceJavaToJavaScript(((Map)target).get(key));
         return null;
     }
 
-    // duktape entry point
     @Override
     public Object get(Object key) {
         if (key instanceof String)
@@ -211,7 +210,7 @@ public final class JavaObject implements DuktapeJavaObject {
         for (Field field: clazz.getFields()) {
             if (field.getName().equals(key)) {
                 try {
-                    field.set(target, duktape.coerceJavaScriptToJava(field.getType(), value));
+                    field.set(target, quackContext.coerceJavaScriptToJava(field.getType(), value));
                 }
                 catch (IllegalAccessException e) {
                     throw new IllegalArgumentException(e);
@@ -223,7 +222,7 @@ public final class JavaObject implements DuktapeJavaObject {
         Method s = getSetterMethod(key, clazz.getMethods());
         if (s != null) {
             try {
-                duktape.coerceJavaToJavaScript(s.invoke(target, duktape.coerceJavaScriptToJava(s.getParameterTypes()[0], value)));
+                quackContext.coerceJavaToJavaScript(s.invoke(target, quackContext.coerceJavaScriptToJava(s.getParameterTypes()[0], value)));
             }
             catch (Exception e) {
                 throw new IllegalArgumentException(e);
@@ -234,7 +233,6 @@ public final class JavaObject implements DuktapeJavaObject {
         return putMap(key, value);
     }
 
-    // duktape entry point
     @Override
     public boolean set(Object key, Object value) {
         if (key instanceof Number) {
@@ -266,15 +264,15 @@ public final class JavaObject implements DuktapeJavaObject {
         if (property == null)
             throw new NullPointerException();
         property = get(property);
-        if (property instanceof DuktapeObject)
-            return ((DuktapeObject)property).callMethod(this, args);
+        if (property instanceof QuackObject)
+            return ((QuackObject)property).callMethod(this, args);
         throw new UnsupportedOperationException("can not call " + target);
     }
 
     @Override
     public Object construct(Object... args) {
         if (!(target instanceof Class))
-            return DuktapeJavaObject.super.construct(args);
+            return QuackJavaObject.super.construct(args);
 
         Class clazz = (Class)target;
         Constructor[] constructors = clazz.getConstructors();
@@ -285,7 +283,7 @@ public final class JavaObject implements DuktapeJavaObject {
             else
                 argTypes.add(arg.getClass());
         }
-        Constructor best = Duktape.javaObjectConstructorCandidates.memoize(() -> {
+        Constructor best = QuackContext.javaObjectConstructorCandidates.memoize(() -> {
             Constructor ret = null;
             int bestScore = Integer.MAX_VALUE;
             for (Constructor constructor: constructors) {
@@ -299,7 +297,7 @@ public final class JavaObject implements DuktapeJavaObject {
                     if (paramType == argType) {
                         score -= 4;
                     }
-                    if (Duktape.isNumberClass(paramType) && Duktape.isNumberClass(argType)) {
+                    if (QuackContext.isNumberClass(paramType) && QuackContext.isNumberClass(argType)) {
                         score -= 3;
                     }
                     else if ((paramType == Long.class || paramType == long.class) && argType == String.class) {
@@ -325,7 +323,7 @@ public final class JavaObject implements DuktapeJavaObject {
             int i = 0;
             for (; i < numParameters; i++) {
                 if (i < args.length)
-                    coerced.add(duktape.coerceJavaScriptToJava(best.getParameterTypes()[i], args[i]));
+                    coerced.add(quackContext.coerceJavaScriptToJava(best.getParameterTypes()[i], args[i]));
                 else
                     coerced.add(null);
             }
@@ -333,14 +331,14 @@ public final class JavaObject implements DuktapeJavaObject {
                 Class varargType = best.getParameterTypes()[numParameters].getComponentType();
                 ArrayList<Object> varargs = new ArrayList<>();
                 for (; i < args.length; i++) {
-                    varargs.add(duktape.coerceJavaScriptToJava(varargType, args[i]));
+                    varargs.add(quackContext.coerceJavaScriptToJava(varargType, args[i]));
                 }
                 coerced.add(JavaMethodObject.toArray(varargType, varargs));
             }
             else if (i < args.length) {
-//                Log.w("Duktape", "dropping javascript to java arguments on the floor: " + (args.length - i));
+                System.err.println("dropping javascript to java arguments on the floor: " + (args.length - i));
             }
-            return duktape.coerceJavaToJavaScript(best.newInstance(coerced.toArray()));
+            return quackContext.coerceJavaToJavaScript(best.newInstance(coerced.toArray()));
         }
         catch (IllegalAccessException e) {
             throw new IllegalArgumentException(best.toString(), e);

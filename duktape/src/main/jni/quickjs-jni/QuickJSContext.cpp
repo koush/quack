@@ -21,7 +21,7 @@ static JSValue stacktrace_getter(JSContext *ctx, JSValueConst this_val, int argc
 }
 
 static JSClassID customFinalizerClassId = 0;
-static JSClassID duktapeObjectProxyClassId = 0;
+static JSClassID quackObjectProxyClassId = 0;
 
 static void javaWeakRefFinalizer(QuickJSContext *ctx, JSValue val, void *udata) {
     auto weakRef = reinterpret_cast<jobject>(udata);
@@ -46,8 +46,8 @@ static void customFinalizer(JSRuntime *rt, JSValue val) {
     free(data);
 }
 
-static void duktapeObjectFinalizer(JSRuntime *rt, JSValue val) {
-    CustomFinalizerData *data = reinterpret_cast<CustomFinalizerData *>(JS_GetOpaque(val, duktapeObjectProxyClassId));
+static void quackObjectFinalizer(JSRuntime *rt, JSValue val) {
+    CustomFinalizerData *data = reinterpret_cast<CustomFinalizerData *>(JS_GetOpaque(val, quackObjectProxyClassId));
     if (data)
         data->finalizer(data->ctx, val, data->udata);
     free(data);
@@ -59,23 +59,23 @@ static struct JSClassDef customFinalizerClassDef = {
 };
 
 int quickjs_has(JSContext *ctx, JSValueConst obj, JSAtom atom) {
-    CustomFinalizerData *data = reinterpret_cast<CustomFinalizerData *>(JS_GetOpaque(obj, duktapeObjectProxyClassId));
+    CustomFinalizerData *data = reinterpret_cast<CustomFinalizerData *>(JS_GetOpaque(obj, quackObjectProxyClassId));
     jobject object = reinterpret_cast<jobject>(data->udata);
     return data->ctx->quickjs_has(object, atom);
 }
 JSValue quickjs_get(JSContext *ctx, JSValueConst obj, JSAtom atom, JSValueConst receiver) {
-    CustomFinalizerData *data = reinterpret_cast<CustomFinalizerData *>(JS_GetOpaque(obj, duktapeObjectProxyClassId));
+    CustomFinalizerData *data = reinterpret_cast<CustomFinalizerData *>(JS_GetOpaque(obj, quackObjectProxyClassId));
     jobject object = reinterpret_cast<jobject>(data->udata);
     return data->ctx->quickjs_get(object, atom, receiver);
 }
 /* return < 0 if exception or TRUE/FALSE */
 int quickjs_set(JSContext *ctx, JSValueConst obj, JSAtom atom, JSValueConst value, JSValueConst receiver, int flags) {
-    CustomFinalizerData *data = reinterpret_cast<CustomFinalizerData *>(JS_GetOpaque(obj, duktapeObjectProxyClassId));
+    CustomFinalizerData *data = reinterpret_cast<CustomFinalizerData *>(JS_GetOpaque(obj, quackObjectProxyClassId));
     jobject object = reinterpret_cast<jobject>(data->udata);
     return data->ctx->quickjs_set(object, atom, value, receiver, flags);
 }
 JSValue quickjs_apply(JSContext *ctx, JSValueConst func_obj, JSValueConst this_val, int argc, JSValueConst *argv) {
-    CustomFinalizerData *data = reinterpret_cast<CustomFinalizerData *>(JS_GetOpaque(func_obj, duktapeObjectProxyClassId));
+    CustomFinalizerData *data = reinterpret_cast<CustomFinalizerData *>(JS_GetOpaque(func_obj, quackObjectProxyClassId));
     jobject object = reinterpret_cast<jobject>(data->udata);
     return data->ctx->quickjs_apply(object, this_val, argc, argv);
 }
@@ -84,21 +84,21 @@ int quickjs_construct(JSContext *ctx, JSValue func_obj, JSValueConst this_val, i
     return qctx->quickjs_construct(func_obj, this_val, argc, argv);
 }
 
-struct JSClassExoticMethods duktapeObjectProxyMethods = {
+struct JSClassExoticMethods quackObjectProxyMethods = {
     .has_property = quickjs_has,
     .get_property = quickjs_get,
     .set_property = quickjs_set,
     .construct = quickjs_construct,
 };
 
-static struct JSClassDef duktapeObjectProxyClassDef = {
-    .class_name = "DuktapeObjectProxy",
-    .finalizer = duktapeObjectFinalizer,
+static struct JSClassDef quackObjectProxyClassDef = {
+    .class_name = "QuackObjectProxy",
+    .finalizer = quackObjectFinalizer,
     .call = quickjs_apply,
-    .exotic = &duktapeObjectProxyMethods,
+    .exotic = &quackObjectProxyMethods,
 };
 
-QuickJSContext::QuickJSContext(JavaVM* javaVM, jobject javaDuktape):
+QuickJSContext::QuickJSContext(JavaVM* javaVM, jobject javaQuack):
     javaVM(javaVM) {
     runtime = JS_NewRuntime();
     ctx = JS_NewContext(runtime);
@@ -119,12 +119,12 @@ QuickJSContext::QuickJSContext(JavaVM* javaVM, jobject javaDuktape):
     javaExceptionAtom = privateAtom("javaException");
     // JS_NewClassID is static run once mechanism
     JS_NewClassID(&customFinalizerClassId);
-    JS_NewClassID(&duktapeObjectProxyClassId);
+    JS_NewClassID(&quackObjectProxyClassId);
     JS_NewClass(runtime, customFinalizerClassId, &customFinalizerClassDef);
-    JS_NewClass(runtime, duktapeObjectProxyClassId, &duktapeObjectProxyClassDef);
+    JS_NewClass(runtime, quackObjectProxyClassId, &quackObjectProxyClassDef);
 
     JNIEnv *env = getEnvFromJavaVM(javaVM);
-    this->javaDuktape = env->NewWeakGlobalRef(javaDuktape);
+    this->javaQuack = env->NewWeakGlobalRef(javaQuack);
 
     // primitives
     objectClass = findClass(env, "java/lang/Object");
@@ -144,37 +144,37 @@ QuickJSContext::QuickJSContext(JavaVM* javaVM, jobject javaDuktape):
     byteBufferClass = findClass(env, "java/nio/ByteBuffer");
     byteBufferAllocateDirect = env->GetStaticMethodID(byteBufferClass, "allocateDirect", "(I)Ljava/nio/ByteBuffer;");
 
-    // Duktape
-    duktapeClass = findClass(env, "com/squareup/duktape/Duktape");
-    duktapeHasMethod = env->GetMethodID(duktapeClass, "duktapeHas", "(Lcom/squareup/duktape/DuktapeObject;Ljava/lang/Object;)Z");
-    duktapeGetMethod = env->GetMethodID(duktapeClass, "duktapeGet", "(Lcom/squareup/duktape/DuktapeObject;Ljava/lang/Object;)Ljava/lang/Object;");
-    duktapeSetMethod = env->GetMethodID(duktapeClass, "duktapeSet", "(Lcom/squareup/duktape/DuktapeObject;Ljava/lang/Object;Ljava/lang/Object;)Z");
-    duktapeApply = env->GetMethodID(duktapeClass, "duktapeApply", "(Lcom/squareup/duktape/DuktapeObject;Ljava/lang/Object;[Ljava/lang/Object;)Ljava/lang/Object;");
-    duktapeConstruct = env->GetMethodID(duktapeClass, "duktapeConstruct", "(Lcom/squareup/duktape/DuktapeObject;[Ljava/lang/Object;)Ljava/lang/Object;");
-    duktapeObjectClass = findClass(env, "com/squareup/duktape/DuktapeObject");
+    // Quack
+    quackClass = findClass(env, "com/koushikdutta/quack/QuackContext");
+    quackHasMethod = env->GetMethodID(quackClass, "quackHas", "(Lcom/koushikdutta/quack/QuackObject;Ljava/lang/Object;)Z");
+    quackGetMethod = env->GetMethodID(quackClass, "quackGet", "(Lcom/koushikdutta/quack/QuackObject;Ljava/lang/Object;)Ljava/lang/Object;");
+    quackSetMethod = env->GetMethodID(quackClass, "quackSet", "(Lcom/koushikdutta/quack/QuackObject;Ljava/lang/Object;Ljava/lang/Object;)Z");
+    quackApply = env->GetMethodID(quackClass, "quackApply", "(Lcom/koushikdutta/quack/QuackObject;Ljava/lang/Object;[Ljava/lang/Object;)Ljava/lang/Object;");
+    quackConstruct = env->GetMethodID(quackClass, "quackConstruct", "(Lcom/koushikdutta/quack/QuackObject;[Ljava/lang/Object;)Ljava/lang/Object;");
+    quackObjectClass = findClass(env, "com/koushikdutta/quack/QuackObject");
 
-    // DuktapeJsonObject
-    duktapejsonObjectClass = findClass(env, "com/squareup/duktape/DuktapeJsonObject");
-    duktapeJsonField = env->GetFieldID(duktapejsonObjectClass, "json", "Ljava/lang/String;");
+    // QuackJsonObject
+    quackjsonObjectClass = findClass(env, "com/koushikdutta/quack/QuackJsonObject");
+    quackJsonField = env->GetFieldID(quackjsonObjectClass, "json", "Ljava/lang/String;");
 
     // JavaScriptObject
-    javaScriptObjectClass = findClass(env, "com/squareup/duktape/JavaScriptObject");
-    javaScriptObjectConstructor = env->GetMethodID(javaScriptObjectClass, "<init>", "(Lcom/squareup/duktape/Duktape;JJ)V");
+    javaScriptObjectClass = findClass(env, "com/koushikdutta/quack/JavaScriptObject");
+    javaScriptObjectConstructor = env->GetMethodID(javaScriptObjectClass, "<init>", "(Lcom/koushikdutta/quack/QuackContext;JJ)V");
     contextField = env->GetFieldID(javaScriptObjectClass, "context", "J");
     pointerField = env->GetFieldID(javaScriptObjectClass, "pointer", "J");
 
     // JavaObject
-    javaObjectClass = findClass(env, "com/squareup/duktape/JavaObject");
-    javaObjectConstructor = env->GetMethodID(javaObjectClass, "<init>", "(Lcom/squareup/duktape/Duktape;Ljava/lang/Object;)V");
+    javaObjectClass = findClass(env, "com/koushikdutta/quack/JavaObject");
+    javaObjectConstructor = env->GetMethodID(javaObjectClass, "<init>", "(Lcom/koushikdutta/quack/QuackContext;Ljava/lang/Object;)V");
 
-    // DuktapeJavaObject
-    duktapeJavaObject = findClass(env, "com/squareup/duktape/DuktapeJavaObject");
-    duktapeJavaObjectGetObject = env->GetMethodID(duktapeJavaObject, "getObject", "(Ljava/lang/Class;)Ljava/lang/Object;");
+    // QuackJavaObject
+    quackJavaObject = findClass(env, "com/koushikdutta/quack/QuackJavaObject");
+    quackJavaObjectGetObject = env->GetMethodID(quackJavaObject, "getObject", "(Ljava/lang/Class;)Ljava/lang/Object;");
 
     // exceptions
-    duktapeExceptionClass = findClass(env, "com/squareup/duktape/DuktapeException");
-    addDuktapeStack =env->GetStaticMethodID(duktapeExceptionClass, "addDuktapeStack","(Ljava/lang/Throwable;Ljava/lang/String;)V");
-    addJavaStack = env->GetStaticMethodID(duktapeExceptionClass, "addJavaStack", "(Ljava/lang/String;Ljava/lang/Throwable;)Ljava/lang/String;");
+    quackExceptionClass = findClass(env, "com/koushikdutta/quack/QuackException");
+    addJSStack =env->GetStaticMethodID(quackExceptionClass, "addJSStack","(Ljava/lang/Throwable;Ljava/lang/String;)V");
+    addJavaStack = env->GetStaticMethodID(quackExceptionClass, "addJavaStack", "(Ljava/lang/String;Ljava/lang/Throwable;)Ljava/lang/String;");
 }
 
 QuickJSContext::~QuickJSContext() {
@@ -282,30 +282,30 @@ JSValue QuickJSContext::toObject(JNIEnv *env, jobject value) {
         JSValue args[] = { (JSValue)buffer };
         return JS_CallConstructor(ctx, uint8ArrayConstructor, 1, args);
     }
-    else if (env->IsAssignableFrom(clazz, duktapejsonObjectClass)) {
-        jstring json = (jstring)env->GetObjectField(value, duktapeJsonField);
+    else if (env->IsAssignableFrom(clazz, quackjsonObjectClass)) {
+        jstring json = (jstring)env->GetObjectField(value, quackJsonField);
         const char *jsonPtr = env->GetStringUTFChars(json, 0);
-        return JS_ParseJSON(ctx, jsonPtr, env->GetStringUTFLength(json), "<DuktapeJsonObject>");
+        return JS_ParseJSON(ctx, jsonPtr, env->GetStringUTFLength(json), "<QuackJsonObject>");
     }
     else if (env->IsAssignableFrom(clazz, javaScriptObjectClass)) {
         QuickJSContext *context = reinterpret_cast<QuickJSContext *>(env->GetLongField(value, contextField));
         // matching context, grab the native JSValue
         if (context == this)
             return toValueAsDup(ctx, env->GetLongField(value, pointerField));
-        // a proxy already exists, but not for the correct DuktapeContext, so native javascript heap
+        // a proxy already exists, but not for the correct QuackContext, so native javascript heap
         // pointer can't be used.
     }
-    else if (!env->IsAssignableFrom(clazz, duktapeObjectClass)) {
-        // a DuktapeObject can support a duktape Proxy, and does not need any further boxing
+    else if (!env->IsAssignableFrom(clazz, quackObjectClass)) {
+        // a QuackObject can support a quack Proxy, and does not need any further boxing
         // so, this must be a normal Java object, create a proxy for it to access fields and methods
-        value = env->NewObject(javaObjectClass, javaObjectConstructor, javaDuktape, value);
+        value = env->NewObject(javaObjectClass, javaObjectConstructor, javaQuack, value);
     }
 
-    // at this point, the object is guaranteed to be a JavaScriptObject from another DuktapeContext
-    // or a DuktapeObject (java proxy of some sort). JavaScriptObject implements DuktapeObject,
+    // at this point, the object is guaranteed to be a JavaScriptObject from another QuackContext
+    // or a QuackObject (java proxy of some sort). JavaScriptObject implements QuackObject,
     // so, it works without any further coercion.
 
-    JSValue ret = JS_NewObjectClass(ctx, duktapeObjectProxyClassId);
+    JSValue ret = JS_NewObjectClass(ctx, quackObjectProxyClassId);
     setFinalizerOnFinalizerObject(ret, javaRefFinalizer, env->NewGlobalRef(value));
     return ret;
 }
@@ -397,7 +397,7 @@ jobject QuickJSContext::toObject(JNIEnv *env, JSValue value) {
 
     // no luck, so create a JavaScriptObject
     void* ptr = JS_VALUE_GET_PTR(value);
-    jobject javaThis = env->NewObject(javaScriptObjectClass, javaScriptObjectConstructor, javaDuktape,
+    jobject javaThis = env->NewObject(javaScriptObjectClass, javaScriptObjectConstructor, javaQuack,
         reinterpret_cast<jlong>(this), reinterpret_cast<jlong>(ptr));
 
     // stash this to hold a reference, and to free automatically on runtime shutdown.
@@ -539,7 +539,7 @@ int QuickJSContext::quickjs_has(jobject object, JSAtom atom) {
     const auto prop = hold(JS_AtomToValue(ctx, atom));
     JNIEnv *env = getEnvFromJavaVM(javaVM);
     const auto jprop = LocalRefHolder(env, toObject(env, prop));
-    jboolean has = env->CallBooleanMethod(javaDuktape, duktapeHasMethod, object, (jobject)jprop);
+    jboolean has = env->CallBooleanMethod(javaQuack, quackHasMethod, object, (jobject)jprop);
     if (rethrowJavaExceptionToQuickJS(env))
         return -1;
     return has;
@@ -554,7 +554,7 @@ JSValue QuickJSContext::quickjs_get(jobject object, JSAtom atom, JSValueConst re
 
     auto prop = hold(JS_AtomToValue(ctx, atom));
     const auto jprop = LocalRefHolder(env, toObject(env, prop));
-    jobject result = env->CallObjectMethod(javaDuktape, duktapeGetMethod, object, (jobject)jprop);
+    jobject result = env->CallObjectMethod(javaQuack, quackGetMethod, object, (jobject)jprop);
 
     if (rethrowJavaExceptionToQuickJS(env))
         return JS_EXCEPTION;
@@ -571,7 +571,7 @@ int QuickJSContext::quickjs_set(jobject object, JSAtom atom, JSValueConst value,
     JNIEnv *env = getEnvFromJavaVM(javaVM);
     const auto jprop = LocalRefHolder(env, toObject(env, prop));
     const auto jvalue = LocalRefHolder(env, toObject(env, value));
-    jboolean ret = env->CallBooleanMethod(javaDuktape, duktapeSetMethod, object, (jobject)jprop, (jobject)jvalue);
+    jboolean ret = env->CallBooleanMethod(javaQuack, quackSetMethod, object, (jobject)jprop, (jobject)jvalue);
 
     if (rethrowJavaExceptionToQuickJS(env))
         return -1;
@@ -588,7 +588,7 @@ JSValue QuickJSContext::quickjs_apply(jobject func_obj, JSValueConst this_val, i
     }
 
     const auto thiz = LocalRefHolder(env, toObject(env, this_val));
-    jobject result = env->CallObjectMethod(javaDuktape, duktapeApply, func_obj, (jobject)thiz, javaArgs);
+    jobject result = env->CallObjectMethod(javaQuack, quackApply, func_obj, (jobject)thiz, javaArgs);
     env->DeleteLocalRef(javaArgs);
 
     if (rethrowJavaExceptionToQuickJS(env))
@@ -606,13 +606,13 @@ int QuickJSContext::quickjs_construct(JSValue func_obj, JSValueConst this_val, i
     }
 
     const auto thiz = LocalRefHolder(env, toObject(env, func_obj));
-    auto result = LocalRefHolder(env, env->CallObjectMethod(javaDuktape, duktapeConstruct, (jobject)thiz, javaArgs));
+    auto result = LocalRefHolder(env, env->CallObjectMethod(javaQuack, quackConstruct, (jobject)thiz, javaArgs));
     env->DeleteLocalRef(javaArgs);
 
     if (rethrowJavaExceptionToQuickJS(env))
         return -1;
 
-    auto value = LocalRefHolder(env, env->NewObject(javaObjectClass, javaObjectConstructor, javaDuktape, (jobject)result));
+    auto value = LocalRefHolder(env, env->NewObject(javaObjectClass, javaObjectConstructor, javaQuack, (jobject)result));
 
     setFinalizerOnFinalizerObject(this_val, javaRefFinalizer, env->NewGlobalRef(value));
     return 1;
@@ -641,15 +641,15 @@ void QuickJSContext::rethrowQuickJSErrorToJava(JNIEnv *env, JSValue exception) {
             auto stack = hold(JS_GetPropertyStr(ctx, exception, "stack"));
 
             jobject unwrappedException = toObject(env, javaException);
-            jthrowable ex = (jthrowable)env->CallObjectMethod(unwrappedException, duktapeJavaObjectGetObject, nullptr);
-            env->CallStaticVoidMethod(duktapeExceptionClass, addDuktapeStack, ex, toString(env, stack));
+            jthrowable ex = (jthrowable)env->CallObjectMethod(unwrappedException, quackJavaObjectGetObject, nullptr);
+            env->CallStaticVoidMethod(quackExceptionClass, addJSStack, ex, toString(env, stack));
             env->Throw(ex);
         }
         else {
             auto errorMessage = hold(JS_ToString(ctx, exception));
             auto stack = hold(JS_GetPropertyStr(ctx, exception, "stack"));
 
-//            env->ThrowNew(duktapeExceptionClass, (toStdString(errorMessage) + "\n" + toStdString(stack)).c_str());
+//            env->ThrowNew(quackExceptionClass, (toStdString(errorMessage) + "\n" + toStdString(stack)).c_str());
 
             std::string str = "";
             if (!JS_IsUndefinedOrNull(errorMessage))
@@ -661,14 +661,14 @@ void QuickJSContext::rethrowQuickJSErrorToJava(JNIEnv *env, JSValue exception) {
                 str += toStdString(stack);
             else
                 str += "    at unknown (unknown)\n";
-            env->ThrowNew(duktapeExceptionClass, str.c_str());
+            env->ThrowNew(quackExceptionClass, str.c_str());
         }
     }
     else {
         // js can throw strings and ints and all sorts of stuff, so who knows what this is.
         // just stringify it as the message.
         auto string = hold(JS_ToString(ctx, exception));
-        env->ThrowNew(duktapeExceptionClass, toStdString(string).c_str());
+        env->ThrowNew(quackExceptionClass, toStdString(string).c_str());
     }
 }
 
@@ -694,7 +694,7 @@ bool QuickJSContext::rethrowJavaExceptionToQuickJS(JNIEnv *env) {
 
     // merge the stacks
     auto newStack = LocalRefHolder(env,
-        env->CallStaticObjectMethod(duktapeExceptionClass,
+        env->CallStaticObjectMethod(quackExceptionClass,
             addJavaStack,
             env->NewStringUTF((message + "\n" + toStdString(stack)).c_str()), e));
     auto newStackValue = toObject(env, newStack);

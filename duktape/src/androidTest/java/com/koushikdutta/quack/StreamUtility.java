@@ -1,4 +1,4 @@
-package com.squareup.duktape;
+package com.koushikdutta.quack;
 
 import java.io.ByteArrayOutputStream;
 import java.io.Closeable;

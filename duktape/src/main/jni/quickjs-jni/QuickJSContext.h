@@ -137,7 +137,7 @@ public:
     void runJobs(JNIEnv *env);
 
     JavaVM* javaVM;
-    jobject javaDuktape;
+    jobject javaQuack;
     JSRuntime *runtime;
     JSContext *ctx;
     JSValue stash;
@@ -146,24 +146,24 @@ public:
     jclass objectClass;
     jmethodID objectToString;
 
-    jclass duktapeJavaObject;
-    jclass duktapeClass;
-    jclass duktapeObjectClass;
+    jclass quackJavaObject;
+    jclass quackClass;
+    jclass quackObjectClass;
     jclass javaScriptObjectClass;
     jclass javaObjectClass;
-    jmethodID duktapeJavaObjectGetObject;
-    jclass duktapejsonObjectClass;
-    jmethodID duktapeHasMethod;
-    jmethodID duktapeGetMethod;
-    jmethodID duktapeSetMethod;
-    jmethodID duktapeApply;
-    jmethodID duktapeConstruct;
+    jmethodID quackJavaObjectGetObject;
+    jclass quackjsonObjectClass;
+    jmethodID quackHasMethod;
+    jmethodID quackGetMethod;
+    jmethodID quackSetMethod;
+    jmethodID quackApply;
+    jmethodID quackConstruct;
     jmethodID javaScriptObjectConstructor;
     jmethodID javaObjectConstructor;
     jmethodID byteBufferAllocateDirect;
     jfieldID contextField;
     jfieldID pointerField;
-    jfieldID duktapeJsonField;
+    jfieldID quackJsonField;
 
     jclass booleanClass;
     jmethodID booleanValueOf;
@@ -177,8 +177,8 @@ public:
     jclass stringClass;
     jclass byteBufferClass;
 
-    jclass duktapeExceptionClass;
-    jmethodID addDuktapeStack;
+    jclass quackExceptionClass;
+    jmethodID addJSStack;
     jmethodID addJavaStack;
 
     JSAtom atomHoldsJavaObject;

@@ -186,22 +186,22 @@ DuktapeContext::DuktapeContext(JavaVM* javaVM, jobject javaDuktape)
 
   m_objectClass = findClass(env, "java/lang/Object");
 
-  jclass duktapeJavaObject = findClass(env, "com/squareup/duktape/DuktapeJavaObject");
+  jclass duktapeJavaObject = findClass(env, "com/koushikdutta/quack/QuackJavaObject");
 
-  m_duktapeClass = findClass(env, "com/squareup/duktape/Duktape");
-  m_duktapeObjectClass = findClass(env, "com/squareup/duktape/DuktapeObject");
-  m_javaScriptObjectClass = findClass(env, "com/squareup/duktape/JavaScriptObject");
-  m_javaObjectClass = findClass(env, "com/squareup/duktape/JavaObject");
-  m_jsonObjectClass = findClass(env, "com/squareup/duktape/DuktapeJsonObject");
+  m_duktapeClass = findClass(env, "com/koushikdutta/quack/QuackContext");
+  m_duktapeObjectClass = findClass(env, "com/koushikdutta/quack/QuackObject");
+  m_javaScriptObjectClass = findClass(env, "com/koushikdutta/quack/JavaScriptObject");
+  m_javaObjectClass = findClass(env, "com/koushikdutta/quack/JavaObject");
+  m_jsonObjectClass = findClass(env, "com/koushikdutta/quack/QuackJsonObject");
   m_byteBufferClass = findClass(env, "java/nio/ByteBuffer");
 
-  m_duktapeHasMethod = env->GetMethodID(m_duktapeClass, "duktapeHas", "(Lcom/squareup/duktape/DuktapeObject;Ljava/lang/Object;)Z");
-  m_duktapeGetMethod = env->GetMethodID(m_duktapeClass, "duktapeGet", "(Lcom/squareup/duktape/DuktapeObject;Ljava/lang/Object;)Ljava/lang/Object;");
-  m_duktapeSetMethod = env->GetMethodID(m_duktapeClass, "duktapeSet", "(Lcom/squareup/duktape/DuktapeObject;Ljava/lang/Object;Ljava/lang/Object;)Z");
-  m_duktapeCallMethodMethod = env->GetMethodID(m_duktapeClass, "duktapeCallMethod", "(Lcom/squareup/duktape/DuktapeObject;Ljava/lang/Object;[Ljava/lang/Object;)Ljava/lang/Object;");
+  m_duktapeHasMethod = env->GetMethodID(m_duktapeClass, "quackHas", "(Lcom/koushikdutta/quack/QuackObject;Ljava/lang/Object;)Z");
+  m_duktapeGetMethod = env->GetMethodID(m_duktapeClass, "quackGet", "(Lcom/koushikdutta/quack/QuackObject;Ljava/lang/Object;)Ljava/lang/Object;");
+  m_duktapeSetMethod = env->GetMethodID(m_duktapeClass, "quackSet", "(Lcom/koushikdutta/quack/QuackObject;Ljava/lang/Object;Ljava/lang/Object;)Z");
+  m_duktapeCallMethodMethod = env->GetMethodID(m_duktapeClass, "quackApply", "(Lcom/koushikdutta/quack/QuackObject;Ljava/lang/Object;[Ljava/lang/Object;)Ljava/lang/Object;");
 
-  m_javaScriptObjectConstructor = env->GetMethodID(m_javaScriptObjectClass, "<init>", "(Lcom/squareup/duktape/Duktape;JJ)V");
-  m_javaObjectConstructor = env->GetMethodID(m_javaObjectClass, "<init>", "(Lcom/squareup/duktape/Duktape;Ljava/lang/Object;)V");
+  m_javaScriptObjectConstructor = env->GetMethodID(m_javaScriptObjectClass, "<init>", "(Lcom/koushikdutta/quack/QuackContext;JJ)V");
+  m_javaObjectConstructor = env->GetMethodID(m_javaObjectClass, "<init>", "(Lcom/koushikdutta/quack/QuackContext;Ljava/lang/Object;)V");
   m_javaObjectGetObject = env->GetMethodID(duktapeJavaObject, "getObject", "(Ljava/lang/Class;)Ljava/lang/Object;");
   m_byteBufferAllocateDirect = env->GetStaticMethodID(m_byteBufferClass, "allocateDirect", "(I)Ljava/nio/ByteBuffer;");
 
@@ -1013,7 +1013,7 @@ void queueIllegalArgumentException(JNIEnv* env, const std::string& message) {
 }
 
 void queueDuktapeException(JNIEnv* env, const std::string& message) {
-  const jclass exceptionClass = env->FindClass("com/squareup/duktape/DuktapeException");
+  const jclass exceptionClass = env->FindClass("com/koushikdutta/quack/QuackException");
   env->ThrowNew(exceptionClass, message.c_str());
 }
 
@@ -1049,7 +1049,7 @@ bool checkRethrowDuktapeErrorInternal(JNIEnv* env, duk_context* ctx) {
   duk_swap_top(ctx, -2);
   duk_put_prop_string(ctx, -2, JAVA_EXCEPTION_PROP_NAME);
 
-  jclass exceptionClass = env->FindClass("com/squareup/duktape/DuktapeException");
+  jclass exceptionClass = env->FindClass("com/koushikdutta/quack/QuackException");
   duk_get_prop_string(ctx, -1, "stack");
   std::string stack = duk_safe_to_string(ctx, -1);
   duk_pop(ctx);
@@ -1079,7 +1079,7 @@ bool checkRethrowDuktapeErrorException(JNIEnv* env, duk_context* ctx) {
 }
 
 void queueJavaExceptionForDuktapeError(JNIEnv *env, duk_context *ctx) {
-  jclass exceptionClass = env->FindClass("com/squareup/duktape/DuktapeException");
+  jclass exceptionClass = env->FindClass("com/koushikdutta/quack/QuackException");
 
   // If it's a Duktape error object, try to pull out the full stacktrace.
   if (duk_is_error(ctx, -1) && duk_has_prop_string(ctx, -1, "stack")) {
@@ -1096,7 +1096,7 @@ void queueJavaExceptionForDuktapeError(JNIEnv *env, duk_context *ctx) {
       // add the Duktape JavaScript stack to this exception.
       const jmethodID addDuktapeStack =
               env->GetStaticMethodID(exceptionClass,
-                                     "addDuktapeStack",
+                                     "addJSStack",
                                      "(Ljava/lang/Throwable;Ljava/lang/String;)V");
       env->CallStaticVoidMethod(exceptionClass, addDuktapeStack, ex, env->NewStringUTF(stack));
 

@@ -1,4 +1,4 @@
-package com.squareup.duktape;
+package com.koushikdutta.quack;
 
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
@@ -7,46 +7,46 @@ import java.util.ArrayList;
 import java.util.Collections;
 
 @SuppressWarnings({"unchecked", "rawtypes"})
-public class JavaScriptObject implements DuktapeObject {
-    final public Duktape duktape;
+public class JavaScriptObject implements QuackObject {
+    final public QuackContext quackContext;
     public final long context;
     final public long pointer;
-    public JavaScriptObject(Duktape duktape, long context, long pointer) {
-        this.duktape = duktape;
+    public JavaScriptObject(QuackContext quackContext, long context, long pointer) {
+        this.quackContext = quackContext;
         this.context = context;
         this.pointer = pointer;
     }
 
     public String stringify() {
-        return duktape.stringify(pointer);
+        return quackContext.stringify(pointer);
     }
 
     @Override
     public Object get(String key) {
-        return duktape.getKeyString(pointer, key);
+        return quackContext.getKeyString(pointer, key);
     }
 
     @Override
     public Object get(int index) {
-        return duktape.getKeyInteger(pointer, index);
+        return quackContext.getKeyInteger(pointer, index);
     }
 
     @Override
     public Object call(Object... args) {
-        duktape.coerceJavaArgsToJavaScript(args);
-        return duktape.coerceJavaScriptToJava(null, duktape.call(pointer, args));
+        quackContext.coerceJavaArgsToJavaScript(args);
+        return quackContext.coerceJavaScriptToJava(null, quackContext.call(pointer, args));
     }
 
     @Override
     public Object callMethod(Object thiz, Object... args) {
-        duktape.coerceJavaArgsToJavaScript(args);
-        return duktape.coerceJavaScriptToJava(null, duktape.callMethod(pointer, thiz, args));
+        quackContext.coerceJavaArgsToJavaScript(args);
+        return quackContext.coerceJavaScriptToJava(null, quackContext.callMethod(pointer, thiz, args));
     }
 
     @Override
     public Object callProperty(Object property, Object... args) {
-        duktape.coerceJavaArgsToJavaScript(args);
-        return duktape.coerceJavaScriptToJava(null, duktape.callProperty(pointer, property, args));
+        quackContext.coerceJavaArgsToJavaScript(args);
+        return quackContext.coerceJavaScriptToJava(null, quackContext.callProperty(pointer, property, args));
     }
 
     @Override
@@ -60,17 +60,17 @@ public class JavaScriptObject implements DuktapeObject {
                 return get(number.intValue());
         }
 
-        return duktape.getKeyObject(pointer, key);
+        return quackContext.getKeyObject(pointer, key);
     }
 
     @Override
     public boolean set(String key, Object value) {
-        return duktape.setKeyString(pointer, key, value);
+        return quackContext.setKeyString(pointer, key, value);
     }
 
     @Override
     public boolean set(int index, Object value) {
-        return duktape.setKeyInteger(pointer, index, value);
+        return quackContext.setKeyInteger(pointer, index, value);
     }
 
     @Override
@@ -86,7 +86,7 @@ public class JavaScriptObject implements DuktapeObject {
             }
         }
 
-        return duktape.setKeyObject(pointer, key, value);
+        return quackContext.setKeyObject(pointer, key, value);
     }
 
     @Override
@@ -99,27 +99,27 @@ public class JavaScriptObject implements DuktapeObject {
 
     public InvocationHandler createInvocationHandler() {
         InvocationHandler handler = (proxy, method, args) -> {
-            Method interfaceMethod = Duktape.getInterfaceMethod(method);
-            DuktapeMethodCoercion methodCoercion = duktape.JavaToJavascriptMethodCoercions.get(interfaceMethod);
+            Method interfaceMethod = QuackContext.getInterfaceMethod(method);
+            QuackMethodCoercion methodCoercion = quackContext.JavaToJavascriptMethodCoercions.get(interfaceMethod);
             if (methodCoercion != null)
                 return methodCoercion.invoke(interfaceMethod, this, args);
 
             String methodName = method.getName();
-            DuktapeMethodName annotation = method.getAnnotation(DuktapeMethodName.class);
+            QuackMethodName annotation = method.getAnnotation(QuackMethodName.class);
             if (annotation != null)
                 methodName = annotation.name();
 
             if (args != null) {
                 Class[] types = method.getParameterTypes();
                 for (int i = 0; i < Math.min(args.length, types.length); i++) {
-                    args[i] = duktape.coerceJavaToJavaScript(types[i], args[i]);
+                    args[i] = quackContext.coerceJavaToJavaScript(types[i], args[i]);
                 }
             }
 
-            return duktape.coerceJavaScriptToJava(method.getReturnType(), JavaScriptObject.this.callProperty(methodName, args));
+            return quackContext.coerceJavaScriptToJava(method.getReturnType(), JavaScriptObject.this.callProperty(methodName, args));
         };
 
-        return duktape.getWrappedInvocationHandler(this, handler);
+        return quackContext.getWrappedInvocationHandler(this, handler);
     }
 
     public <T> T proxyInterface(Class<T> clazz, Class... more) {
@@ -134,6 +134,6 @@ public class JavaScriptObject implements DuktapeObject {
     @Override
     protected void finalize() throws Throwable {
         super.finalize();
-        duktape.finalizeJavaScriptObject(pointer);
+        quackContext.finalizeJavaScriptObject(pointer);
     }
 }

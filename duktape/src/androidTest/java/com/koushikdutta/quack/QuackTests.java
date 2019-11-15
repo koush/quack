@@ -1,4 +1,4 @@
-package com.squareup.duktape;
+package com.koushikdutta.quack;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
@@ -15,12 +15,12 @@ import java.util.regex.Pattern;
 import org.junit.Assert;
 import org.junit.Test;
 
-public class DuktapeTests {
+public class QuackTests {
     private static boolean useQuickJS = true;
     static {
         try {
             // for non-android jvm
-            System.load(new File("duktape-jni/build/lib/main/debug/libduktape-jni.dylib").getAbsolutePath());
+            System.load(new File("quack.jni/build/lib/main/debug/libquack.jni.dylib").getAbsolutePath());
         }
         catch (UnsatisfiedLinkError e) {
         }
@@ -29,35 +29,35 @@ public class DuktapeTests {
     // takes a long time. Duktape does not pass due to a const limit. quickjs works.
     // @Test
     public void testOctane() throws IOException {
-        Duktape duktape = Duktape.create(false);
-        File files[] = new File("/Volumes/Dev/Scrypted/duktape-android/tests/src/main/assets/octane").listFiles();
+        QuackContext quack = QuackContext.create(false);
+        File files[] = new File("/Volumes/Dev/Scrypted/quack.android/tests/src/main/assets/octane").listFiles();
         Arrays.sort(files, (a, b) -> {
             return a.getAbsolutePath().compareTo(b.getAbsolutePath());            
         });
         for (File file: files) {
             String script = StreamUtility.readFile(file);
-            duktape.evaluate(script, file.getAbsolutePath());
+            quack.evaluate(script, file.getAbsolutePath());
         }
-        String script = StreamUtility.readFile("/Volumes/Dev/Scrypted/duktape-android/tests/src/main/assets/octane.js");
-        duktape.evaluate(script);
-        String ret = duktape.evaluateForJavaScriptObject("getResults").call().toString();
+        String script = StreamUtility.readFile("/Volumes/Dev/Scrypted/quack.android/tests/src/main/assets/octane.js");
+        quack.evaluate(script);
+        String ret = quack.evaluateForJavaScriptObject("getResults").call().toString();
         System.out.println(ret);
-        duktape.close();
+        quack.close();
     }
 
     @Test
     public void testQuickJSExceptionWithTemplateArgs() {
-        Duktape duktape = Duktape.create(true);
-        duktape.evaluate("(function(){function tcp(str) {return `_${str}._tcp`;}})", "script.js");
-        duktape.close();
+        QuackContext quack = QuackContext.create(true);
+        quack.evaluate("(function(){function tcp(str) {return `_${str}._tcp`;}})", "script.js");
+        quack.close();
     }
 
     public class Console {
-        Duktape duktape;
+        QuackContext quack;
         PrintStream out;
         PrintStream err;
-        public Console(Duktape duktape, PrintStream out, PrintStream err) {
-            this.duktape = duktape;
+        public Console(QuackContext quack, PrintStream out, PrintStream err) {
+            this.quack = quack;
             this.out = out;
             this.err = err;
         }
@@ -90,7 +90,7 @@ public class DuktapeTests {
             err.println(getLog(objects));
         }
 
-        @DuktapeMethodName(name = "assert")
+        @QuackMethodName(name = "assert")
         public void assert_(Object... objects) {
             err.println(getLog(objects));
         }
@@ -103,25 +103,25 @@ public class DuktapeTests {
 
     @Test
     public void testGlobal() {
-        Duktape duktape = Duktape.create(true);
-        duktape.setGlobalProperty("hello", "world");
-        duktape.setGlobalProperty("thing", new Object());
-        duktape.close();
+        QuackContext quack = QuackContext.create(true);
+        quack.setGlobalProperty("hello", "world");
+        quack.setGlobalProperty("thing", new Object());
+        quack.close();
     }
 
     @Test
     public void testConsole() {
-        Duktape duktape = Duktape.create(useQuickJS);
-        duktape.setGlobalProperty("console", new Console(duktape, System.out, System.err));
-        duktape.evaluate("console.log('hello.');");
-        duktape.close();
+        QuackContext quack = QuackContext.create(useQuickJS);
+        quack.setGlobalProperty("console", new Console(quack, System.out, System.err));
+        quack.evaluate("console.log('hello.');");
+        quack.close();
     }
 
     @Test
     public void testRoundtrip() {
-        Duktape duktape = Duktape.create(false);
+        QuackContext quack = QuackContext.create(false);
         String script = "function(ret) { return ret; }";
-        JavaScriptObject func = duktape.compileFunction(script, "?");
+        JavaScriptObject func = quack.compileFunction(script, "?");
 
         // should all come back as numbers.
         List<Object> values = Arrays.asList(new Float(0), new Double(0), 0f, 0d);
@@ -147,7 +147,7 @@ public class DuktapeTests {
 
         // longs must be strings, since it loses precision in doubles.
         assertTrue(func.call(0L) instanceof String);
-        duktape.close();
+        quack.close();
     }
 
     interface Callback {
@@ -159,14 +159,14 @@ public class DuktapeTests {
         ResultHolder<Boolean> resultHolder = new ResultHolder<>();
         Callback cb = () -> resultHolder.result = true;
 
-        Duktape duktape = Duktape.create(useQuickJS);
+        QuackContext quack = QuackContext.create(useQuickJS);
         String script = "function(cb) { cb.callback() }";
-        JavaScriptObject func = duktape.compileFunction(script, "?");
+        JavaScriptObject func = quack.compileFunction(script, "?");
 
         func.call(cb);
 
         assertTrue(resultHolder.result);
-        duktape.close();
+        quack.close();
     }
 
     @Test
@@ -174,14 +174,14 @@ public class DuktapeTests {
         ResultHolder<Boolean> resultHolder = new ResultHolder<>();
         Callback cb = () -> resultHolder.result = true;
 
-        Duktape duktape = Duktape.create(useQuickJS);
+        QuackContext quack = QuackContext.create(useQuickJS);
         String script = "function(cb) { cb() }";
-        JavaScriptObject func = duktape.compileFunction(script, "?");
+        JavaScriptObject func = quack.compileFunction(script, "?");
 
-        func.call(duktape.coerceJavaToJavaScript(Callback.class, cb));
+        func.call(quack.coerceJavaToJavaScript(Callback.class, cb));
 
         assertTrue(resultHolder.result);
-        duktape.close();
+        quack.close();
     }
     
 
@@ -191,7 +191,7 @@ public class DuktapeTests {
 
     @Test
     public void testInterfaceReturn() {
-        Duktape duktape = Duktape.create(useQuickJS);
+        QuackContext quack = QuackContext.create(useQuickJS);
         String script = "function() {" +
                 "function RoundtripCallback() {" +
                 "}" +
@@ -200,15 +200,15 @@ public class DuktapeTests {
                 "};" +
                 "return new RoundtripCallback();" +
                 "}";
-        JavaScriptObject func = duktape.compileFunction(script, "?");
+        JavaScriptObject func = quack.compileFunction(script, "?");
         RoundtripCallback cb = ((JavaScriptObject)func.call()).proxyInterface(RoundtripCallback.class);
 
-        duktape.close();
+        quack.close();
     }
 
     @Test
     public void testInterface() {
-        Duktape duktape = Duktape.create(useQuickJS);
+        QuackContext quack = QuackContext.create(useQuickJS);
         String script = "function() {" +
                 "function RoundtripCallback() {" +
                 "}" +
@@ -217,7 +217,7 @@ public class DuktapeTests {
                 "};" +
                 "return new RoundtripCallback();" +
                 "}";
-        JavaScriptObject func = duktape.compileFunction(script, "?");
+        JavaScriptObject func = quack.compileFunction(script, "?");
         RoundtripCallback cb = ((JavaScriptObject)func.call()).proxyInterface(RoundtripCallback.class);
 
         // should all come back as doubles.
@@ -232,7 +232,7 @@ public class DuktapeTests {
             Object ret = cb.callback(value);
             assertTrue(ret instanceof String);
         }
-        duktape.close();
+        quack.close();
     }
 
     interface InterfaceCallback {
@@ -244,7 +244,7 @@ public class DuktapeTests {
         ResultHolder<Boolean> resultHolder = new ResultHolder<>();
         Callback cb = () -> resultHolder.result = true;
 
-        Duktape duktape = Duktape.create(useQuickJS);
+        QuackContext quack = QuackContext.create(useQuickJS);
         String script = "function() {" +
                 "function RoundtripCallback() {" +
                 "}" +
@@ -253,12 +253,12 @@ public class DuktapeTests {
                 "};" +
                 "return new RoundtripCallback();" +
                 "}";
-        JavaScriptObject func = duktape.compileFunction(script, "?");
+        JavaScriptObject func = quack.compileFunction(script, "?");
         InterfaceCallback iface = ((JavaScriptObject)func.call()).proxyInterface(InterfaceCallback.class);
         iface.callback(cb);
 
         assertTrue(resultHolder.result);
-        duktape.close();
+        quack.close();
     }
 
     interface RoundtripInterfaceCallback {
@@ -275,7 +275,7 @@ public class DuktapeTests {
             return o;
         };
 
-        Duktape duktape = Duktape.create(useQuickJS);
+        QuackContext quack = QuackContext.create(useQuickJS);
         String script = "function() {" +
                 "function RoundtripCallback() {" +
                 "}" +
@@ -284,7 +284,7 @@ public class DuktapeTests {
                 "};" +
                 "return new RoundtripCallback();" +
                 "}";
-        JavaScriptObject func = duktape.compileFunction(script, "?");
+        JavaScriptObject func = quack.compileFunction(script, "?");
         RoundtripInterfaceCallback iface = ((JavaScriptObject)func.call()).proxyInterface(RoundtripInterfaceCallback.class);
 
         // should all come back as doubles.
@@ -294,7 +294,7 @@ public class DuktapeTests {
             assertTrue(ret instanceof Double || ret instanceof Integer);
         }
         assertTrue(resultHolder.result == 5);
-        duktape.close();
+        quack.close();
     }
 
     @Test
@@ -307,7 +307,7 @@ public class DuktapeTests {
             return o;
         };
 
-        Duktape duktape = Duktape.create(useQuickJS);
+        QuackContext quack = QuackContext.create(useQuickJS);
         String script = "function() {" +
                 "function RoundtripCallback() {" +
                 "}" +
@@ -316,7 +316,7 @@ public class DuktapeTests {
                 "};" +
                 "return new RoundtripCallback();" +
                 "}";
-        JavaScriptObject func = duktape.compileFunction(script, "?");
+        JavaScriptObject func = quack.compileFunction(script, "?");
         for (int i = 0; i < 100; i++) {
             RoundtripInterfaceCallback iface = ((JavaScriptObject)func.call()).proxyInterface(RoundtripInterfaceCallback.class);
 
@@ -328,7 +328,7 @@ public class DuktapeTests {
             }
             System.gc();
         }
-        duktape.close();
+        quack.close();
     }
 
     enum Foo {
@@ -338,18 +338,18 @@ public class DuktapeTests {
 
     @Test
     public void testEnumRoundtrip() {
-        Duktape duktape = Duktape.create(useQuickJS);
+        QuackContext quack = QuackContext.create(useQuickJS);
         String script = "function(ret) { return ret; }";
-        JavaScriptObject func = duktape.compileFunction(script, "?");
+        JavaScriptObject func = quack.compileFunction(script, "?");
 
         // should all come back as strings.
         List<Object> values = Arrays.asList(Foo.values());
         for (Object value: values) {
             Object ret = func.call(value);
             assertTrue(ret instanceof String);
-            assertTrue(duktape.coerceJavaScriptToJava(Foo.class, ret) instanceof Foo);
+            assertTrue(quack.coerceJavaScriptToJava(Foo.class, ret) instanceof Foo);
         }
-        duktape.close();
+        quack.close();
     }
 
     interface EnumInterface {
@@ -358,7 +358,7 @@ public class DuktapeTests {
 
     @Test
     public void testEnumInterface() {
-        Duktape duktape = Duktape.create(useQuickJS);
+        QuackContext quack = QuackContext.create(useQuickJS);
         String script = "function() {" +
                 "function RoundtripCallback() {" +
                 "}" +
@@ -367,7 +367,7 @@ public class DuktapeTests {
                 "};" +
                 "return new RoundtripCallback();" +
                 "}";
-        JavaScriptObject func = duktape.compileFunction(script, "?");
+        JavaScriptObject func = quack.compileFunction(script, "?");
         EnumInterface cb = ((JavaScriptObject)func.call()).proxyInterface(EnumInterface.class);
 
         // should all come back as Foos.
@@ -376,7 +376,7 @@ public class DuktapeTests {
             Object ret = cb.callback(value);
             assertNotNull(ret);
         }
-        duktape.close();
+        quack.close();
     }
 
     interface RoundtripEnumInterfaceCallback {
@@ -393,7 +393,7 @@ public class DuktapeTests {
             return o;
         };
 
-        Duktape duktape = Duktape.create(useQuickJS);
+        QuackContext quack = QuackContext.create(useQuickJS);
         String script = "function() {" +
                 "function RoundtripCallback() {" +
                 "}" +
@@ -402,7 +402,7 @@ public class DuktapeTests {
                 "};" +
                 "return new RoundtripCallback();" +
                 "}";
-        JavaScriptObject func = duktape.compileFunction(script, "?");
+        JavaScriptObject func = quack.compileFunction(script, "?");
         RoundtripEnumInterfaceCallback iface = ((JavaScriptObject)func.call()).proxyInterface(RoundtripEnumInterfaceCallback.class);
 
         // should all come back as Foos.
@@ -412,15 +412,15 @@ public class DuktapeTests {
             assertNotNull(ret);
         }
         assertTrue(resultHolder.result == 2);
-        duktape.close();
+        quack.close();
     }
 
     @Test
     public void testDuktapeException() {
-        Duktape duktape = Duktape.create(useQuickJS);
+        QuackContext quack = QuackContext.create(useQuickJS);
         String script = "function() {" +
                 "function func1() {" +
-                "throw new Error('duktape!')" +
+                "throw new Error('quack.')" +
                 "}" +
                 "function func2() {" +
                 "func1();" +
@@ -431,25 +431,25 @@ public class DuktapeTests {
                 "func3();" +
                 "}";
         try {
-            JavaScriptObject func = duktape.compileFunction(script, "test.js");
+            JavaScriptObject func = quack.compileFunction(script, "test.js");
             func.call();
             Assert.fail("failure expected");
         }
         catch (Exception e) {
-            Assert.assertTrue(e.getMessage().contains("duktape!"));
+            Assert.assertTrue(e.getMessage().contains("quack."));
             Assert.assertTrue(e.getStackTrace()[0].getMethodName().contains("func1"));
             Assert.assertTrue(e.getStackTrace()[1].getMethodName().contains("func2"));
             Assert.assertTrue(e.getStackTrace()[2].getMethodName().contains("func3"));
         }
-        duktape.close();
+        quack.close();
     }
 
     @Test
     public void testDuktapeException2() {
-        Duktape duktape = Duktape.create(useQuickJS);
+        QuackContext quack = QuackContext.create(useQuickJS);
         String script = "function() {\n" +
                 "function func1() {\n" +
-                "throw new Error('duktape!')\n" +
+                "throw new Error('quack.')\n" +
                 "}\n" +
                 "function func2() {\n" +
                 "func1();\n" +
@@ -460,17 +460,17 @@ public class DuktapeTests {
                 "func3();\n" +
                 "}\n";
         try {
-            JavaScriptObject func = duktape.compileFunction(script, "test.js");
+            JavaScriptObject func = quack.compileFunction(script, "test.js");
             func.call();
             Assert.fail("failure expected");
         }
         catch (Exception e) {
-            Assert.assertTrue(e.getMessage().contains("duktape!"));
+            Assert.assertTrue(e.getMessage().contains("quack."));
             Assert.assertTrue(e.getStackTrace()[0].getMethodName().contains("func1"));
             Assert.assertTrue(e.getStackTrace()[1].getMethodName().contains("func2"));
             Assert.assertTrue(e.getStackTrace()[2].getMethodName().contains("func3"));
         }
-        duktape.close();
+        quack.close();
     }
 
     void findStack(String[] strs, String regex) {
@@ -492,7 +492,7 @@ public class DuktapeTests {
 
     @Test
     public void testDuktapeExceptionFromJava() {
-        Duktape duktape = Duktape.create(useQuickJS);
+        QuackContext quack = QuackContext.create(useQuickJS);
         String script = "function(cb) {" +
                 "function func1() {" +
                 "cb.callback();" +
@@ -513,23 +513,23 @@ public class DuktapeTests {
                 }
             };
 
-            JavaScriptObject func = duktape.compileFunction(script, "?");
+            JavaScriptObject func = quack.compileFunction(script, "?");
             func.call(cb);
             Assert.fail("failure expected");
         }
         catch (Exception e) {
             Assert.assertTrue(e.getMessage().contains("java!"));
-            findStack(e, "callback.*?DuktapeTests");
+            findStack(e, "callback.*?QuackTests");
             findStack(e, "func1");
             findStack(e, "func2");
             findStack(e, "func3");
         }
-        duktape.close();
+        quack.close();
     }
 
     @Test
     public void testDuktapeExceptionMessageFromJava() {
-        Duktape duktape = Duktape.create(useQuickJS);
+        QuackContext quack = QuackContext.create(useQuickJS);
         String script = "function(cb, cb2) {" +
                 "function func1() {" +
                 "try {" +
@@ -564,16 +564,16 @@ public class DuktapeTests {
             }
         };
 
-        JavaScriptObject func = duktape.compileFunction(script, "?");
+        JavaScriptObject func = quack.compileFunction(script, "?");
         func.call(cb, cb2);
 
         assertTrue(resultHolder.result.contains("java.lang.IllegalArgumentException: java!"));
-        duktape.close();
+        quack.close();
     }
 
     @Test
     public void testJavaStackInJavaScript() {
-        Duktape duktape = Duktape.create(useQuickJS);
+        QuackContext quack = QuackContext.create(useQuickJS);
         String script = "function(cb) {" +
                 "function func1() {" +
                 "cb.callback();" +
@@ -598,17 +598,17 @@ public class DuktapeTests {
             }
         };
 
-        JavaScriptObject func = duktape.compileFunction(script, "?");
+        JavaScriptObject func = quack.compileFunction(script, "?");
         String ret = func.call(cb).toString();
 
         String splits[] = ret.split("\n");
 
         Assert.assertTrue(ret.contains("java!"));
-        findStack(splits, "callback.*?DuktapeTests");
+        findStack(splits, "callback.*?QuackTests");
         findStack(splits, "func1");
         findStack(splits, "func2");
         findStack(splits, "func3");
-        duktape.close();
+        quack.close();
     }
 
     interface MarshallCallback {
@@ -617,7 +617,7 @@ public class DuktapeTests {
 
     @Test
     public void testJavaProxyInDuktapeThreadCrash() {
-        Duktape duktape = Duktape.create(false);
+        QuackContext quack = QuackContext.create(false);
         String script = "function(cb, o, B, S, I, L, F, D, b, s, i, l, f, d, str) {\n" +
                 "function yielder() {\n" +
                 "\tcb.callback(o, B, S, I, L, F, D, b, s, i, l, f, d, str);\n" +
@@ -650,18 +650,18 @@ public class DuktapeTests {
                 }
             };
 
-            JavaScriptObject func = duktape.compileFunction(script, "?");
+            JavaScriptObject func = quack.compileFunction(script, "?");
             func.call(cb, o, (Boolean)true, (Short)(short)2, (Integer)2, (Long)2L, (Float)2f, (Double)2d, true, (short)2, 2, 2L, 2f, 2d, "test");
         }
         catch (Exception e) {
             Assert.assertTrue(e.getMessage().contains("java!"));
         }
-        duktape.close();
+        quack.close();
     }
 
     @Test
     public void testJson() {
-        Duktape duktape = Duktape.create(useQuickJS);
+        QuackContext quack = QuackContext.create(useQuickJS);
         String script = "function() {" +
                 "function RoundtripCallback() {" +
                 "}" +
@@ -670,18 +670,18 @@ public class DuktapeTests {
                 "};" +
                 "return new RoundtripCallback();" +
                 "}";
-        JavaScriptObject func = duktape.compileFunction(script, "?");
+        JavaScriptObject func = quack.compileFunction(script, "?");
         RoundtripCallback cb = ((JavaScriptObject)func.call()).proxyInterface(RoundtripCallback.class);
 
-        JavaScriptObject ret = (JavaScriptObject)cb.callback(new DuktapeJsonObject("{\"meaningOfLife\":42}"));
+        JavaScriptObject ret = (JavaScriptObject)cb.callback(new QuackJsonObject("{\"meaningOfLife\":42}"));
         Object property = ret.get("meaningOfLife");
         assertTrue(property.equals(42d) || property.equals(42));
-        duktape.close();
+        quack.close();
     }
 
     @Test
     public void testBufferIn() {
-        Duktape duktape = Duktape.create(useQuickJS);
+        QuackContext quack = QuackContext.create(useQuickJS);
 
         String script = "function testBuffer(buf) {\n" +
                 "\tif (buf.constructor.name !== 'Uint8Array') throw new Error('unexpected type ' + buf.constructor.name);\n" +
@@ -698,13 +698,13 @@ public class DuktapeTests {
         for (int i = 0; i < 10; i++) {
             b.put(i, (byte)i);
         }
-        assertEquals("done", duktape.compileFunction(script, "?").call(b));
+        assertEquals("done", quack.compileFunction(script, "?").call(b));
 
-        duktape.close();
+        quack.close();
     }
     @Test
     public void testBufferOut() {
-        Duktape duktape = Duktape.create(useQuickJS);
+        QuackContext quack = QuackContext.create(useQuickJS);
 
         String script = "function testBuffer(buf) {\n" +
                 "\tvar u = new Uint8Array(10);\n" +
@@ -714,20 +714,20 @@ public class DuktapeTests {
                 "\treturn u;\n" +
                 "}";
 
-        ByteBuffer b = (ByteBuffer)duktape.coerceJavaScriptToJava(ByteBuffer.class, duktape.compileFunction(script, "?").call());
+        ByteBuffer b = (ByteBuffer)quack.coerceJavaScriptToJava(ByteBuffer.class, quack.compileFunction(script, "?").call());
         for (int i = 0; i < 10; i++) {
             assertEquals(i, b.get(i));
         }
 
-        duktape.close();
+        quack.close();
     }
 
     @Test
     public void testSystemOut() {
-        Duktape duktape = Duktape.create(useQuickJS);
-        duktape.setGlobalProperty("System", System.class);
-        duktape.evaluate("System.out.println('hello world');");
-        duktape.close();
+        QuackContext quack = QuackContext.create(useQuickJS);
+        quack.setGlobalProperty("System", System.class);
+        quack.evaluate("System.out.println('hello world');");
+        quack.close();
     }
 
     public static class RandomObject {
@@ -746,11 +746,11 @@ public class DuktapeTests {
 
     @Test
     public void testNewObject() {
-        Duktape duktape = Duktape.create(useQuickJS);
-        duktape.setGlobalProperty("RandomObject", RandomObject.class);
-        RandomObject ret = duktape.evaluate("var r = new RandomObject(); RandomObject.setBar(5); r.setFoo(3); r;", RandomObject.class);
+        QuackContext quack = QuackContext.create(useQuickJS);
+        quack.setGlobalProperty("RandomObject", RandomObject.class);
+        RandomObject ret = quack.evaluate("var r = new RandomObject(); RandomObject.setBar(5); r.setFoo(3); r;", RandomObject.class);
         assertTrue(ret.foo == 3);
         assertTrue(RandomObject.bar == 5);
-        duktape.close();
+        quack.close();
     }
 }

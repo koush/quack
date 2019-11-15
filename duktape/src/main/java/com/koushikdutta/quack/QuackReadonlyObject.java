@@ -1,6 +1,6 @@
-package com.squareup.duktape;
+package com.koushikdutta.quack;
 
-public interface DuktapeReadonlyObject extends DuktapeObject {
+public interface QuackReadonlyObject extends QuackObject {
     default boolean set(String key, Object value) {
         return set((Object)key, value);
     }

@@ -1,4 +1,4 @@
-package com.squareup.duktape;
+package com.koushikdutta.quack;
 
 //import android.util.Log;
 
@@ -9,11 +9,11 @@ import java.util.ArrayList;
 import java.util.Collections;
 
 @SuppressWarnings({"unchecked", "rawtypes"})
-public class JavaMethodObject implements DuktapeMethodObject {
+public class JavaMethodObject implements QuackMethodObject {
     String target;
-    Duktape duktape;
-    public JavaMethodObject(Duktape duktape, String method) {
-        this.duktape = duktape;
+    QuackContext quackContext;
+    public JavaMethodObject(QuackContext quackContext, String method) {
+        this.quackContext = quackContext;
         this.target = method;
     }
 
@@ -46,7 +46,7 @@ public class JavaMethodObject implements DuktapeMethodObject {
     public Object callMethod(Object thiz, Object... args) {
         if (thiz == null)
             throw new UnsupportedOperationException("can not call " + target);
-        thiz = duktape.coerceJavaScriptToJava(Object.class, thiz);
+        thiz = quackContext.coerceJavaScriptToJava(Object.class, thiz);
 
         Method[] thisMethods = getMethods(thiz);
         ArrayList<Class> argTypes = new ArrayList<>();
@@ -56,12 +56,12 @@ public class JavaMethodObject implements DuktapeMethodObject {
             else
                 argTypes.add(arg.getClass());
         }
-        Method best = Duktape.javaObjectMethodCandidates.memoize(() -> {
+        Method best = QuackContext.javaObjectMethodCandidates.memoize(() -> {
             Method ret = null;
             int bestScore = Integer.MAX_VALUE;
             for (Method method: thisMethods) {
                 if (!method.getName().equals(target)) {
-                    DuktapeMethodName annotation = method.getAnnotation(DuktapeMethodName.class);
+                    QuackMethodName annotation = method.getAnnotation(QuackMethodName.class);
                     if (annotation == null || !annotation.name().equals(target))
                         continue;
                 }
@@ -75,7 +75,7 @@ public class JavaMethodObject implements DuktapeMethodObject {
                     if (paramType == argType) {
                         score -= 4;
                     }
-                    if (Duktape.isNumberClass(paramType) && Duktape.isNumberClass(argType)) {
+                    if (QuackContext.isNumberClass(paramType) && QuackContext.isNumberClass(argType)) {
                         score -= 3;
                     }
                     else if ((paramType == Long.class || paramType == long.class) && argType == String.class) {
@@ -99,8 +99,8 @@ public class JavaMethodObject implements DuktapeMethodObject {
         thiz = getThis(thiz, best);
 
         try {
-            Method interfaceMethod = Duktape.getInterfaceMethod(best);
-            DuktapeMethodCoercion methodCoercion = duktape.JavaScriptToJavaMethodCoercions.get(interfaceMethod);
+            Method interfaceMethod = QuackContext.getInterfaceMethod(best);
+            QuackMethodCoercion methodCoercion = quackContext.JavaScriptToJavaMethodCoercions.get(interfaceMethod);
             if (methodCoercion != null)
                 return methodCoercion.invoke(interfaceMethod, thiz, args);
 
@@ -111,7 +111,7 @@ public class JavaMethodObject implements DuktapeMethodObject {
             int i = 0;
             for (; i < numParameters; i++) {
                 if (i < args.length)
-                    coerced.add(duktape.coerceJavaScriptToJava(best.getParameterTypes()[i], args[i]));
+                    coerced.add(quackContext.coerceJavaScriptToJava(best.getParameterTypes()[i], args[i]));
                 else
                     coerced.add(null);
             }
@@ -119,14 +119,14 @@ public class JavaMethodObject implements DuktapeMethodObject {
                 Class varargType = best.getParameterTypes()[numParameters].getComponentType();
                 ArrayList<Object> varargs = new ArrayList<>();
                 for (; i < args.length; i++) {
-                    varargs.add(duktape.coerceJavaScriptToJava(varargType, args[i]));
+                    varargs.add(quackContext.coerceJavaScriptToJava(varargType, args[i]));
                 }
                 coerced.add(toArray(varargType, varargs));
             }
             else if (i < args.length) {
-//                Log.w("Duktape", "dropping javascript to java arguments on the floor: " + (args.length - i));
+                System.err.println("dropping javascript to java arguments on the floor: " + (args.length - i));
             }
-            return duktape.coerceJavaToJavaScript(best.invoke(thiz, coerced.toArray()));
+            return quackContext.coerceJavaToJavaScript(best.invoke(thiz, coerced.toArray()));
         }
         catch (IllegalAccessException e) {
             throw new IllegalArgumentException(best.toString(), e);

@@ -13,16 +13,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.squareup.duktape;
+package com.koushikdutta.quack;
 
 
-import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-public final class DuktapeException extends RuntimeException {
+public final class QuackException extends RuntimeException {
   /**
    *
    */
@@ -37,16 +36,16 @@ public final class DuktapeException extends RuntimeException {
   /** Java StackTraceElements require a class name.  We don't have one in JS, so use this. */
   private final static String STACK_TRACE_CLASS_NAME = "JavaScript";
 
-  public DuktapeException(String detailMessage) {
+  public QuackException(String detailMessage) {
     super(getErrorMessage(detailMessage));
-    addDuktapeStack(this, detailMessage);
+    addJSStack(this, detailMessage);
   }
 
   /**
    * Parses {@code StackTraceElement}s from {@code detailMessage} and adds them to the proper place
    * in {@code throwable}'s stack trace.  Note: this method is also called from native code.
    */
-  static void addDuktapeStack(Throwable throwable, String detailMessage) {
+  static void addJSStack(Throwable throwable, String detailMessage) {
     String[] lines = detailMessage.split("\n", -1);
     if (lines.length <= 1) {
       return;

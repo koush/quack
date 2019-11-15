@@ -1,9 +1,9 @@
-package com.squareup.duktape;
+package com.koushikdutta.quack;
 
 /**
  * Coerce a value passing through Duktape to the desired output class.
  */
 @SuppressWarnings("rawtypes")
-public interface DuktapeCoercion<T, F> {
+public interface QuackCoercion<T, F> {
   T coerce(Class clazz, F o);
 }

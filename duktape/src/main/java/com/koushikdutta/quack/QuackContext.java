@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.squareup.duktape;
+package com.koushikdutta.quack;
 
 import java.io.Closeable;
 import java.lang.reflect.Array;
@@ -32,16 +32,16 @@ import java.util.logging.Logger;
 
 /** A simple EMCAScript (Javascript) interpreter. */
 @SuppressWarnings({"unchecked", "rawtypes"})
-public final class Duktape implements Closeable {
-  private final Map<Class, DuktapeCoercion> JavaScriptToJavaCoercions = new LinkedHashMap<>();
-  private final Map<Class, DuktapeCoercion> JavaToJavascriptCoercions = new LinkedHashMap<>();
-  final Map<Method, DuktapeMethodCoercion> JavaScriptToJavaMethodCoercions = new LinkedHashMap<>();
-  final Map<Method, DuktapeMethodCoercion> JavaToJavascriptMethodCoercions = new LinkedHashMap<>();
-  private DuktapeInvocationHandlerWrapper invocationHandlerWrapper;
+public final class QuackContext implements Closeable {
+  private final Map<Class, QuackCoercion> JavaScriptToJavaCoercions = new LinkedHashMap<>();
+  private final Map<Class, QuackCoercion> JavaToJavascriptCoercions = new LinkedHashMap<>();
+  final Map<Method, QuackMethodCoercion> JavaScriptToJavaMethodCoercions = new LinkedHashMap<>();
+  final Map<Method, QuackMethodCoercion> JavaToJavascriptMethodCoercions = new LinkedHashMap<>();
+  private QuackInvocationHandlerWrapper invocationHandlerWrapper;
 
   static {
     try {
-      System.loadLibrary("duktape");
+      System.loadLibrary("quack");
     }
     catch (UnsatisfiedLinkError err) {
     }
@@ -56,7 +56,7 @@ public final class Duktape implements Closeable {
             || c == long.class || c == Long.class || c == float.class || c == Float.class || c == double.class || c == Double.class;
   }
 
-  public void setInvocationHandlerWrapper(DuktapeInvocationHandlerWrapper invocationHandlerWrapper) {
+  public void setInvocationHandlerWrapper(QuackInvocationHandlerWrapper invocationHandlerWrapper) {
     this.invocationHandlerWrapper = invocationHandlerWrapper;
   }
 
@@ -88,7 +88,7 @@ public final class Duktape implements Closeable {
    * Register a function that coerces values JavaScript values into an object of type
    * {@code clazz} before being passed along to Java.
    */
-  public synchronized <T> void putJavaScriptToJavaCoercion(Class<T> clazz, DuktapeCoercion<T, Object> coercion) {
+  public synchronized <T> void putJavaScriptToJavaCoercion(Class<T> clazz, QuackCoercion<T, Object> coercion) {
     JavaScriptToJavaCoercions.put(clazz, coercion);
   }
 
@@ -99,7 +99,7 @@ public final class Duktape implements Closeable {
    * @param coercion
    * @param <F>
    */
-  public synchronized <F> void putJavaToJavaScriptCoercion(Class<F> clazz, DuktapeCoercion<Object, F> coercion) {
+  public synchronized <F> void putJavaToJavaScriptCoercion(Class<F> clazz, QuackCoercion<Object, F> coercion) {
     JavaToJavascriptCoercions.put(clazz, coercion);
   }
 
@@ -140,7 +140,7 @@ public final class Duktape implements Closeable {
     if (clazz.isInterface() && clazz.getMethods().length == 1) {
       // automatically coerce functional interfaces into functions
       Method method = clazz.getMethods()[0];
-      return new DuktapeMethodObject() {
+      return new QuackMethodObject() {
         @Override
         public Object callMethod(Object thiz, Object... args) {
           try {
@@ -168,8 +168,8 @@ public final class Duktape implements Closeable {
   public Object coerceJavaScriptToJava(Class<?> clazz, Object o) {
     if (o == null)
       return null;
-    while (o instanceof DuktapeJavaObject) {
-      Object coerced = ((DuktapeJavaObject)o).getObject(clazz);;
+    while (o instanceof QuackJavaObject) {
+      Object coerced = ((QuackJavaObject)o).getObject(clazz);;
       if (o == coerced)
         break;
       o = coerced;
@@ -319,12 +319,12 @@ public final class Duktape implements Closeable {
     }, method);
   }
 
-  public synchronized void putJavaScriptToJavaMethodCoercion(Method method, DuktapeMethodCoercion coercion) {
+  public synchronized void putJavaScriptToJavaMethodCoercion(Method method, QuackMethodCoercion coercion) {
     JavaScriptToJavaMethodCoercions.put(method, coercion);
     interfaceMethods.clear();
   }
 
-  public synchronized void putJavaToJavaScriptMethodCoercion(Method method, DuktapeMethodCoercion coercion) {
+  public synchronized void putJavaToJavaScriptMethodCoercion(Method method, QuackMethodCoercion coercion) {
     JavaToJavascriptMethodCoercions.put(method, coercion);
     interfaceMethods.clear();
   }
@@ -345,7 +345,7 @@ public final class Duktape implements Closeable {
   }
 
   private static <T> T createMethodInterceptProxy(Class<T> clazz) {
-    return (T)Proxy.newProxyInstance(clazz.getClassLoader(), new Class[] { clazz }, Duktape::throwInvokedMethod);
+    return (T)Proxy.newProxyInstance(clazz.getClassLoader(), new Class[] { clazz }, QuackContext::throwInvokedMethod);
   }
 
   private static <T> Method invokeMethodReferenceProxy(Class<T> clazz, Object ref) {
@@ -376,14 +376,14 @@ public final class Duktape implements Closeable {
     throw new IllegalArgumentException("interface method was not called by lambda.");
   }
 
-  private static Object coerceJavaToJavaScript(Map<Class, DuktapeCoercion> coerce, Object o, Class<?> clazz) {
-    DuktapeCoercion coercion = coerce.get(clazz);
+  private static Object coerceJavaToJavaScript(Map<Class, QuackCoercion> coerce, Object o, Class<?> clazz) {
+    QuackCoercion coercion = coerce.get(clazz);
     if (coercion != null) {
       return coercion.coerce(clazz, o);
     }
 
     // check to see if there is a superclass converter (ie, Enum.class as a catch all).
-    for (Map.Entry<Class, DuktapeCoercion> check: coerce.entrySet()) {
+    for (Map.Entry<Class, QuackCoercion> check: coerce.entrySet()) {
       if (check.getKey().isAssignableFrom(clazz))
         return check.getValue().coerce(clazz, o);
     }
@@ -391,21 +391,21 @@ public final class Duktape implements Closeable {
     return null;
   }
 
-  private static Object coerceJavaScriptToJava(Map<Class, DuktapeCoercion> coerce, Object o, Class<?> clazz) {
-    DuktapeCoercion coercion = coerce.get(clazz);
+  private static Object coerceJavaScriptToJava(Map<Class, QuackCoercion> coerce, Object o, Class<?> clazz) {
+    QuackCoercion coercion = coerce.get(clazz);
     if (coercion != null) {
       return coercion.coerce(clazz, o);
     }
 
     // check to see if there exists a more specific superclass converter.
-    for (Map.Entry<Class, DuktapeCoercion> check: coerce.entrySet()) {
+    for (Map.Entry<Class, QuackCoercion> check: coerce.entrySet()) {
       if (clazz.isAssignableFrom(check.getKey())) {
         throw new AssertionError("Superclass converter not implemented.");
       }
     }
 
     // check to see if there is a subclass converter (ie, Enum.class as a catch all).
-    for (Map.Entry<Class, DuktapeCoercion> check: coerce.entrySet()) {
+    for (Map.Entry<Class, QuackCoercion> check: coerce.entrySet()) {
       if (check.getKey().isAssignableFrom(clazz))
         return check.getValue().coerce(clazz, o);
     }
@@ -417,32 +417,32 @@ public final class Duktape implements Closeable {
    * Create a new interpreter instance. Calls to this method <strong>must</strong> matched with
    * calls to {@link #close()} on the returned instance to avoid leaking native memory.
    */
-  public static Duktape create(boolean useQuickJS) {
-    Duktape duktape = new Duktape();
+  public static QuackContext create(boolean useQuickJS) {
+    QuackContext quack = new QuackContext();
     // context will hold a weak ref, so this doesn't matter if it fails.
-    long context = createContext(duktape, useQuickJS);
+    long context = createContext(quack, useQuickJS);
     if (context == 0) {
       throw new OutOfMemoryError("Cannot create Duktape instance");
     }
-    duktape.context = context;
-    return duktape;
+    quack.context = context;
+    return quack;
   }
 
-  public static Duktape create() {
+  public static QuackContext create() {
     return create(true);
   }
 
   private long context;
 
-  private Duktape() {
+  private QuackContext() {
     // coercing javascript string into an enum for java
-    JavaScriptToJavaCoercions.put(Enum.class, (DuktapeCoercion<Enum, Object>) (clazz, o) -> {
+    JavaScriptToJavaCoercions.put(Enum.class, (QuackCoercion<Enum, Object>) (clazz, o) -> {
       if (o == null)
         return null;
       return Enum.valueOf(clazz, o.toString());
     });
 
-    // coerce JavaScript Numbers. duktape supports ints and doubles natively.
+    // coerce JavaScript Numbers. quack supports ints and doubles natively.
     JavaScriptToJavaCoercions.put(Byte.class, (clazz, o) -> o instanceof Number ? ((Number)o).byteValue() : o instanceof String ? Byte.parseByte(o.toString()) : o);
     JavaScriptToJavaCoercions.put(byte.class, (clazz, o) -> o instanceof Number ? ((Number)o).byteValue() : o instanceof String ? Byte.parseByte(o.toString()) : o);
     // bytes become ints
@@ -511,7 +511,7 @@ public final class Duktape implements Closeable {
    * Evaluate {@code script} and return a result. {@code fileName} will be used in error
    * reporting.
    *
-   * @throws DuktapeException if there is an error evaluating the script.
+   * @throws QuackException if there is an error evaluating the script.
    */
   public synchronized Object evaluate(String script, String fileName) {
     if (context == 0)
@@ -528,7 +528,7 @@ public final class Duktape implements Closeable {
   /**
    * Evaluate {@code script} and return a result.
    *
-   * @throws DuktapeException if there is an error evaluating the script.
+   * @throws QuackException if there is an error evaluating the script.
    */
   public synchronized Object evaluate(String script) {
     return evaluate(script, "?");
@@ -557,7 +557,7 @@ public final class Duktape implements Closeable {
   /**
    * Compile a JavaScript function and return of JavaScriptObject as the resulting function.
    *
-   * @throws DuktapeException if there is an error evaluating the script.
+   * @throws QuackException if there is an error evaluating the script.
    */
   public synchronized JavaScriptObject compileFunction(String script, String fileName) {
     return compileFunction(context, script, fileName);
@@ -735,30 +735,30 @@ public final class Duktape implements Closeable {
     return getHeapSize(context);
   }
 
-  private Object duktapeGet(DuktapeObject duktapeObject, Object key) {
-    return duktapeObject.get(key);
+  private Object quackGet(QuackObject quackObject, Object key) {
+    return quackObject.get(key);
   }
 
-  private boolean duktapeHas(DuktapeObject duktapeObject, Object key) {
-    return duktapeObject.has(key);
+  private boolean quackHas(QuackObject quackObject, Object key) {
+    return quackObject.has(key);
   }
 
-  private boolean duktapeSet(DuktapeObject duktapeObject, Object key, Object value) {
-    return duktapeObject.set(key, value);
+  private boolean quackSet(QuackObject quackObject, Object key, Object value) {
+    return quackObject.set(key, value);
   }
 
   private Object[] empty = new Object[0];
-  private Object duktapeApply(DuktapeObject duktapeObject, Object thiz, Object... args) {
-    return duktapeObject.callMethod(thiz, args == null ? empty : args);
+  private Object quackApply(QuackObject quackObject, Object thiz, Object... args) {
+    return quackObject.callMethod(thiz, args == null ? empty : args);
   }
   
-  private Object duktapeConstruct(DuktapeObject duktapeObject, Object... args) {
-    return duktapeObject.construct(args == null ? empty : args);
+  private Object quackConstruct(QuackObject quackObject, Object... args) {
+    return quackObject.construct(args == null ? empty : args);
   }
 
   private static native long getHeapSize(long context);
 
-  private static native long createContext(Duktape duktape, boolean useQuickJS);
+  private static native long createContext(QuackContext quackContext, boolean useQuickJS);
   private static native void destroyContext(long context);
   private static native Object evaluate(long context, String sourceCode, String fileName);
   private static native JavaScriptObject compileFunction(long context, String script, String fileName);
