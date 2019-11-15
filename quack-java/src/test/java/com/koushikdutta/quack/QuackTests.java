@@ -20,7 +20,7 @@ public class QuackTests {
     static {
         // for non-android jvm
         try {
-            System.load(new File("quack-jni/build/lib/main/debug/libquack.jni-dylib").getCanonicalPath());
+            System.load(new File("quack-jni/build/lib/main/debug/libquack-jni.dylib").getCanonicalPath());
         }
         catch (IOException e) {
         }

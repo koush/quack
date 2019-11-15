@@ -15,7 +15,7 @@
         {
             "label": "build-jni",
             "type": "shell",
-            "command": "gradle duktape-jni:build",
+            "command": "gradle quack-jni:build",
             "group": {
                 "kind": "build",
                 "isDefault": true
