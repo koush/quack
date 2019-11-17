@@ -138,6 +138,11 @@ QuickJSContext::QuickJSContext(JavaVM* javaVM, jobject javaQuack):
     // ByteBuffer
     byteBufferClass = findClass(env, "java/nio/ByteBuffer");
     byteBufferAllocateDirect = env->GetStaticMethodID(byteBufferClass, "allocateDirect", "(I)Ljava/nio/ByteBuffer;");
+    auto bufferClass = env->FindClass("java/nio/ByteBuffer");
+    byteBufferGetPosition = env->GetMethodID(bufferClass, "position", "()I");
+    byteBufferGetLimit = env->GetMethodID(bufferClass, "limit", "()I");
+    byteBufferSetPosition = env->GetMethodID(byteBufferClass, "position", "(I)Ljava/nio/Buffer;");
+    env->DeleteLocalRef(bufferClass);
 
     // Quack
     quackClass = findClass(env, "com/koushikdutta/quack/QuackContext");
@@ -273,9 +278,15 @@ JSValue QuickJSContext::toObject(JNIEnv *env, jobject value) {
         return toString(env, reinterpret_cast<jstring>(value));
     else if (env->IsAssignableFrom(clazz, byteBufferClass)) {
         jlong capacity = env->GetDirectBufferCapacity(value);
-        auto buffer = hold(JS_NewArrayBufferCopy(ctx, reinterpret_cast<uint8_t *>(env->GetDirectBufferAddress(value)), (size_t)capacity));
-        JSValue args[] = { (JSValue)buffer };
-        return JS_CallConstructor(ctx, uint8ArrayConstructor, 1, args);
+        if (capacity >= 0) {
+            int position = env->CallIntMethod(value, byteBufferGetPosition);
+            int limit = env->CallIntMethod(value, byteBufferGetLimit);
+            auto buffer = hold(JS_NewArrayBufferCopy(ctx,
+                reinterpret_cast<uint8_t *>(env->GetDirectBufferAddress(value))  + position,
+                (size_t)(limit - position)));
+            JSValue args[] = { (JSValue)buffer };
+            return JS_CallConstructor(ctx, uint8ArrayConstructor, 1, args);
+        }
     }
     else if (env->IsAssignableFrom(clazz, quackjsonObjectClass)) {
         jstring json = (jstring)env->GetObjectField(value, quackJsonField);
@@ -438,6 +449,12 @@ void QuickJSContext::setGlobalProperty(JNIEnv *env, jobject property, jobject va
     checkQuickJSErrorAndThrow(env, setKeyInternal(env, global, property, value));
 }
 
+static void freeValues(JSContext *ctx, std::vector<JSValue> &valueArgs) {
+    for (JSValue & valueArg : valueArgs) {
+        JS_FreeValue(ctx, valueArg);
+    }
+}
+
 jobject QuickJSContext::callInternal(JNIEnv *env, JSValue func, JSValue thiz, jobjectArray args) {
     jsize length = 0;
     std::vector<JSValue> valueArgs;
@@ -447,18 +464,19 @@ jobject QuickJSContext::callInternal(JNIEnv *env, JSValue func, JSValue thiz, jo
             for (int i = 0; i < length; i++) {
                 const auto arg = LocalRefHolder(env, env->GetObjectArrayElement(args, i));
                 JSValue argValue = toObject(env, arg);
-                /// is it possible to fail during marshalling? would be catastrophic.
-                if (JS_IsException(argValue))
-                    assert(false);
                 valueArgs.push_back(argValue);
+                /// is it possible to fail during marshalling? would be catastrophic.
+                if (JS_IsException(argValue)) {
+                    rethrowQuickJSErrorToJava(env, argValue);
+                    freeValues(ctx, valueArgs);
+                    return nullptr;
+                }
             }
         }
     }
 
     auto ret = hold(JS_Call(ctx, func, thiz, length, &valueArgs.front()));
-    for (JSValue & valueArg : valueArgs) {
-        JS_FreeValue(ctx, valueArg);
-    }
+    freeValues(ctx, valueArgs);
 
     return toObjectCheckQuickJSError(env, ret);
 }

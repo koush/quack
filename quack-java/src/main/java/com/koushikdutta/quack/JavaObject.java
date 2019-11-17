@@ -1,12 +1,6 @@
 package com.koushikdutta.quack;
 
-import java.lang.reflect.Array;
-import java.lang.reflect.Constructor;
-import java.lang.reflect.Field;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
-import java.lang.reflect.Modifier;
-import java.lang.reflect.Proxy;
+import java.lang.reflect.*;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -22,6 +16,7 @@ public final class JavaObject implements QuackJavaObject {
         this.quackContext = quackContext;
         this.target = target;
     }
+
     @Override
     public Object getObject(Class clazz) {
         return target;
@@ -276,6 +271,15 @@ public final class JavaObject implements QuackJavaObject {
 
         Class clazz = (Class)target;
         Constructor[] constructors = clazz.getConstructors();
+        if (constructors.length == 0) {
+            try {
+                return clazz.newInstance();
+            }
+            catch (Exception e) {
+                return new IllegalArgumentException(e);
+            }
+        }
+
         ArrayList<Class> argTypes = new ArrayList<>();
         for (Object arg: args) {
             if (arg == null)

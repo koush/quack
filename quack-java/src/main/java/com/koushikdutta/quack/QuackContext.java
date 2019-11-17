@@ -16,14 +16,7 @@
 package com.koushikdutta.quack;
 
 import java.io.Closeable;
-import java.lang.reflect.Array;
-import java.lang.reflect.Constructor;
-import java.lang.reflect.Field;
-import java.lang.reflect.InvocationHandler;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
-import java.lang.reflect.Proxy;
-import java.lang.reflect.UndeclaredThrowableException;
+import java.lang.reflect.*;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -212,7 +205,9 @@ public final class QuackContext implements Closeable {
       JavaScriptObject jo = (JavaScriptObject)o;
       int length = ((Number)jo.get("length")).intValue();
       Class componentType = clazz.getComponentType();
-      Object ret = Array.newInstance(componentType, length);
+      // should be Object.class component type, because coercion
+      // can change the type
+      Object ret = Array.newInstance(Object.class, length);
       for (int i = 0; i < length; i++) {
         Array.set(ret, i, coerceJavaScriptToJava(componentType, jo.get(i)));
       }

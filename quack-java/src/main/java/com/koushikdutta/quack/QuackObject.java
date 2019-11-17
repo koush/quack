@@ -60,12 +60,10 @@ public interface QuackObject {
     /**
      * Construct this object with the expectation that it is a function. The this argument
      * is provided.
-     * @param thiz
      * @param args
      * @return
      */
     default Object construct(Object... args) {
         throw new UnsupportedOperationException();
     }
-
 }

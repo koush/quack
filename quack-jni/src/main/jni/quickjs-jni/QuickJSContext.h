@@ -182,6 +182,9 @@ public:
     jmethodID javaScriptObjectConstructor;
     jmethodID javaObjectConstructor;
     jmethodID byteBufferAllocateDirect;
+    jmethodID byteBufferGetLimit;
+    jmethodID byteBufferGetPosition;
+    jmethodID byteBufferSetPosition;
     jfieldID contextField;
     jfieldID pointerField;
     jfieldID quackJsonField;

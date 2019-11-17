@@ -11,9 +11,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.regex.Pattern;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.*;
 
 public class QuackTests {
     private static boolean useQuickJS = true;
@@ -701,7 +699,7 @@ public class QuackTests {
                 "\treturn 'done'\n" +
                 "}";
 
-        ByteBuffer b = ByteBuffer.allocate(10);
+        ByteBuffer b = ByteBuffer.allocateDirect(10);
         for (int i = 0; i < 10; i++) {
             b.put(i, (byte)i);
         }
@@ -765,5 +763,39 @@ public class QuackTests {
     public void testCoercion() {
         QuackContext quack = QuackContext.create(useQuickJS);
         quack.putJavaToJavaScriptCoercion(Foo.class, (clazz, o) -> "hello world");
+    }
+
+    @Test
+    public void testPromise() {
+        QuackContext quack = QuackContext.create();
+
+        String script = "new Promise((resolve, reject) => { resolve('hello'); });";
+        JavaScriptObject jo = quack.evaluateForJavaScriptObject(script);
+        QuackPromise promise = jo.proxyInterface(QuackPromise.class);
+
+        promise.then(new QuackPromiseReceiver(){
+            @Override
+            public void receive(Object o) {
+                System.out.println("OK");
+            }
+        });
+    }
+
+    static class Foo2 {
+        public void hello(String str) {
+            System.out.println(str);
+        }
+    }
+
+    @Test
+    public void testClassCreation() {
+        String script =
+        "var Foo = JavaClass.forName('com.koushikdutta.quack.QuackTests$Foo2');\n" +
+        "var foo = new Foo();\n" +
+        "foo.hello('hello world');\n";
+
+        QuackContext quack = QuackContext.create();
+        quack.setGlobalProperty("JavaClass", Class.class);
+        quack.evaluate(script);
     }
 }

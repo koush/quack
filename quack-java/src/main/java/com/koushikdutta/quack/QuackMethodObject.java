@@ -4,7 +4,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 
 public interface QuackMethodObject extends QuackObject {
-    @Override
     default Object get(Object key) {
         QuackMethodObject self = this;
         if ("call".equals(key)) {
