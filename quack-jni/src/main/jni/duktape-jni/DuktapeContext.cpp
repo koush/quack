@@ -813,14 +813,11 @@ jobject DuktapeContext::callProperty(JNIEnv *env, jlong object, jobject property
   return popObject2(env);
 }
 
-void DuktapeContext::setGlobalProperty(JNIEnv *env, jobject property, jobject value) {
+jobject DuktapeContext::getGlobalObject(JNIEnv *env) {
   CHECK_STACK(m_context);
 
   duk_push_global_object(m_context);
-  pushObject(env, property, false);
-  pushObject(env, value, false);
-  duk_put_prop(m_context, -3);
-  duk_pop(m_context);
+  return popObject(env);
 }
 
 jobject DuktapeContext::getKeyInteger(JNIEnv *env, jlong object, jint index) {

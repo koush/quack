@@ -70,10 +70,9 @@ Java_com_koushikdutta_quack_QuackContext_stringify(JNIEnv *env, jclass type, jlo
   return reinterpret_cast<JSContext *>(context)->stringify(env, object);
 }
 
-JNIEXPORT void JNICALL
-Java_com_koushikdutta_quack_QuackContext_setGlobalProperty(JNIEnv *env, jclass type, jlong context,
-                                                    jobject property, jobject value) {
-    return reinterpret_cast<JSContext *>(context)->setGlobalProperty(env, property, value);
+JNIEXPORT jobject JNICALL
+Java_com_koushikdutta_quack_QuackContext_getGlobalObject(JNIEnv *env, jclass type, jlong context) {
+    return reinterpret_cast<JSContext *>(context)->getGlobalObject(env);
 }
 
 JNIEXPORT void JNICALL

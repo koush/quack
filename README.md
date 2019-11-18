@@ -76,7 +76,7 @@ System.out.println('hello world');
 #### Java
 ```java
 QuackContext quack = QuackContext.create();
-quack.setGlobalProperty("System", System.class);
+quack.getGlobalObject().set("System", System.class);
 quack.evaluate(javascriptString);
 // prints "hello world"
 ```
@@ -165,7 +165,7 @@ class Foo {
 }
 
 QuackContext quack = QuackContext.create();
-quack.setGlobalProperty("Foo", Foo.class);
+quack.getGlobalObject().set("Foo", Foo.class);
 quack.evaluate(javascriptString);
 // prints "hello world"
 ```
@@ -186,7 +186,7 @@ class Foo {
 }
 
 QuackContext quack = QuackContext.create();
-quack.setGlobalProperty("JavaClass", Class.class);
+quack.getGlobalObject().set("JavaClass", Class.class);
 quack.evaluate(javascriptString);
 // prints "hello world"
 ```
@@ -253,7 +253,7 @@ System.out.println('set a breakpoint here!');
 ### Java
 ```java
 QuackContext quack = QuackContext.create();
-quack.setGlobalProperty("System", System.class);
+quack.getGlobalObject().set("System", System.class);
 quack.waitForDebugger("0.0.0.0:9091")
 // attach using VS Code
 quack.evaluate(javascriptString);

@@ -49,7 +49,7 @@ public:
   jobject call(JNIEnv* env, jlong object, jobjectArray args);
   jobject callMethod(JNIEnv *env, jlong object, jobject thiz, jobjectArray args);
   jobject callProperty(JNIEnv* env, jlong object, jobject target, jobjectArray args);
-  void setGlobalProperty(JNIEnv *env, jobject property, jobject value);
+  jobject getGlobalObject(JNIEnv *env);
   jstring stringify(JNIEnv *env, jlong object);
   void finalizeJavaScriptObject(JNIEnv *env, jlong object);
   jlong getHeapSize(JNIEnv *env);

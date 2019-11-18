@@ -444,9 +444,8 @@ jobject QuickJSContext::compile(JNIEnv* env, jstring code, jstring filename) {
     return toObjectCheckQuickJSError(env, result);
 }
 
-void QuickJSContext::setGlobalProperty(JNIEnv *env, jobject property, jobject value) {
-    const auto global = hold(JS_GetGlobalObject(ctx));
-    checkQuickJSErrorAndThrow(env, setKeyInternal(env, global, property, value));
+jobject QuickJSContext::getGlobalObject(JNIEnv *env) {
+    return toObject(env, hold(JS_GetGlobalObject(ctx)));
 }
 
 static void freeValues(JSContext *ctx, std::vector<JSValue> &valueArgs) {

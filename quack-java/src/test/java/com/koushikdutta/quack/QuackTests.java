@@ -109,15 +109,17 @@ public class QuackTests {
     @Test
     public void testGlobal() {
         QuackContext quack = QuackContext.create(true);
-        quack.setGlobalProperty("hello", "world");
-        quack.setGlobalProperty("thing", new Object());
+        JavaScriptObject global = quack.getGlobalObject();
+        global.set("hello", "world");
+        global.set("thing", new Object());
         quack.close();
     }
 
     @Test
     public void testConsole() {
         QuackContext quack = QuackContext.create(useQuickJS);
-        quack.setGlobalProperty("console", new Console(quack, System.out, System.err));
+        JavaScriptObject global = quack.getGlobalObject();
+        global.set("console", new Console(quack, System.out, System.err));
         quack.evaluate("console.log('hello.');");
         quack.close();
     }
@@ -730,7 +732,8 @@ public class QuackTests {
     @Test
     public void testSystemOut() {
         QuackContext quack = QuackContext.create(useQuickJS);
-        quack.setGlobalProperty("System", System.class);
+        JavaScriptObject global = quack.getGlobalObject();
+        global.set("System", System.class);
         quack.evaluate("System.out.println('hello world');");
         quack.close();
     }
@@ -752,7 +755,8 @@ public class QuackTests {
     @Test
     public void testNewObject() {
         QuackContext quack = QuackContext.create(useQuickJS);
-        quack.setGlobalProperty("RandomObject", RandomObject.class);
+        JavaScriptObject global = quack.getGlobalObject();
+        global.set("RandomObject", RandomObject.class);
         RandomObject ret = quack.evaluate("var r = new RandomObject(); RandomObject.setBar(5); r.setFoo(3); r;", RandomObject.class);
         assertTrue(ret.foo == 3);
         assertTrue(RandomObject.bar == 5);
@@ -790,12 +794,27 @@ public class QuackTests {
     @Test
     public void testClassCreation() {
         String script =
-        "var Foo = JavaClass.forName('com.koushikdutta.quack.QuackTests$Foo2');\n" +
-        "var foo = new Foo();\n" +
+        "var Foo2 = JavaClass.forName('com.koushikdutta.quack.QuackTests$Foo2');\n" +
+        "var foo = new Foo2();\n" +
         "foo.hello('hello world');\n";
 
         QuackContext quack = QuackContext.create();
-        quack.setGlobalProperty("JavaClass", Class.class);
+        JavaScriptObject global = quack.getGlobalObject();
+        global.set("JavaClass", Class.class);
         quack.evaluate(script);
+        quack.close();
+    }
+
+    @Test
+    public void testRegex() {
+        String test = "#foo\n" +
+        "\n" +
+        "bar\n" +
+        "#flee\n" + 
+        "poops\n" + 
+        "\n";
+
+        Pattern p = Pattern.compile("^[^#]+(.+)$", Pattern.MULTILINE);
+        System.out.println(p.matcher(test).replaceAll("https://test.com/$1"));
     }
 }

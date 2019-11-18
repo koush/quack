@@ -28,7 +28,7 @@ public:
     virtual jobject evaluate(JNIEnv *env, jstring code, jstring filename) = 0;
     virtual jobject compile(JNIEnv* env, jstring code, jstring filename) = 0;
 
-    virtual void setGlobalProperty(JNIEnv *env, jobject property, jobject value) = 0;
+    virtual jobject getGlobalObject(JNIEnv *env) = 0;
     virtual jstring stringify(JNIEnv *env, jlong object) = 0;
 
     virtual jobject getKeyString(JNIEnv* env, jlong object, jstring key) = 0;

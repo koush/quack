@@ -234,7 +234,8 @@ public final class QuackContext implements Closeable {
       }
     }
 
-
+    // coercion was a failure, and returning the input value may cause a class
+    // cast exception if the caller is expecting a specific type.
     return o;
   }
 
@@ -581,10 +582,8 @@ public final class QuackContext implements Closeable {
     close();
   }
 
-  public synchronized void setGlobalProperty(Object property, Object value) {
-    if (context == 0)
-      return;
-    setGlobalProperty(context, property, value);
+  synchronized public JavaScriptObject getGlobalObject() {
+    return getGlobalObject(context);
   }
 
   /**
@@ -793,7 +792,7 @@ public final class QuackContext implements Closeable {
   private static native Object call(long context, long object, Object... args);
   private static native Object callMethod(long context, long object, Object thiz, Object... args);
   private static native Object callProperty(long context, long object, Object property, Object... args);
-  private static native void setGlobalProperty(long context, Object property, Object value);
+  private static native JavaScriptObject getGlobalObject(long context);
   private static native String stringify(long context, long object);
   private static native void finalizeJavaScriptObject(long context, long object);
   private static native boolean hasPendingJobs(long context);

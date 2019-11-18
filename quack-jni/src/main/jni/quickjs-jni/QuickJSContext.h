@@ -121,7 +121,7 @@ public:
     jobject evaluate(JNIEnv *env, jstring code, jstring filename);
     jobject compile(JNIEnv* env, jstring code, jstring filename);
 
-    void setGlobalProperty(JNIEnv *env, jobject property, jobject value);
+    jobject getGlobalObject(JNIEnv *env);
     jstring stringify(JNIEnv *env, jlong object);
 
     jobject getKeyString(JNIEnv* env, jlong object, jstring key);
