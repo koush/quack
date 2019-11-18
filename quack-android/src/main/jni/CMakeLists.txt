@@ -20,13 +20,13 @@ file(GLOB quickjs_SRC
     "../../../../quack-jni/src/main/jni/quickjs-jni/*.h"
     "../../../../quack-jni/src/main/jni/quickjs-jni/*.c"
     "../../../../quack-jni/src/main/jni/quickjs-jni/*.cpp"
-    "../../../../quack-jni/src/main/jni/quickjs/*.h"
-    "../../../../quack-jni/src/main/jni/quickjs/quickjs.c"
-    "../../../../quack-jni/src/main/jni/quickjs/quickjs-debugger.c"
-    "../../../../quack-jni/src/main/jni/quickjs/quickjs-debugger-transport-unix.c"
-    "../../../../quack-jni/src/main/jni/quickjs/libunicode.c"
-    "../../../../quack-jni/src/main/jni/quickjs/libregexp.c"
-    "../../../../quack-jni/src/main/jni/quickjs/cutils.c"
+    "../../../../../../quickjs/*.h"
+    "../../../../../quickjs/quickjs.c"
+    "../../../../../quickjs/quickjs-debugger.c"
+    "../../../../../quickjs/quickjs-debugger-transport-unix.c"
+    "../../../../../quickjs/libunicode.c"
+    "../../../../../quickjs/libregexp.c"
+    "../../../../../quickjs/cutils.c"
 )
 
 add_library(quack SHARED ${common_SRC} ${quickjs_SRC} ${duktape_SRC})

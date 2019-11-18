@@ -3,8 +3,8 @@
 
 #include <jni.h>
 #include <list>
-#include "../quickjs/quickjs.h"
-#include "../quickjs/quickjs-debugger.h"
+#include "../../../../../../quickjs/quickjs.h"
+#include "../../../../../../quickjs/quickjs-debugger.h"
 #include "../JSContext.h"
 
 class QuickJSContext;

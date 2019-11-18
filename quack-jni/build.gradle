@@ -1,7 +1,7 @@
 apply plugin: 'cpp-library'
 
 task quickjs(type: Exec) {
-    workingDir 'src/main/jni/quickjs'
+    workingDir '../../quickjs'
     commandLine 'make'
     args ( '-j32','libquickjs.a')
 
@@ -26,7 +26,6 @@ library {
     source.from file('src/main/jni/duktape-jni')
     source.from('src/main/cpp/duktape.cpp')
 
-    source.from file('src/main/jni/quickjs')
     source.from file('src/main/jni/quickjs-jni')
 
     source.from('src/main/jni/JSContext.h')
@@ -43,6 +42,6 @@ tasks.withType(CppCompile).configureEach {
 }
 
 tasks.withType(LinkSharedLibrary).configureEach {
-    linkerArgs.add '-Lsrc/main/jni/quickjs/'
+    linkerArgs.add '-L../..//quickjs/'
     linkerArgs.add '-lquickjs'
 }
