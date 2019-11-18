@@ -804,17 +804,4 @@ public class QuackTests {
         quack.evaluate(script);
         quack.close();
     }
-
-    @Test
-    public void testRegex() {
-        String test = "#foo\n" +
-        "\n" +
-        "bar\n" +
-        "#flee\n" + 
-        "poops\n" + 
-        "\n";
-
-        Pattern p = Pattern.compile("^[^#]+(.+)$", Pattern.MULTILINE);
-        System.out.println(p.matcher(test).replaceAll("https://test.com/$1"));
-    }
 }
