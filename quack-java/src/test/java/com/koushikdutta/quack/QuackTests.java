@@ -9,6 +9,8 @@ import java.io.PrintStream;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.Semaphore;
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 
 import static org.junit.Assert.*;
@@ -706,6 +708,7 @@ public class QuackTests {
             b.put(i, (byte)i);
         }
         assertEquals("done", quack.compileFunction(script, "?").call(b));
+        assertTrue(!b.hasRemaining());
 
         quack.close();
     }
@@ -725,6 +728,31 @@ public class QuackTests {
         for (int i = 0; i < 10; i++) {
             assertEquals(i, b.get(i));
         }
+
+        quack.close();
+    }
+
+    @Test
+    public void testBufferInArray() {
+        QuackContext quack = QuackContext.create(useQuickJS);
+
+        String script = "function testBuffer(buf) {\n" +
+                "\tif (buf.constructor.name !== 'Uint8Array') throw new Error('unexpected type ' + buf.constructor.name);\n" +
+                // "\tvar u = new Uint8Array(buf);\n" +
+                "\tvar u = buf\n" +
+                "\tfor (var i = 0; i < 10; i++) {\n" +
+                "\t\tif (u[i] != i)\n" +
+                "\t\t\tthrow new Error('expected ' + i);\n" +
+                "\t}\n" +
+                "\treturn 'done'\n" +
+                "}";
+
+        ByteBuffer b = ByteBuffer.allocate(10);
+        for (int i = 0; i < 10; i++) {
+            b.put(i, (byte)i);
+        }
+        assertEquals("done", quack.compileFunction(script, "?").call(b));
+        assertTrue(!b.hasRemaining());
 
         quack.close();
     }
@@ -754,7 +782,7 @@ public class QuackTests {
 
     @Test
     public void testNewObject() {
-        QuackContext quack = QuackContext.create(useQuickJS);
+        QuackContext quack = QuackContext.create();
         JavaScriptObject global = quack.getGlobalObject();
         global.set("RandomObject", RandomObject.class);
         RandomObject ret = quack.evaluate("var r = new RandomObject(); RandomObject.setBar(5); r.setFoo(3); r;", RandomObject.class);
@@ -770,19 +798,22 @@ public class QuackTests {
     }
 
     @Test
-    public void testPromise() {
+    public void testPromise() throws InterruptedException {
         QuackContext quack = QuackContext.create();
 
         String script = "new Promise((resolve, reject) => { resolve('hello'); });";
         JavaScriptObject jo = quack.evaluateForJavaScriptObject(script);
         QuackPromise promise = jo.proxyInterface(QuackPromise.class);
 
+        Semaphore semaphore = new Semaphore(0);
         promise.then(new QuackPromiseReceiver(){
             @Override
             public void receive(Object o) {
-                System.out.println("OK");
+                semaphore.release();
             }
         });
+
+        assertTrue(semaphore.tryAcquire(500, TimeUnit.MILLISECONDS));
     }
 
     static class Foo2 {
@@ -803,5 +834,33 @@ public class QuackTests {
         global.set("JavaClass", Class.class);
         quack.evaluate(script);
         quack.close();
+    }
+
+    interface TestJS {
+        String foo();
+    }
+
+    @Test
+    public void testJavaScriptObjectCallCoercion() {
+        QuackContext quack = QuackContext.create(useQuickJS);
+        String script = "function() { return (function() { return 'HI'; }) }";
+        JavaScriptObject func = quack.compileFunction(script, "?");
+        TestJS foo = func.callCoerced(TestJS.class);
+        assertEquals(foo.foo(), "HI");
+    }
+
+    interface TestJS2 {
+        String foo1();
+        String foo2();
+    }
+
+    @Test
+    public void testJavaScriptObjectCallCoercion2() {
+        QuackContext quack = QuackContext.create(useQuickJS);
+        String script = "function() { return { foo1: function() { return 'HI'; }, foo2: function() { return 'BYE'; } } }";
+        JavaScriptObject func = quack.compileFunction(script, "?");
+        TestJS2 foo = func.callCoerced(TestJS2.class);
+        assertEquals(foo.foo1(), "HI");
+        assertEquals(foo.foo2(), "BYE");
     }
 }

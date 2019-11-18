@@ -33,20 +33,32 @@ public class JavaScriptObject implements QuackObject {
 
     @Override
     public Object call(Object... args) {
-        quackContext.coerceJavaArgsToJavaScript(args);
-        return quackContext.coerceJavaScriptToJava(null, quackContext.call(pointer, args));
+        return callCoerced(null, args);
     }
 
     @Override
     public Object callMethod(Object thiz, Object... args) {
-        quackContext.coerceJavaArgsToJavaScript(args);
-        return quackContext.coerceJavaScriptToJava(null, quackContext.callMethod(pointer, thiz, args));
+        return callMethodCoerced(null, thiz, args);
     }
 
     @Override
     public Object callProperty(Object property, Object... args) {
+        return callPropertyCoerced(null, property, args);
+    }
+
+    public <T> T callCoerced(Class<T> clazz, Object... args) {
         quackContext.coerceJavaArgsToJavaScript(args);
-        return quackContext.coerceJavaScriptToJava(null, quackContext.callProperty(pointer, property, args));
+        return (T)quackContext.coerceJavaScriptToJava(clazz, quackContext.call(pointer, args));
+    }
+
+    public <T> T callMethodCoerced(Class<T> clazz, Object thiz, Object... args) {
+        quackContext.coerceJavaArgsToJavaScript(args);
+        return (T)quackContext.coerceJavaScriptToJava(clazz, quackContext.callMethod(pointer, thiz, args));
+    }
+
+    public <T> T callPropertyCoerced(Class<T> clazz, Object property, Object... args) {
+        quackContext.coerceJavaArgsToJavaScript(args);
+        return (T)quackContext.coerceJavaScriptToJava(clazz, quackContext.callProperty(pointer, property, args));
     }
 
     @Override

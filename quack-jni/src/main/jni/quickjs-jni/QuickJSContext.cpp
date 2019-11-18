@@ -281,6 +281,9 @@ JSValue QuickJSContext::toObject(JNIEnv *env, jobject value) {
         if (capacity >= 0) {
             int position = env->CallIntMethod(value, byteBufferGetPosition);
             int limit = env->CallIntMethod(value, byteBufferGetLimit);
+            jvalue newPosition;
+            newPosition.i = limit;
+            env->CallObjectMethod(value, byteBufferSetPosition, newPosition);
             auto buffer = hold(JS_NewArrayBufferCopy(ctx,
                 reinterpret_cast<uint8_t *>(env->GetDirectBufferAddress(value))  + position,
                 (size_t)(limit - position)));

@@ -414,6 +414,7 @@ public final class QuackContext implements Closeable {
    * Create a new interpreter instance. Calls to this method <strong>must</strong> matched with
    * calls to {@link #close()} on the returned instance to avoid leaking native memory.
    */
+  private boolean useQuickJS;
   public static QuackContext create(boolean useQuickJS) {
     QuackContext quack = new QuackContext();
     // context will hold a weak ref, so this doesn't matter if it fails.
@@ -422,6 +423,7 @@ public final class QuackContext implements Closeable {
       throw new OutOfMemoryError("Cannot create Duktape instance");
     }
     quack.context = context;
+    quack.useQuickJS = useQuickJS;
     return quack;
   }
 
@@ -440,7 +442,7 @@ public final class QuackContext implements Closeable {
     });
 
     // coerce JavaScript Numbers. quack supports ints and doubles natively.
-    JavaScriptToJavaCoercions.put(Byte.class, (clazz, o) -> o instanceof Number ? ((Number)o).byteValue() : o instanceof String ? Byte.parseByte(o.toString()) : o);
+    putJavaScriptToJavaCoercion(Byte.class, (clazz, o) -> o instanceof Number ? ((Number)o).byteValue() : o instanceof String ? Byte.parseByte(o.toString()) : (Byte)o);
     JavaScriptToJavaCoercions.put(byte.class, (clazz, o) -> o instanceof Number ? ((Number)o).byteValue() : o instanceof String ? Byte.parseByte(o.toString()) : o);
     // bytes become ints
     putJavaToJavaScriptCoercion(byte.class, (clazz, o) -> o.intValue());
@@ -476,9 +478,14 @@ public final class QuackContext implements Closeable {
 
     // buffers are transferred one way
     putJavaToJavaScriptCoercion(ByteBuffer.class, (clazz, o) -> {
-      // can send as is if sending whole buffers.
-      if (o.isDirect() && o.remaining() == o.capacity())
+      // send as is to quickjs, it can handle direct buffers at any position/limit.
+      if (o.isDirect() && useQuickJS)
         return o;
+      // duktape supports reading whole buffers
+      if (o.isDirect() && o.remaining() == o.capacity()) {
+        o.position(o.limit());
+        return o;
+      }
       ByteBuffer direct = ByteBuffer.allocateDirect(o.remaining());
       direct.put(o);
       direct.flip();
