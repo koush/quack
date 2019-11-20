@@ -753,6 +753,8 @@ public final class QuackContext implements Closeable {
     jobExecutor.execute(this::runPostInvocation);
   }
   synchronized void runPostInvocation() {
+    if (context == 0)
+      return;
     finalizeJavaScriptObjects();
     runJobs(context);
   }

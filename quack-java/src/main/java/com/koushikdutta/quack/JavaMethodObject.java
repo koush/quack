@@ -124,7 +124,7 @@ public class JavaMethodObject implements QuackMethodObject {
                 coerced.add(toArray(varargType, varargs));
             }
             else if (i < args.length) {
-                System.err.println("dropping javascript to java arguments on the floor: " + (args.length - i));
+                System.err.println("dropping javascript to java arguments on the floor: " + (args.length - i) + " " + best.toString());
             }
             return quackContext.coerceJavaToJavaScript(best.invoke(thiz, coerced.toArray()));
         }
