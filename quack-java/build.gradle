@@ -7,13 +7,8 @@ dependencies {
 
 }
 
-sourceSets {
-//    main.java.srcDirs += "../duktape/src/main/java/"
-//    test.java.srcDirs += "../duktape/src/androidTest/java/"
-
-}
 buildscript {
-    ext.kotlin_version = '1.3.50'
+    ext.kotlin_version = '1.3.60'
     repositories {
         mavenCentral()
     }

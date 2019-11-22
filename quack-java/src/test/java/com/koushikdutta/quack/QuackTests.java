@@ -863,4 +863,106 @@ public class QuackTests {
         assertEquals(foo.foo1(), "HI");
         assertEquals(foo.foo2(), "BYE");
     }
+
+    @Test
+    public void testRunnable() {
+        QuackContext quack = QuackContext.create(useQuickJS);
+        quack.getGlobalObject().set("setTimeout", quack.coerceJavaToJavaScript(Runnable.class, new Runnable() {
+            int foo = 34;
+            @Override
+            public void run() {
+                System.out.println(foo);
+            }
+        }));
+        quack.evaluate("setTimeout()");
+        quack.close();
+    }
+
+    @Test
+    public void testRunnableApply() {
+        QuackContext quack = QuackContext.create(useQuickJS);
+        quack.getGlobalObject().set("setTimeout", quack.coerceJavaToJavaScript(Runnable.class, new Runnable() {
+            int foo = 34;
+            @Override
+            public void run() {
+                System.out.println(foo);
+            }
+        }));
+        quack.evaluate("setTimeout.apply(null)");
+        quack.close();
+    }
+
+
+    public static class FieldTest {
+        public int foo;
+        public static int staticFoo;
+    }
+    @Test
+    public void testFields() {
+        QuackContext quack = QuackContext.create(useQuickJS);
+        FieldTest test = new FieldTest();
+        quack.getGlobalObject().set("test", test);
+        quack.getGlobalObject().set("testClass", FieldTest.class);
+        quack.evaluate("test.foo = 3; testClass.staticFoo = 4;");
+        quack.close();
+
+        assertEquals(test.foo, 3);
+        assertEquals(FieldTest.staticFoo, 4);
+    }
+
+    @Test
+    public void testModule() {
+        QuackContext quack = QuackContext.create();
+        JavaScriptObject jo = quack.evaluateModule("console.log('test');", "test.js");
+        quack.close();
+    }
+
+    public interface VarArgTest {
+        Object invoke(Object... args);
+    }
+
+    @Test
+    public void testVarArgs() {
+        QuackContext quack = QuackContext.create();
+        String scriptString = "(function(a, b, c, d) { return c; })";
+        VarArgTest test = quack.evaluate(scriptString, VarArgTest.class);
+        assertEquals(test.invoke("a", "b", "c"), "c");
+    }
+
+    @Test
+    public void testClassBug() {
+        QuackContext quack = QuackContext.create();
+        StringBuilder builder = new StringBuilder();
+        builder.append("(function(cb) {\n");
+        builder.append("class Foo{};\n");
+        builder.append("class Bar extends Foo{};\n");
+        builder.append("cb(Foo, Bar);\n");
+        builder.append("}\n");
+        builder.append(")\n");
+
+        JavaScriptObject jo = quack.evaluateForJavaScriptObject(builder.toString());
+
+        jo.call(new QuackMethodObject() {
+            @Override
+            public Object callMethod(Object thiz, Object... args) {
+                return null;
+            }
+        });
+
+        quack.close();
+    }
+
+    @Test
+    public void testConstruct() {
+        QuackContext quack = QuackContext.create();
+        quack.getGlobalObject().set("Test", new QuackObject() {
+            @Override
+            public Object construct(Object... args) {
+                return new Object();
+            }
+        });
+
+        quack.evaluate("new Test()");
+        quack.close();
+    }
 }

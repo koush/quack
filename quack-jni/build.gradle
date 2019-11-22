@@ -3,7 +3,7 @@ apply plugin: 'cpp-library'
 task quickjs(type: Exec) {
     workingDir '../../quickjs'
     commandLine 'make'
-    args ( '-j32','libquickjs.a')
+    args ( '-j32','libquickjs.a','.obj/quickjs-libc.o')
 
     //store the output instead of printing to the console:
     standardOutput = new ByteArrayOutputStream()
@@ -44,4 +44,6 @@ tasks.withType(CppCompile).configureEach {
 tasks.withType(LinkSharedLibrary).configureEach {
     linkerArgs.add '-L../..//quickjs/'
     linkerArgs.add '-lquickjs'
+
+    linkerArgs.add '../../quickjs/.obj/quickjs-libc.o'
 }

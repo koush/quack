@@ -31,6 +31,7 @@ public:
   DuktapeContext & operator=(const DuktapeContext &) = delete;
 
   jobject evaluate(JNIEnv* env, jstring sourceCode, jstring fileName);
+  jobject evaluateModule(JNIEnv* env, jstring sourceCode, jstring fileName) { return nullptr; }
   jobject compile(JNIEnv* env, jstring code, jstring fileName);
 
   void cooperateDebugger();

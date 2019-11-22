@@ -131,29 +131,39 @@ public final class QuackContext implements Closeable {
       return ret;
 
 
-    if (clazz.isInterface() && clazz.getMethods().length == 1) {
-      // automatically coerce functional interfaces into functions
-      Method method = clazz.getMethods()[0];
-      return new QuackMethodObject() {
+    // automatically coerce functional interfaces into functions
+    Method method = getLambdaMethod(clazz);
+    if (method != null) {
+      return new JavaMethodObject(this, method.getName()) {
         @Override
         public Object callMethod(Object thiz, Object... args) {
-          try {
-            if (args != null) {
-              Class[] parameters = method.getParameterTypes();
-              for (int i = 0; i < args.length; i++) {
-                args[i] = coerceJavaScriptToJava(parameters[i], args[i]);
-              }
-            }
-            return coerceJavaToJavaScript(method.invoke(o, args));
-          }
-          catch (Exception e) {
-            throw new IllegalArgumentException(e);
-          }
+          return super.callMethod(o, args);
+        }
+
+        @Override
+        protected Method[] getMethods(Object thiz) {
+          return clazz.getMethods();
         }
       };
     }
 
     return o;
+  }
+
+  private static Method getLambdaMethod(Class clazz) {
+    if (!clazz.isInterface())
+      return null;
+
+    Method match = null;
+    for (Method method: clazz.getMethods()) {
+      if (!Modifier.isStatic(method.getModifiers())) {
+        if (match != null)
+          return null;
+        match = method;
+      }
+    }
+
+    return match;
   }
 
   /**
@@ -223,10 +233,11 @@ public final class QuackContext implements Closeable {
       JavaScriptObject jo = (JavaScriptObject)o;
 
       // single method arguments are simply callbacks
-      if (clazz.getMethods().length == 1) {
+      Method lambda = getLambdaMethod(clazz);
+      if (lambda != null) {
         return Proxy.newProxyInstance(clazz.getClassLoader(), new Class[]{clazz},
                 getWrappedInvocationHandler(jo, (proxy, method, args) ->
-                        coerceJavaScriptToJava(method.getReturnType(), jo.call(args))));
+                        coerceJavaScriptToJava(method.getReturnType(), jo.call(JavaScriptObject.coerceArgs(this, method, args)))));
       }
       else {
         InvocationHandler handler = jo.createInvocationHandler();
@@ -522,11 +533,41 @@ public final class QuackContext implements Closeable {
       return null;
     long start = System.nanoTime() / 1000000;
     try {
-      return evaluate(context, script, fileName);
+      return coerceJavaScriptToJava(null, evaluate(context, script, fileName));
     }
     finally {
       totalElapsedScriptExecutionMs += System.nanoTime() / 1000000 - start;
+      handlePostInvocation();
     }
+  }
+
+  /**
+   * Evaluate {@code script} and return a result. {@code fileName} will be used in error
+   * reporting.
+   *
+   * @throws QuackException if there is an error evaluating the script.
+   */
+  public synchronized JavaScriptObject evaluateModule(String script, String fileName) {
+    if (context == 0)
+      return null;
+    long start = System.nanoTime() / 1000000;
+    try {
+      return (JavaScriptObject)coerceJavaScriptToJava(JavaScriptObject.class, evaluateModule(context, script, fileName));
+    }
+    finally {
+      totalElapsedScriptExecutionMs += System.nanoTime() / 1000000 - start;
+      handlePostInvocation();
+    }
+  }
+
+  /**
+   * Evaluate {@code script} and return a result. {@code fileName} will be used in error
+   * reporting.
+   *
+   * @throws QuackException if there is an error evaluating the script.
+   */
+  public synchronized JavaScriptObject evaluateModule(String script) {
+    return evaluateModule(script, "?");
   }
 
   /**
@@ -786,6 +827,7 @@ public final class QuackContext implements Closeable {
   private static native long createContext(QuackContext quackContext, boolean useQuickJS);
   private static native void destroyContext(long context);
   private static native Object evaluate(long context, String sourceCode, String fileName);
+  private static native Object evaluateModule(long context, String sourceCode, String fileName);
   private static native JavaScriptObject compileFunction(long context, String script, String fileName);
 
   private static native void cooperateDebugger(long context);

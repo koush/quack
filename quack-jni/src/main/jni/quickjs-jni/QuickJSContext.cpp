@@ -1,6 +1,9 @@
 #include "QuickJSContext.h"
 #include <string>
 #include <vector>
+extern "C" {
+#include "../../../../../../quickjs/quickjs-libc.h"
+}
 
 #define JS_IsUndefinedOrNull(value) (JS_IsUndefined(value) || JS_IsNull(value))
 
@@ -97,6 +100,19 @@ QuickJSContext::QuickJSContext(JavaVM* javaVM, jobject javaQuack):
     javaVM(javaVM) {
     runtime = JS_NewRuntime();
     ctx = JS_NewContext(runtime);
+
+    // test
+    JS_SetModuleLoaderFunc(runtime, NULL, js_module_loader, NULL);
+    js_std_add_helpers(ctx, 0, nullptr);
+    js_init_module_std(ctx, "std");
+    js_init_module_os(ctx, "os");
+    const char *str = "import * as std from 'std';\n"
+        "import * as os from 'os';\n"
+        "globalThis.std = std;\n"
+        "globalThis.os = os;\n";
+    JS_Eval(ctx, str, strlen(str), "<input>", JS_EVAL_TYPE_MODULE);
+    // end test
+
     JS_SetMaxStackSize(ctx, 1024 * 1024 * 4);
     stash = JS_NewObject(ctx);
 
@@ -329,6 +345,8 @@ jobject QuickJSContext::toObject(JNIEnv *env, JSValue value) {
         return nullptr;
 
     jvalue ret;
+    void *buf = nullptr;
+    size_t buf_size;
     if (JS_IsInteger(value)) {
         JS_ToInt32(ctx, &ret.i, value);
         return box(env, intClass, intValueOf, ret);
@@ -344,11 +362,9 @@ jobject QuickJSContext::toObject(JNIEnv *env, JSValue value) {
     else if (JS_IsString(value)) {
         return toString(env, value);
     }
-    else if (JS_IsArrayBuffer(value)) {
-        size_t size;
-        uint8_t *ptr = JS_GetArrayBuffer(ctx, &size, value);
-        jobject byteBuffer = env->CallStaticObjectMethod(byteBufferClass, byteBufferAllocateDirect, (jint)size);
-        memcpy(env->GetDirectBufferAddress(byteBuffer), ptr, size);
+    else if ((buf = JS_GetArrayBuffer(ctx, &buf_size, value))) {
+        jobject byteBuffer = env->CallStaticObjectMethod(byteBufferClass, byteBufferAllocateDirect, (jint)buf_size);
+        memcpy(env->GetDirectBufferAddress(byteBuffer), buf, buf_size);
         return byteBuffer;
     }
     else if (JS_IsException(value)) {
@@ -379,7 +395,12 @@ jobject QuickJSContext::toObject(JNIEnv *env, JSValue value) {
 
     // attempt to find an existing JavaScriptObject that exists on the java side (weak ref)
     auto finalizerFound = hold(JS_GetProperty(ctx, value, customFinalizerAtom));
-    if (!JS_IsUndefinedOrNull(finalizerFound)) {
+    int ownProp;
+    if (!JS_IsUndefinedOrNull(finalizerFound) && (ownProp = JS_GetOwnProperty(ctx, nullptr, value, customFinalizerAtom))) {
+        // exception
+        if (ownProp == -1)
+            return nullptr;
+
         auto data = reinterpret_cast<CustomFinalizerData *>(JS_GetOpaque(finalizerFound, customFinalizerClassId));
         auto javaThis = reinterpret_cast<jobject>(data->udata);
         if (javaThis) {
@@ -397,7 +418,10 @@ jobject QuickJSContext::toObject(JNIEnv *env, JSValue value) {
     else {
         // check if this is a JavaObject that just needs to be unboxed (global ref)
         auto javaValue = JS_GetProperty(ctx, value, atomHoldsJavaObject);
-        if (!JS_IsUndefinedOrNull(javaValue)) {
+        if (!JS_IsUndefinedOrNull(javaValue) && (ownProp = JS_GetOwnProperty(ctx, nullptr, value, atomHoldsJavaObject))) {
+            // exception
+            if (ownProp == -1)
+                return nullptr;
             int64_t javaPtr;
             JS_ToInt64(ctx, &javaPtr, javaValue);
             return env->NewLocalRef(reinterpret_cast<jobject>(javaPtr));
@@ -428,13 +452,22 @@ jobject QuickJSContext::toObjectCheckQuickJSError(JNIEnv *env, JSValue value) {
     return nullptr;
 }
 
-jobject QuickJSContext::evaluate(JNIEnv *env, jstring code, jstring filename) {
+jobject QuickJSContext::evaluateInternal(JNIEnv *env, jstring code, jstring filename, int flags) {
     auto codeStr = env->GetStringUTFChars(code, 0);
     size_t len = strlen(codeStr);
     char* mem = (char*)js_malloc(ctx, len + 1);
     mem[len] = '\0';
     memcpy(mem, codeStr, len);
-    auto result = hold(JS_Eval(ctx, mem, len, env->GetStringUTFChars(filename, 0), JS_EVAL_TYPE_GLOBAL));
+    if (!(flags & JS_EVAL_TYPE_MODULE)) {
+        auto result = hold(JS_Eval(ctx, mem, len, env->GetStringUTFChars(filename, 0), flags));
+        return toObjectCheckQuickJSError(env, result);
+    }
+
+    JSValue result = JS_Eval(ctx, mem, len, env->GetStringUTFChars(filename, 0), flags);
+    if ((flags & JS_EVAL_TYPE_MODULE) && !JS_IsException(result)) {
+        js_module_set_import_meta(ctx, result, 1, 1);
+        result = JS_EvalFunction(ctx, result);
+    }
     return toObjectCheckQuickJSError(env, result);
 }
 

@@ -147,6 +147,12 @@ Java_com_koushikdutta_quack_QuackContext_evaluate(
     return reinterpret_cast<JSContext *>(context)->evaluate(env, code, fname);
 }
 
+JNIEXPORT jobject JNICALL
+Java_com_koushikdutta_quack_QuackContext_evaluateModule(
+    JNIEnv* env, jclass type, jlong context, jstring code, jstring fname) {
+    return reinterpret_cast<JSContext *>(context)->evaluateModule(env, code, fname);
+}
+
 JNIEXPORT jlong JNICALL
 Java_com_koushikdutta_quack_QuackContext_getHeapSize__J(JNIEnv *env, jclass type, jlong context) {
     return reinterpret_cast<JSContext *>(context)->getHeapSize(env);

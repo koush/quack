@@ -118,7 +118,9 @@ public:
 
     void finalizeJavaScriptObject(JNIEnv *env, jlong object);
 
-    jobject evaluate(JNIEnv *env, jstring code, jstring filename);
+    jobject evaluateInternal(JNIEnv *env, jstring code, jstring filename, int flags);
+    jobject evaluate(JNIEnv *env, jstring code, jstring filename) { return evaluateInternal(env, code, filename, JS_EVAL_TYPE_GLOBAL); }
+    jobject evaluateModule(JNIEnv *env, jstring code, jstring filename) { return evaluateInternal(env, code, filename, JS_EVAL_TYPE_MODULE | JS_EVAL_FLAG_COMPILE_ONLY); }
     jobject compile(JNIEnv* env, jstring code, jstring filename);
 
     jobject getGlobalObject(JNIEnv *env);

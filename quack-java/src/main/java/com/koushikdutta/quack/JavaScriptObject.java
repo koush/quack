@@ -1,9 +1,11 @@
 package com.koushikdutta.quack;
 
+import java.lang.reflect.Array;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 
 @SuppressWarnings({"unchecked", "rawtypes"})
@@ -109,6 +111,36 @@ public class JavaScriptObject implements QuackObject {
         return ret.toString();
     }
 
+    static Object[] coerceArgs(QuackContext quackContext, Method method, Object[] args) {
+        if (args != null && args.length > 0) {
+            Class[] types = method.getParameterTypes();
+
+            if (args.length != types.length)
+                throw new AssertionError("JavaScript.createInvocationHandler different args count?");
+
+            int numParameters = types.length;
+            if (method.isVarArgs())
+                numParameters--;
+
+            for (int i = 0; i < numParameters; i++) {
+                args[i] = quackContext.coerceJavaToJavaScript(types[i], args[i]);
+            }
+
+            if (method.isVarArgs()) {
+                Class varargType = method.getParameterTypes()[numParameters].getComponentType();
+                ArrayList<Object> varargs = new ArrayList<>(Arrays.asList(args).subList(0, numParameters));
+                Object varargArg = args[numParameters];
+                for (int i = 0; i < Array.getLength(varargArg); i++) {
+                    Object vararg = Array.get(varargArg, i);
+                    varargs.add(quackContext.coerceJavaScriptToJava(varargType, vararg));
+                }
+                args = varargs.toArray();
+            }
+        }
+
+        return args;
+    }
+
     public InvocationHandler createInvocationHandler() {
         InvocationHandler handler = (proxy, method, args) -> {
             Method interfaceMethod = QuackContext.getInterfaceMethod(method);
@@ -121,14 +153,7 @@ public class JavaScriptObject implements QuackObject {
             if (annotation != null)
                 methodName = annotation.name();
 
-            if (args != null) {
-                Class[] types = method.getParameterTypes();
-                for (int i = 0; i < Math.min(args.length, types.length); i++) {
-                    args[i] = quackContext.coerceJavaToJavaScript(types[i], args[i]);
-                }
-            }
-
-            return quackContext.coerceJavaScriptToJava(method.getReturnType(), JavaScriptObject.this.callProperty(methodName, args));
+            return quackContext.coerceJavaScriptToJava(method.getReturnType(), JavaScriptObject.this.callProperty(methodName, coerceArgs(quackContext, method, args)));
         };
 
         return quackContext.getWrappedInvocationHandler(this, handler);

@@ -78,6 +78,25 @@ public final class JavaObject implements QuackJavaObject {
         return false;
     }
 
+    private Field findField(String key, Class clazz) {
+        return QuackContext.javaObjectFields.memoize(() -> {
+            // try to get fields
+            for (Field field : clazz.getDeclaredFields()) {
+                if (field.getName().equals(key) && ((field.getModifiers() & Modifier.STATIC) == 0) && ((field.getModifiers() & Modifier.PUBLIC) != 0))
+                    return field;
+            }
+
+            if (target instanceof Class) {
+                for (Field field : ((Class)target).getDeclaredFields()) {
+                    if (field.getName().equals(key) && ((field.getModifiers() & Modifier.STATIC) != 0) && ((field.getModifiers() & Modifier.PUBLIC) != 0))
+                        return field;
+                }
+            }
+
+            return null;
+        }, key, clazz.getDeclaredFields());
+    }
+
     @Override
     public Object get(String key) {
         Object ret = getMap(key);
@@ -91,22 +110,7 @@ public final class JavaObject implements QuackJavaObject {
             if (clazz.isArray() && "length".equals(key))
                 return Array.getLength(target);
 
-            Field f = QuackContext.javaObjectFields.memoize(() -> {
-                // try to get fields
-                for (Field field : clazz.getFields()) {
-                    if (field.getName().equals(key) && ((field.getModifiers() & Modifier.STATIC) == 0))
-                        return field;
-                }
-
-                if (target instanceof Class) {
-                    for (Field field : ((Class)target).getFields()) {
-                        if (field.getName().equals(key) && ((field.getModifiers() & Modifier.STATIC) != 0))
-                            return field;
-                    }
-                }
-
-                return null;
-            }, key, clazz.getFields());
+            Field f = findField(key, clazz);
 
             if (f != null) {
                 try {
@@ -202,15 +206,13 @@ public final class JavaObject implements QuackJavaObject {
     public boolean set(String key, Object value) {
         Class clazz = target.getClass();
 
-        for (Field field: clazz.getFields()) {
-            if (field.getName().equals(key)) {
-                try {
-                    field.set(target, quackContext.coerceJavaScriptToJava(field.getType(), value));
-                }
-                catch (IllegalAccessException e) {
-                    throw new IllegalArgumentException(e);
-                }
+        Field f = findField(key, clazz);
+        if (f != null) {
+            try {
+                f.set(target, quackContext.coerceJavaScriptToJava(f.getType(), value));
                 return true;
+            } catch (IllegalAccessException e) {
+                throw new IllegalArgumentException(e);
             }
         }
 

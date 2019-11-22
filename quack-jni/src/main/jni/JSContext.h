@@ -26,6 +26,7 @@ public:
     virtual void finalizeJavaScriptObject(JNIEnv *env, jlong object) = 0;
 
     virtual jobject evaluate(JNIEnv *env, jstring code, jstring filename) = 0;
+    virtual jobject evaluateModule(JNIEnv *env, jstring code, jstring filename) = 0;
     virtual jobject compile(JNIEnv* env, jstring code, jstring filename) = 0;
 
     virtual jobject getGlobalObject(JNIEnv *env) = 0;
