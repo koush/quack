@@ -418,10 +418,7 @@ jobject QuickJSContext::toObject(JNIEnv *env, JSValue value) {
     else {
         // check if this is a JavaObject that just needs to be unboxed (global ref)
         auto javaValue = JS_GetProperty(ctx, value, atomHoldsJavaObject);
-        if (!JS_IsUndefinedOrNull(javaValue) && (ownProp = JS_GetOwnProperty(ctx, nullptr, value, atomHoldsJavaObject))) {
-            // exception
-            if (ownProp == -1)
-                return nullptr;
+        if (!JS_IsUndefinedOrNull(javaValue)) {
             int64_t javaPtr;
             JS_ToInt64(ctx, &javaPtr, javaValue);
             return env->NewLocalRef(reinterpret_cast<jobject>(javaPtr));
