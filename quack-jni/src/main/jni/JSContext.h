@@ -39,6 +39,7 @@ public:
     virtual jboolean setKeyInteger(JNIEnv* env, jlong object, jint index, jobject value) = 0;
     virtual jboolean setKeyObject(JNIEnv* env, jlong object, jobject key, jobject value) = 0;
 
+    virtual jobject callConstructor(JNIEnv *env, jlong object, jobjectArray args) = 0;
     virtual jobject call(JNIEnv *env, jlong object, jobjectArray args) = 0;
     virtual jobject callProperty(JNIEnv *env, jlong object, jobject property, jobjectArray args) = 0;
     virtual jobject callMethod(JNIEnv *env, jlong method, jobject object, jobjectArray args) = 0;

@@ -6,6 +6,7 @@
 #include "../../../../../../quickjs/quickjs.h"
 #include "../../../../../../quickjs/quickjs-debugger.h"
 #include "../JSContext.h"
+#include <vector>
 
 class QuickJSContext;
 
@@ -134,7 +135,9 @@ public:
     jboolean setKeyInternal(JNIEnv* env, JSValue thiz, jobject key, jobject value);
     jboolean setKeyObject(JNIEnv* env, jlong object, jobject key, jobject value);
 
+    bool callArgs(JNIEnv *env, jobjectArray args, std::vector<JSValue> &valueArgs);
     jobject callInternal(JNIEnv *env, JSValue func, JSValue thiz, jobjectArray args);
+    jobject callConstructor(JNIEnv *env, jlong object, jobjectArray args);
     jobject call(JNIEnv *env, jlong object, jobjectArray args);
     jobject callProperty(JNIEnv *env, jlong object, jobject property, jobjectArray args);
     jobject callMethod(JNIEnv *env, jlong method, jobject object, jobjectArray args);

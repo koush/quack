@@ -90,6 +90,13 @@ Java_com_koushikdutta_quack_QuackContext_call(JNIEnv *env, jclass type,
 }
 
 JNIEXPORT jobject JNICALL
+Java_com_koushikdutta_quack_QuackContext_callConstructor(JNIEnv *env, jclass type,
+                                           jlong context, jlong object,
+                                           jobjectArray args) {
+    return reinterpret_cast<JSContext *>(context)->callConstructor(env, object, args);
+}
+
+JNIEXPORT jobject JNICALL
 Java_com_koushikdutta_quack_QuackContext_callMethod(
         JNIEnv *env, jclass type, jlong context, jlong object, jobject thiz, jobjectArray args) {
     return reinterpret_cast<JSContext *>(context)->callMethod(env, object, thiz, args);

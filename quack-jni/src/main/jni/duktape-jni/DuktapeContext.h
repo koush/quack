@@ -47,6 +47,7 @@ public:
   jboolean setKeyString(JNIEnv* env, jlong object, jstring key, jobject value);
   jboolean setKeyInteger(JNIEnv* env, jlong object, jint index, jobject value);
   jboolean setKeyObject(JNIEnv* env, jlong object, jobject key, jobject value);
+  jobject callConstructor(JNIEnv *env, jlong object, jobjectArray args) { return nullptr; }
   jobject call(JNIEnv* env, jlong object, jobjectArray args);
   jobject callMethod(JNIEnv *env, jlong object, jobject thiz, jobjectArray args);
   jobject callProperty(JNIEnv* env, jlong object, jobject target, jobjectArray args);

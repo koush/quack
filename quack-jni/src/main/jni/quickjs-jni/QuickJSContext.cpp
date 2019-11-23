@@ -487,11 +487,9 @@ static void freeValues(JSContext *ctx, std::vector<JSValue> &valueArgs) {
     }
 }
 
-jobject QuickJSContext::callInternal(JNIEnv *env, JSValue func, JSValue thiz, jobjectArray args) {
-    jsize length = 0;
-    std::vector<JSValue> valueArgs;
+bool QuickJSContext::callArgs(JNIEnv *env, jobjectArray args, std::vector<JSValue> &valueArgs) {
     if (args != nullptr) {
-        length = env->GetArrayLength(args);
+        int length = env->GetArrayLength(args);
         if (length != 0) {
             for (int i = 0; i < length; i++) {
                 const auto arg = LocalRefHolder(env, env->GetObjectArrayElement(args, i));
@@ -501,13 +499,34 @@ jobject QuickJSContext::callInternal(JNIEnv *env, JSValue func, JSValue thiz, jo
                 if (JS_IsException(argValue)) {
                     rethrowQuickJSErrorToJava(env, argValue);
                     freeValues(ctx, valueArgs);
-                    return nullptr;
+                    return false;
                 }
             }
         }
     }
 
-    auto ret = hold(JS_Call(ctx, func, thiz, length, &valueArgs.front()));
+    return true;
+}
+
+jobject QuickJSContext::callInternal(JNIEnv *env, JSValue func, JSValue thiz, jobjectArray args) {
+    std::vector<JSValue> valueArgs;
+    if (!callArgs(env, args, valueArgs))
+        return nullptr;
+
+    auto ret = hold(JS_Call(ctx, func, thiz, valueArgs.size(), &valueArgs.front()));
+    freeValues(ctx, valueArgs);
+
+    return toObjectCheckQuickJSError(env, ret);
+}
+
+jobject QuickJSContext::callConstructor(JNIEnv *env, jlong object, jobjectArray args) {
+    auto func = toValueAsLocal(object);
+
+    std::vector<JSValue> valueArgs;
+    if (!callArgs(env, args, valueArgs))
+        return nullptr;
+
+    auto ret = hold(JS_CallConstructor(ctx, func, valueArgs.size(), &valueArgs.front()));
     freeValues(ctx, valueArgs);
 
     return toObjectCheckQuickJSError(env, ret);

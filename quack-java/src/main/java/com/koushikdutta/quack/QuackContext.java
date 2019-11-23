@@ -715,6 +715,18 @@ public final class QuackContext implements Closeable {
       handlePostInvocation();
     }
   }
+  synchronized Object callConstructor(long object, Object... args) {
+    if (context == 0)
+      return null;
+    long start = System.nanoTime() / 1000000;
+    try {
+      return callConstructor(context, object, args);
+    }
+    finally {
+      totalElapsedScriptExecutionMs += System.nanoTime() / 1000000 - start;
+      handlePostInvocation();
+    }
+  }
   synchronized Object callMethod(long object, Object thiz, Object... args) {
     if (context == 0)
       return null;
@@ -841,6 +853,7 @@ public final class QuackContext implements Closeable {
   private static native boolean setKeyString(long context, long object, String key, Object value);
   private static native boolean setKeyInteger(long context, long object, int index, Object value);
   private static native Object call(long context, long object, Object... args);
+  private static native Object callConstructor(long context, long object, Object... args);
   private static native Object callMethod(long context, long object, Object thiz, Object... args);
   private static native Object callProperty(long context, long object, Object property, Object... args);
   private static native JavaScriptObject getGlobalObject(long context);

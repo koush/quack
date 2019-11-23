@@ -25,14 +25,8 @@ public class JavaScriptObject implements QuackObject {
     }
 
     public <T> T constructCoerced(Class<T> clazz, Object... args) {
-        ArrayList<Object> arr = new ArrayList<>();
-        arr.add(this);
-        Collections.addAll(arr, args);
-        return (T)quackContext.coerceJavaScriptToJava(clazz, quackContext.evaluateForJavaScriptObject(
-                "(function(f) {\n" +
-                        "return new (Function.prototype.bind.apply(f, arguments));\n" +
-                        "})\n")
-                .call(arr.toArray()));
+        quackContext.coerceJavaArgsToJavaScript(args);
+        return (T)quackContext.coerceJavaScriptToJava(clazz, quackContext.callConstructor(pointer, args));
     }
 
     public String typeof() {
