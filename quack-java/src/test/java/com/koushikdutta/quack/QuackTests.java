@@ -954,7 +954,7 @@ public class QuackTests {
 
     @Test
     public void testConstruct() {
-        QuackContext quack = QuackContext.create();
+        QuackContext quack = QuackContext.create(useQuickJS);
         quack.getGlobalObject().set("Test", new QuackObject() {
             @Override
             public Object construct(Object... args) {
@@ -963,6 +963,30 @@ public class QuackTests {
         });
 
         quack.evaluate("new Test()");
+        quack.close();
+    }
+
+    @Test
+    public void testJsConstruct() {
+        QuackContext quack = QuackContext.create(useQuickJS);
+        quack.getGlobalObject().set("observe", quack.coerceJavaToJavaScript(RoundtripCallback.class, new RoundtripCallback() {
+            @Override
+            public Object callback(Object o) {
+                return null;
+            }
+        }));
+
+        JavaScriptObject Foo = quack.evaluateForJavaScriptObject("(function Foo(b) { observe(arguments.length); this.b = b } )");
+        JavaScriptObject foo = (JavaScriptObject)Foo.construct("hello");
+        assertEquals(foo.get("b"), "hello");
+        quack.close();
+    }
+
+    @Test
+    public void testTypeOf() {
+        QuackContext quack = QuackContext.create(useQuickJS);
+        assertEquals("object", quack.evaluateForJavaScriptObject("({})").typeof());
+        assertEquals("function", quack.evaluateForJavaScriptObject("(function(){})").typeof());
         quack.close();
     }
 }
