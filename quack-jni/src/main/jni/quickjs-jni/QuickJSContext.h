@@ -175,6 +175,7 @@ public:
     jclass quackJavaObject;
     jclass quackClass;
     jclass quackObjectClass;
+    jclass quackJavaScriptObjectClass;
     jclass javaScriptObjectClass;
     jclass javaObjectClass;
     jmethodID quackJavaObjectGetObject;
@@ -190,8 +191,8 @@ public:
     jmethodID byteBufferGetLimit;
     jmethodID byteBufferGetPosition;
     jmethodID byteBufferSetPosition;
-    jfieldID contextField;
-    jfieldID pointerField;
+    jmethodID quackGetNativeContext;
+    jmethodID quackGetNativePointer;
     jfieldID quackJsonField;
 
     jclass booleanClass;

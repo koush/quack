@@ -989,4 +989,22 @@ public class QuackTests {
         assertEquals("function", quack.evaluateForJavaScriptObject("(function(){})").typeof());
         quack.close();
     }
+
+    @Test
+    public void testMarshalledInterfaceRoundtripMarshalling() {
+        QuackContext quack = QuackContext.create(useQuickJS);
+        RoundtripCallback cb = new RoundtripCallback() {
+            @Override
+            public Object callback(Object o) {
+                // returning a proxied interface should get turned back into the same javascript object that
+                // is being proxied by that interface.
+                Callback c = (Callback)quack.coerceJavaScriptToJava(Callback.class, o);
+                c.callback();
+                return c;
+            }
+        };
+
+        quack.evaluateForJavaScriptObject("(function(cb) { var f = function(){}; if (cb.callback(f) !== f) throw new Error('expected same object'); })").call(cb);
+        quack.close();
+    }
 }

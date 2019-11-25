@@ -235,13 +235,13 @@ public final class QuackContext implements Closeable {
       // single method arguments are simply callbacks
       Method lambda = getLambdaMethod(clazz);
       if (lambda != null) {
-        return Proxy.newProxyInstance(clazz.getClassLoader(), new Class[]{clazz},
-                getWrappedInvocationHandler(jo, (proxy, method, args) ->
+        return Proxy.newProxyInstance(clazz.getClassLoader(), new Class[]{QuackJavaScriptObject.class, clazz},
+                jo.getWrappedInvocationHandler((proxy, method, args) ->
                         coerceJavaScriptToJava(method.getReturnType(), jo.call(JavaScriptObject.coerceArgs(this, method, args)))));
       }
       else {
         InvocationHandler handler = jo.createInvocationHandler();
-        return Proxy.newProxyInstance(clazz.getClassLoader(), new Class[] { clazz }, handler);
+        return Proxy.newProxyInstance(clazz.getClassLoader(), new Class[] { QuackJavaScriptObject.class, clazz }, handler);
       }
     }
 
@@ -528,17 +528,27 @@ public final class QuackContext implements Closeable {
    *
    * @throws QuackException if there is an error evaluating the script.
    */
-  public synchronized Object evaluate(String script, String fileName) {
+  public synchronized <T> T evaluate(Class<T> clazz, String script, String fileName) {
     if (context == 0)
       return null;
     long start = System.nanoTime() / 1000000;
     try {
-      return coerceJavaScriptToJava(null, evaluate(context, script, fileName));
+      return (T)coerceJavaScriptToJava(clazz, evaluate(context, script, fileName));
     }
     finally {
       totalElapsedScriptExecutionMs += System.nanoTime() / 1000000 - start;
       handlePostInvocation();
     }
+  }
+
+  /**
+   * Evaluate {@code script} and return a result. {@code fileName} will be used in error
+   * reporting.
+   *
+   * @throws QuackException if there is an error evaluating the script.
+   */
+  public synchronized Object evaluate(String script, String fileName) {
+    return evaluate(null, script, fileName);
   }
 
   /**

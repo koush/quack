@@ -176,8 +176,11 @@ QuickJSContext::QuickJSContext(JavaVM* javaVM, jobject javaQuack):
     // JavaScriptObject
     javaScriptObjectClass = findClass(env, "com/koushikdutta/quack/JavaScriptObject");
     javaScriptObjectConstructor = env->GetMethodID(javaScriptObjectClass, "<init>", "(Lcom/koushikdutta/quack/QuackContext;JJ)V");
-    contextField = env->GetFieldID(javaScriptObjectClass, "context", "J");
-    pointerField = env->GetFieldID(javaScriptObjectClass, "pointer", "J");
+
+    // QuackJavaScriptObject (interface, which can be implemented by proxies)
+    quackJavaScriptObjectClass = findClass(env, "com/koushikdutta/quack/QuackJavaScriptObject");
+    quackGetNativeContext = env->GetMethodID(quackJavaScriptObjectClass, "getNativeContext", "()J");
+    quackGetNativePointer = env->GetMethodID(quackJavaScriptObjectClass, "getNativePointer", "()J");
 
     // JavaObject
     javaObjectClass = findClass(env, "com/koushikdutta/quack/JavaObject");
@@ -312,11 +315,11 @@ JSValue QuickJSContext::toObject(JNIEnv *env, jobject value) {
         const char *jsonPtr = env->GetStringUTFChars(json, 0);
         return JS_ParseJSON(ctx, jsonPtr, (size_t)env->GetStringUTFLength(json), "<QuackJsonObject>");
     }
-    else if (env->IsAssignableFrom(clazz, javaScriptObjectClass)) {
-        QuickJSContext *context = reinterpret_cast<QuickJSContext *>(env->GetLongField(value, contextField));
+    else if (env->IsAssignableFrom(clazz, quackJavaScriptObjectClass)) {
+        QuickJSContext *context = reinterpret_cast<QuickJSContext *>(env->CallLongMethod(value, quackGetNativeContext));
         // matching context, grab the native JSValue
         if (context == this)
-            return toValueAsDup(ctx, env->GetLongField(value, pointerField));
+            return toValueAsDup(ctx, env->CallLongMethod(value, quackGetNativePointer));
         // a proxy already exists, but not for the correct QuackContext, so native javascript heap
         // pointer can't be used.
     }

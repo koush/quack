@@ -9,7 +9,7 @@ import java.util.Arrays;
 import java.util.Collections;
 
 @SuppressWarnings({"unchecked", "rawtypes"})
-public class JavaScriptObject implements QuackObject {
+public class JavaScriptObject implements QuackObject, QuackJavaScriptObject {
     final public QuackContext quackContext;
     public final long context;
     final public long pointer;
@@ -17,6 +17,16 @@ public class JavaScriptObject implements QuackObject {
         this.quackContext = quackContext;
         this.context = context;
         this.pointer = pointer;
+    }
+
+    @Override
+    public long getNativePointer() {
+        return pointer;
+    }
+
+    @Override
+    public long getNativeContext() {
+        return context;
     }
 
     @Override
@@ -155,6 +165,15 @@ public class JavaScriptObject implements QuackObject {
         return args;
     }
 
+    public InvocationHandler getWrappedInvocationHandler(InvocationHandler wrapped) {
+        return quackContext.getWrappedInvocationHandler(this, (proxy, method, args) -> {
+            if (method.getDeclaringClass() == QuackJavaScriptObject.class)
+                return method.invoke(JavaScriptObject.this, args);
+
+            return wrapped.invoke(proxy, method, args);
+        });
+    }
+
     public InvocationHandler createInvocationHandler() {
         InvocationHandler handler = (proxy, method, args) -> {
             Method interfaceMethod = QuackContext.getInterfaceMethod(method);
@@ -170,11 +189,12 @@ public class JavaScriptObject implements QuackObject {
             return quackContext.coerceJavaScriptToJava(method.getReturnType(), JavaScriptObject.this.callProperty(methodName, coerceArgs(quackContext, method, args)));
         };
 
-        return quackContext.getWrappedInvocationHandler(this, handler);
+        return getWrappedInvocationHandler(handler);
     }
 
     public <T> T proxyInterface(Class<T> clazz, Class... more) {
         ArrayList<Class> classes = new ArrayList<>();
+        classes.add(QuackJavaScriptObject.class);
         classes.add(clazz);
         if (more != null)
             Collections.addAll(classes, more);
