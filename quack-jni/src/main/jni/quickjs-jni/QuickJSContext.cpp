@@ -365,12 +365,16 @@ jobject QuickJSContext::toObject(JNIEnv *env, JSValue value) {
     else if (JS_IsString(value)) {
         return toString(env, value);
     }
-    else if ((buf = JS_GetArrayBuffer(ctx, &buf_size, value))) {
+
+    if ((buf = JS_GetArrayBuffer(ctx, &buf_size, value))) {
         jobject byteBuffer = env->CallStaticObjectMethod(byteBufferClass, byteBufferAllocateDirect, (jint)buf_size);
         memcpy(env->GetDirectBufferAddress(byteBuffer), buf, buf_size);
         return byteBuffer;
     }
-    else if (JS_IsException(value)) {
+    // attempting to probe for an array buffer will throw an exception, so clear it.
+    JS_FreeValue(ctx, JS_GetException(ctx));
+
+    if (JS_IsException(value)) {
         const auto exception = JS_GetException(ctx);
         std::string val = toStdString(exception);
         return nullptr;
