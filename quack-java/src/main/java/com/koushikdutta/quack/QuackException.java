@@ -56,7 +56,7 @@ public final class QuackException extends RuntimeException {
     // Splice the JavaScript stack in right above the call to Duktape.evaluate.
     StackTraceElement[] selfTrace = new Exception().getStackTrace();
 
-    // depending on the platform, the exception tracem ay add the stack all the way up to the
+    // depending on the platform, the exception trace may add the stack all the way up to the
     // exception constructor (meaning, this method, and the <init> call).
     StackTraceElement search0 = selfTrace[0];
     StackTraceElement search1 = selfTrace[1];
@@ -119,7 +119,7 @@ public final class QuackException extends RuntimeException {
       return null;
     }
     int line = m.group(4) != null ? Integer.parseInt(m.group(4)) : 1;
-    String className = m.group(1) == null ? STACK_TRACE_CLASS_NAME : "";
+    String className = m.group(1) == null ? STACK_TRACE_CLASS_NAME : "<javascript>";
 
     return new StackTraceElement(className, m.group(2), m.group(3),
       line);

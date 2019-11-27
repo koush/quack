@@ -1007,4 +1007,40 @@ public class QuackTests {
         quack.evaluateForJavaScriptObject("(function(cb) { var f = function(){}; if (cb.callback(f) !== f) throw new Error('expected same object'); })").call(cb);
         quack.close();
     }
+
+    @Test
+    public void testErrorExcepionCoercion() {
+        QuackContext quack = QuackContext.create(useQuickJS);
+        try {
+            quack.evaluateForJavaScriptObject("(function(t) {\n" +
+            "function foo1() {" +
+            "throw t.callback();\n" +
+            "}\n" +
+            "function foo2() {" +
+            "foo1();\n" +
+            "}\n" +
+            "foo2();" +
+            "});\n")
+            .call(new RoundtripCallback() {
+                @Override
+                public Object callback(Object o) {
+                    // create an error object from an exception for the
+                    // script to throw.
+                    Exception bad = new RuntimeException("bad");
+                    JavaScriptObject jo = quack.newError(bad);
+                    return jo;
+                }
+            });
+        }
+        catch (Exception e) {
+            // the exception should be the one originally thrown,
+            // including the js stack
+            assertTrue(e instanceof RuntimeException);
+            findStack(e, "foo1");
+            findStack(e, "foo2");
+            return;
+        }
+        fail("exception was expected");
+    }
 }
+

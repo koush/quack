@@ -770,6 +770,7 @@ bool QuickJSContext::rethrowJavaExceptionToQuickJS(JNIEnv *env) {
     // update the stack
     JS_DefinePropertyValueStr(ctx, error, "stack", newStackValue, 0);
     JS_DefinePropertyValueStr(ctx, error, "message", newMessage, 0);
+    JS_DefinePropertyValue(ctx, error, javaExceptionAtom, toObject(env, e), 0);
 
     JS_Throw(ctx, error);
     return true;

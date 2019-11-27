@@ -134,7 +134,7 @@ public final class QuackContext implements Closeable {
     // automatically coerce functional interfaces into functions
     Method method = getLambdaMethod(clazz);
     if (method != null) {
-      return new JavaMethodObject(this, method.getName()) {
+      return new JavaMethodObject(this, o, method.getName()) {
         @Override
         public Object callMethod(Object thiz, Object... args) {
           return super.callMethod(o, args);
@@ -170,6 +170,13 @@ public final class QuackContext implements Closeable {
    * Coerce a JavaScript value into an equivalent Java object.
    */
   public Object coerceJavaScriptToJava(Class<?> clazz, Object o) {
+    Object ret = coerceJavaScriptToJavaOrNull(clazz, o);
+    if (ret != null)
+      return ret;
+    return o;
+  }
+
+  public Object coerceJavaScriptToJavaOrNull(Class<?> clazz, Object o) {
     if (o == null)
       return null;
     while (o instanceof QuackJavaObject) {
@@ -235,19 +242,19 @@ public final class QuackContext implements Closeable {
       // single method arguments are simply callbacks
       Method lambda = getLambdaMethod(clazz);
       if (lambda != null) {
-        return Proxy.newProxyInstance(clazz.getClassLoader(), new Class[]{QuackJavaScriptObject.class, clazz},
+        return Proxy.newProxyInstance(QuackJavaScriptObject.class.getClassLoader(), new Class[]{QuackJavaScriptObject.class, clazz},
                 jo.getWrappedInvocationHandler((proxy, method, args) ->
                         coerceJavaScriptToJava(method.getReturnType(), jo.call(JavaScriptObject.coerceArgs(this, method, args)))));
       }
       else {
         InvocationHandler handler = jo.createInvocationHandler();
-        return Proxy.newProxyInstance(clazz.getClassLoader(), new Class[] { QuackJavaScriptObject.class, clazz }, handler);
+        return Proxy.newProxyInstance(QuackJavaScriptObject.class.getClassLoader(), new Class[] { QuackJavaScriptObject.class, clazz }, handler);
       }
     }
 
     // coercion was a failure, and returning the input value may cause a class
     // cast exception if the caller is expecting a specific type.
-    return o;
+    return null;
   }
 
   public interface JavaMethodReference<T> {
@@ -770,6 +777,34 @@ public final class QuackContext implements Closeable {
     if (context == 0)
       return 0;
     return getHeapSize(context);
+  }
+
+  private interface Thrower {
+    void doThrow() throws Throwable;
+  }
+  private interface Catcher {
+    JavaScriptObject doCatch(Thrower thrower);
+  }
+
+  public synchronized JavaScriptObject newError(Throwable t) {
+    if (context == 0)
+      return null;
+    try {
+      Thrower thrower = () -> {
+        throw t;
+      };
+      Catcher catcher = evaluate("(function(t) { try { t(); } catch (e) { return e } })", Catcher.class);
+      return catcher.doCatch(thrower);
+    }
+    catch (Throwable unexpected) {
+      return null;
+    }
+  }
+
+  public synchronized void throwObject(Object o) {
+    if (context == 0)
+      return;
+    evaluateForJavaScriptObject("(function(t) { throw t; })").call(o);
   }
 
   // to prevent from blocking the JavaScriptObject finalizer, create

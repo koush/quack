@@ -12,8 +12,10 @@ import java.util.Collections;
 public class JavaMethodObject implements QuackMethodObject {
     String target;
     QuackContext quackContext;
-    public JavaMethodObject(QuackContext quackContext, String method) {
+    Object originalThis;
+    public JavaMethodObject(QuackContext quackContext, Object originalThis, String method) {
         this.quackContext = quackContext;
+        this.originalThis = originalThis;
         this.target = method;
     }
 
@@ -44,6 +46,8 @@ public class JavaMethodObject implements QuackMethodObject {
 
     @Override
     public Object callMethod(Object thiz, Object... args) {
+        if (thiz == null || thiz instanceof JavaScriptObject)
+            thiz = originalThis;
         if (thiz == null)
             throw new UnsupportedOperationException("can not call " + target);
         thiz = quackContext.coerceJavaScriptToJava(Object.class, thiz);
@@ -128,13 +132,18 @@ public class JavaMethodObject implements QuackMethodObject {
             }
             return quackContext.coerceJavaToJavaScript(best.invoke(thiz, coerced.toArray()));
         }
+        catch (RuntimeException e) {
+            throw e;
+        }
         catch (IllegalAccessException e) {
-            throw new IllegalArgumentException(best.toString(), e);
+            throw new RuntimeException(e);
         }
         catch (InvocationTargetException e) {
             if (e.getTargetException() instanceof RuntimeException)
                 throw (RuntimeException)e.getTargetException();
-            throw new IllegalArgumentException(best.toString(), e);
+            if (e.getTargetException() instanceof Error)
+                throw (Error)e.getTargetException();
+            throw new RuntimeException(e.getTargetException());
         }
     }
 

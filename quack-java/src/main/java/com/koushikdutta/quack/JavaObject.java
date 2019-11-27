@@ -140,7 +140,7 @@ public final class JavaObject implements QuackJavaObject {
         }, key, clazz.getMethods());
 
         if (m)
-            return new JavaMethodObject(quackContext, key);
+            return new JavaMethodObject(quackContext, target, key);
 
         return null;
     }
