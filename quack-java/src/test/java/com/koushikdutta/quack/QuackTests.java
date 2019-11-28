@@ -1042,5 +1042,22 @@ public class QuackTests {
         }
         fail("exception was expected");
     }
+
+    public static interface InterfaceWithProperty {
+        @QuackProperty(name = "foo")
+        Object getFoo();
+        @QuackProperty(name = "foo")
+        void setFoo(Object foo);
+    }
+
+    @Test
+    public void testJavaScriptProperty() {
+        QuackContext quack = QuackContext.create(useQuickJS);
+        InterfaceWithProperty test = quack.evaluate(InterfaceWithProperty.class, "({ foo: 'hello' })", "?");
+        assertEquals(test.getFoo(), "hello");
+        test.setFoo("goober");
+        assertEquals(test.getFoo(), "goober");
+        quack.close();
+    }
 }
 

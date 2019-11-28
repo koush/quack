@@ -30,6 +30,11 @@ public class JavaScriptObject implements QuackObject, QuackJavaScriptObject {
     }
 
     @Override
+    public JavaScriptObject getJavaScriptObject() {
+        return this;
+    }
+
+    @Override
     public JavaScriptObject construct(Object... args) {
         return constructCoerced(JavaScriptObject.class, args);
     }
@@ -49,12 +54,12 @@ public class JavaScriptObject implements QuackObject, QuackJavaScriptObject {
 
     @Override
     public Object get(String key) {
-        return quackContext.getKeyString(pointer, key);
+        return quackContext.coerceJavaScriptToJava(null, quackContext.getKeyString(pointer, key));
     }
 
     @Override
     public Object get(int index) {
-        return quackContext.getKeyInteger(pointer, index);
+        return quackContext.coerceJavaScriptToJava(null, quackContext.getKeyInteger(pointer, index));
     }
 
     @Override
@@ -98,7 +103,7 @@ public class JavaScriptObject implements QuackObject, QuackJavaScriptObject {
                 return get(number.intValue());
         }
 
-        return quackContext.getKeyObject(pointer, key);
+        return quackContext.coerceJavaScriptToJava(null, quackContext.getKeyObject(pointer, key));
     }
 
     @Override
@@ -180,6 +185,14 @@ public class JavaScriptObject implements QuackObject, QuackJavaScriptObject {
             QuackMethodCoercion methodCoercion = quackContext.JavaToJavascriptMethodCoercions.get(interfaceMethod);
             if (methodCoercion != null)
                 return methodCoercion.invoke(interfaceMethod, this, args);
+
+            QuackProperty property = method.getAnnotation(QuackProperty.class);
+            if (property != null) {
+                if (args == null || args.length == 0)
+                    return quackContext.coerceJavaScriptToJava(method.getReturnType(), JavaScriptObject.this.get(property.name()));
+                JavaScriptObject.this.set(property.name(), quackContext.coerceJavaScriptToJava(method.getParameterTypes()[0], args[0]));
+                return null;
+            }
 
             String methodName = method.getName();
             QuackMethodName annotation = method.getAnnotation(QuackMethodName.class);
