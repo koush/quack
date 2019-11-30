@@ -24,11 +24,11 @@ class PolyfillTests {
         init {
             // for non-android jvm
             try {
-                System.load(File("quack/quack-jni/build/lib/main/debug/libquack-jni.dylib").getCanonicalPath());
+                System.load(File("quack-jni/build/lib/main/debug/libquack-jni.dylib").getCanonicalPath());
             }
             catch (e: Error) {
                 try {
-                    System.load(File("../quack/quack-jni/build/lib/main/debug/libquack-jni.dylib").getCanonicalPath());
+                    System.load(File("../quack-jni/build/lib/main/debug/libquack-jni.dylib").getCanonicalPath());
                 }
                 catch (e: Error) {
                     throw AssertionError("jni load failed")
