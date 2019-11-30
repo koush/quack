@@ -1,0 +1,50 @@
+apply plugin: 'java-library'
+apply plugin: 'kotlin'
+
+
+dependencies {
+    testImplementation 'junit:junit:4.12'
+
+}
+
+buildscript {
+    ext.kotlin_version = '1.3.60'
+    repositories {
+        mavenCentral()
+    }
+    dependencies {
+        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
+    }
+}
+repositories {
+    mavenCentral()
+}
+
+version 'unspecified'
+
+sourceCompatibility = 1.8
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation 'com.google.code.gson:gson:2.8.5'
+    implementation project(":scratch")
+    testCompile group: 'junit', name: 'junit', version: '4.12'
+    compileOnly project(":quack:quack-java")
+    implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk8"
+
+    testImplementation project(":quack:quack-java")
+}
+
+compileKotlin {
+    kotlinOptions {
+        jvmTarget = "1.8"
+    }
+}
+compileTestKotlin {
+    kotlinOptions {
+        jvmTarget = "1.8"
+    }
+}

@@ -1,0 +1,27 @@
+# IntelliJ IDEA
+.idea
+*.iml
+
+# Gradle
+.gradle
+gradlew.bat
+build/
+local.properties
+reports
+jacoco.exec
+duktape/.externalNativeBuild
+
+# upload.sh signing
+/*.asc
+
+# Steve Jobs
+.DS_Store
+.cxx
+duktape-java/*.log
+
+.classpath
+bin
+.project
+.settings
+
+duktape/src/main/jni/quickjs/
