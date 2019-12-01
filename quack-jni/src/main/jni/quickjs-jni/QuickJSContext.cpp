@@ -323,7 +323,7 @@ JSValue QuickJSContext::toObject(JNIEnv *env, jobject value) {
             clazz = env->GetObjectClass(value);
         }
     }
-    
+
     if (env->IsAssignableFrom(clazz, quackjsonObjectClass)) {
         jstring json = (jstring)env->GetObjectField(value, quackJsonField);
         const char *jsonPtr = env->GetStringUTFChars(json, 0);
