@@ -158,6 +158,7 @@ QuickJSContext::QuickJSContext(JavaVM* javaVM, jobject javaQuack):
     byteBufferGetPosition = env->GetMethodID(bufferClass, "position", "()I");
     byteBufferGetLimit = env->GetMethodID(bufferClass, "limit", "()I");
     byteBufferSetPosition = env->GetMethodID(byteBufferClass, "position", "(I)Ljava/nio/Buffer;");
+    byteBufferClear = env->GetMethodID(byteBufferClass, "clear", "()Ljava/nio/Buffer;");
     env->DeleteLocalRef(bufferClass);
 
     // Quack
@@ -165,8 +166,10 @@ QuickJSContext::QuickJSContext(JavaVM* javaVM, jobject javaQuack):
     quackHasMethod = env->GetMethodID(quackClass, "quackHas", "(Lcom/koushikdutta/quack/QuackObject;Ljava/lang/Object;)Z");
     quackGetMethod = env->GetMethodID(quackClass, "quackGet", "(Lcom/koushikdutta/quack/QuackObject;Ljava/lang/Object;)Ljava/lang/Object;");
     quackSetMethod = env->GetMethodID(quackClass, "quackSet", "(Lcom/koushikdutta/quack/QuackObject;Ljava/lang/Object;Ljava/lang/Object;)Z");
-    quackApply = env->GetMethodID(quackClass, "quackApply", "(Lcom/koushikdutta/quack/QuackObject;Ljava/lang/Object;[Ljava/lang/Object;)Ljava/lang/Object;");
-    quackConstruct = env->GetMethodID(quackClass, "quackConstruct", "(Lcom/koushikdutta/quack/QuackObject;[Ljava/lang/Object;)Ljava/lang/Object;");
+    quackApplyMethod = env->GetMethodID(quackClass, "quackApply", "(Lcom/koushikdutta/quack/QuackObject;Ljava/lang/Object;[Ljava/lang/Object;)Ljava/lang/Object;");
+    quackConstructMethod = env->GetMethodID(quackClass, "quackConstruct", "(Lcom/koushikdutta/quack/QuackObject;[Ljava/lang/Object;)Ljava/lang/Object;");
+    quackMapNativeMethod = env->GetMethodID(quackClass, "quackMapNative", "(Ljava/lang/Object;Ljava/lang/Object;)V");
+    quackUnmapNativeMethod = env->GetMethodID(quackClass, "quackUnmapNative", "(Ljava/lang/Object;)Ljava/lang/Object;");
     quackObjectClass = findClass(env, "com/koushikdutta/quack/QuackObject");
 
     // QuackJsonObject
@@ -295,22 +298,33 @@ JSValue QuickJSContext::toObject(JNIEnv *env, jobject value) {
         return JS_NewFloat64(ctx, env->CallDoubleMethodA(value, doubleValue, nullptr));
     else if (env->IsAssignableFrom(clazz, stringClass))
         return toString(env, reinterpret_cast<jstring>(value));
-    else if (env->IsAssignableFrom(clazz, byteBufferClass)) {
+
+    if (env->IsAssignableFrom(clazz, byteBufferClass)) {
         jlong capacity = env->GetDirectBufferCapacity(value);
         if (capacity >= 0) {
-            int position = env->CallIntMethod(value, byteBufferGetPosition);
-            int limit = env->CallIntMethod(value, byteBufferGetLimit);
-            jvalue newPosition;
-            newPosition.i = limit;
-            env->CallObjectMethod(value, byteBufferSetPosition, newPosition);
-            auto buffer = hold(JS_NewArrayBufferCopy(ctx,
-                reinterpret_cast<uint8_t *>(env->GetDirectBufferAddress(value))  + position,
-                (size_t)(limit - position)));
-            JSValue args[] = { (JSValue)buffer };
-            return JS_CallConstructor(ctx, uint8ArrayConstructor, 1, args);
+            // ArrayBuffer and Uint8Arrays originating from QuickJS are mapped to DirectByteBuffers in Java
+            // Java allocated DirectByteBuffers are deep copied because position and limit are mutable properties
+            // that can't be mapped to immutable JavaScript buffer types.
+            jobject nativeValue = env->CallObjectMethod(javaQuack, quackUnmapNativeMethod, value);
+            if (nativeValue == nullptr) {
+                int position = env->CallIntMethod(value, byteBufferGetPosition);
+                int limit = env->CallIntMethod(value, byteBufferGetLimit);
+                jvalue newPosition;
+                newPosition.i = limit;
+                env->CallObjectMethod(value, byteBufferSetPosition, newPosition);
+                auto buffer = hold(JS_NewArrayBufferCopy(ctx,
+                    reinterpret_cast<uint8_t *>(env->GetDirectBufferAddress(value))  + position,
+                    (size_t)(limit - position)));
+                JSValue args[] = { (JSValue)buffer };
+                return JS_CallConstructor(ctx, uint8ArrayConstructor, 1, args);
+            }
+
+            value = nativeValue;
+            clazz = env->GetObjectClass(value);
         }
     }
-    else if (env->IsAssignableFrom(clazz, quackjsonObjectClass)) {
+    
+    if (env->IsAssignableFrom(clazz, quackjsonObjectClass)) {
         jstring json = (jstring)env->GetObjectField(value, quackJsonField);
         const char *jsonPtr = env->GetStringUTFChars(json, 0);
         return JS_ParseJSON(ctx, jsonPtr, (size_t)env->GetStringUTFLength(json), "<QuackJsonObject>");
@@ -366,14 +380,6 @@ jobject QuickJSContext::toObject(JNIEnv *env, JSValue value) {
         return toString(env, value);
     }
 
-    if ((buf = JS_GetArrayBuffer(ctx, &buf_size, value))) {
-        jobject byteBuffer = env->CallStaticObjectMethod(byteBufferClass, byteBufferAllocateDirect, (jint)buf_size);
-        memcpy(env->GetDirectBufferAddress(byteBuffer), buf, buf_size);
-        return byteBuffer;
-    }
-    // attempting to probe for an array buffer will throw an exception, so clear it.
-    JS_FreeValue(ctx, JS_GetException(ctx));
-
     if (JS_IsException(value)) {
         const auto exception = JS_GetException(ctx);
         std::string val = toStdString(exception);
@@ -384,23 +390,7 @@ jobject QuickJSContext::toObject(JNIEnv *env, JSValue value) {
         return nullptr;
     }
 
-    // this does not seem to be dup'd, so don't hold it.
-    auto prototype = JS_GetPrototype(ctx, value);
-    if (JS_VALUE_GET_PTR((JSValue)prototype) == JS_VALUE_GET_PTR(uint8ArrayPrototype)) {
-        size_t offset;
-        size_t size;
-        size_t bpe;
-        auto ab = hold(JS_GetTypedArrayBuffer(ctx, value, &offset, &size, &bpe));
-
-        size_t ab_size;
-        uint8_t *ptr = JS_GetArrayBuffer(ctx, &ab_size, ab);
-
-        jobject byteBuffer = env->CallStaticObjectMethod(byteBufferClass, byteBufferAllocateDirect, (jint)size);
-        memcpy(env->GetDirectBufferAddress(byteBuffer), ptr + offset, size);
-        return byteBuffer;
-    }
-
-    // attempt to find an existing JavaScriptObject that exists on the java side (weak ref)
+    // attempt to find an existing JavaScriptObject (or object like ByteBuffer) that exists on the java side (weak ref)
     auto finalizerFound = hold(JS_GetProperty(ctx, value, customFinalizerAtom));
     int ownProp;
     if (!JS_IsUndefinedOrNull(finalizerFound) && (ownProp = JS_GetOwnProperty(ctx, nullptr, value, customFinalizerAtom))) {
@@ -413,8 +403,15 @@ jobject QuickJSContext::toObject(JNIEnv *env, JSValue value) {
         if (javaThis) {
             // found something, but make sure the weak ref is still alive.
             // if so, return a new local ref, because the global weak ref could be by side effect gc.
-            if (!env->IsSameObject(javaThis, nullptr))
-                return env->NewLocalRef(javaThis);
+            if (!env->IsSameObject(javaThis, nullptr)) {
+                // DirectByteBuffers from QuickJS need to be cleared to reset the position and limit:
+                // The buffer is owned by QuickJS/JavaScript, so position and limit only have meaning
+                // on the Java side.
+                if (!env->IsInstanceOf(javaThis, byteBufferClass) || env->GetDirectBufferCapacity(javaThis) < 0)
+                    return env->NewLocalRef(javaThis);
+                env->CallVoidMethod(javaThis, byteBufferClear);
+                return javaThis;
+            }
             // it was collected, so clean it up
             data->udata = nullptr;
             env->DeleteWeakGlobalRef(javaThis);
@@ -434,8 +431,39 @@ jobject QuickJSContext::toObject(JNIEnv *env, JSValue value) {
 
     // no luck, so create a JavaScriptObject
     void* ptr = JS_VALUE_GET_PTR(value);
+
     jobject javaThis = env->NewObject(javaScriptObjectClass, javaScriptObjectConstructor, javaQuack,
-        reinterpret_cast<jlong>(this), reinterpret_cast<jlong>(ptr));
+                reinterpret_cast<jlong>(this), reinterpret_cast<jlong>(ptr));
+
+    // if the JavaScriptObject is an ArrayBuffer or Uint8Array, create a
+    // corresponding DirectByteBuffer, rather than marshalling the JavaScriptObject.
+    if ((buf = JS_GetArrayBuffer(ctx, &buf_size, value))) {
+        jobject byteBuffer = env->NewDirectByteBuffer(buf, buf_size);
+        // this holds a weak ref to the DirectByteBuffer and a strong ref to the QuickJS ArrayBuffer.
+        env->CallVoidMethod(javaQuack, quackMapNativeMethod, byteBuffer, javaThis);
+        javaThis = byteBuffer;
+    }
+    else {
+        // attempting to probe for an array buffer will throw an exception, so clear it.
+        JS_FreeValue(ctx, JS_GetException(ctx));
+
+        // this does not seem to be dup'd, so don't hold it.
+        auto prototype = JS_GetPrototype(ctx, value);
+        if (JS_VALUE_GET_PTR((JSValue)prototype) == JS_VALUE_GET_PTR(uint8ArrayPrototype)) {
+            size_t offset;
+            size_t size;
+            size_t bpe;
+            auto ab = hold(JS_GetTypedArrayBuffer(ctx, value, &offset, &size, &bpe));
+
+            size_t ab_size;
+            uint8_t *ptr = JS_GetArrayBuffer(ctx, &ab_size, ab);
+
+            jobject byteBuffer = env->NewDirectByteBuffer(ptr + offset, size);
+            // this holds a weak ref to the DirectByteBuffer and a strong ref to the QuickJS Uint8Array.
+            env->CallVoidMethod(javaQuack, quackMapNativeMethod, byteBuffer, javaThis);
+            javaThis = byteBuffer;
+        }
+    }
 
     // stash this to hold a reference, and to free automatically on runtime shutdown.
     auto id = hash(reinterpret_cast<uint64_t>(ptr));
@@ -444,7 +472,6 @@ jobject QuickJSContext::toObject(JNIEnv *env, JSValue value) {
     JS_SetProperty(ctx, stash, prop, value);
 
     setFinalizer(value, javaWeakRefFinalizer, env->NewWeakGlobalRef(javaThis));
-
     return javaThis;
 }
 
@@ -659,7 +686,7 @@ JSValue QuickJSContext::quickjs_apply(jobject func_obj, JSValueConst this_val, i
     }
 
     const auto thiz = LocalRefHolder(env, toObject(env, this_val));
-    jobject result = env->CallObjectMethod(javaQuack, quackApply, func_obj, (jobject)thiz, javaArgs);
+    jobject result = env->CallObjectMethod(javaQuack, quackApplyMethod, func_obj, (jobject)thiz, javaArgs);
     env->DeleteLocalRef(javaArgs);
 
     if (rethrowJavaExceptionToQuickJS(env))
@@ -677,7 +704,7 @@ int QuickJSContext::quickjs_construct(JSValue func_obj, JSValueConst this_val, i
     }
 
     const auto thiz = LocalRefHolder(env, toObject(env, func_obj));
-    auto result = LocalRefHolder(env, env->CallObjectMethod(javaQuack, quackConstruct, (jobject)thiz, javaArgs));
+    auto result = LocalRefHolder(env, env->CallObjectMethod(javaQuack, quackConstructMethod, (jobject)thiz, javaArgs));
     env->DeleteLocalRef(javaArgs);
 
     if (rethrowJavaExceptionToQuickJS(env))

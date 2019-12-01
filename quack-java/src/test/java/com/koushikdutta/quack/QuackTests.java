@@ -1059,5 +1059,53 @@ public class QuackTests {
         assertEquals(test.getFoo(), "goober");
         quack.close();
     }
-}
 
+    @Test
+    public void testNativeArrayBufferSame() {
+        QuackContext quack = QuackContext.create(useQuickJS);
+        JavaScriptObject jo = quack.evaluateForJavaScriptObject("(function(cb) { var a = new ArrayBuffer(10); cb.callback(a); cb.callback(a); })");
+
+        jo.call(new RoundtripCallback() {
+            Object last;
+            @Override
+            public Object callback(Object o) {
+                assertTrue(last == o || last == null);
+                assertTrue(o instanceof ByteBuffer);
+                last = o;
+                return null;
+            }
+        });
+
+        quack.close();
+    }
+
+    @Test
+    public void testNativeArrayBufferSameAndPositionResets() {
+        QuackContext quack = QuackContext.create(useQuickJS);
+        JavaScriptObject jo = quack.evaluateForJavaScriptObject("(function(cb) { var a = new ArrayBuffer(10); cb.callback(a); cb.callback(a); })");
+
+        jo.call(new RoundtripCallback() {
+            Object last;
+            @Override
+            public Object callback(Object o) {
+                assertTrue(last == o || last == null);
+                ByteBuffer bb = (ByteBuffer)o;
+                assert(bb.remaining() == bb.capacity());
+                bb.get(new byte[bb.remaining()]);
+                last = o;
+                return null;
+            }
+        });
+
+        quack.close();
+    }
+
+    @Test
+    public void testArrayBufferSameFromJava() {
+        QuackContext quack = QuackContext.create(useQuickJS);
+        Object ab = quack.evaluate("(new ArrayBuffer(10))");
+        JavaScriptObject jo = quack.evaluateForJavaScriptObject("var last = null; function checker(ab) { if (last != null && last != ab) throw new Error('arraybuffer mismatch'); last = ab; }; checker;");
+        jo.call(ab);
+        jo.call(ab);
+    }
+}

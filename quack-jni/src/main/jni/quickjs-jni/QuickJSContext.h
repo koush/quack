@@ -93,7 +93,7 @@ private:
 
 class QuickJSContext : public JSContext {
 public:
-    explicit QuickJSContext(JavaVM* javaVM, jobject javaDuktape);
+    explicit QuickJSContext(JavaVM* javaVM, jobject javaQuack);
     ~QuickJSContext();
     QuickJSContext(const QuickJSContext &) = delete;
     QuickJSContext & operator=(const QuickJSContext &) = delete;
@@ -151,7 +151,7 @@ public:
     void debuggerAppNotify(JNIEnv *env, jobjectArray args) {}
     jlong getHeapSize(JNIEnv* env);
 
-    // DuktapeObject class traps
+    // QuackObject class traps
     int quickjs_has(jobject object, JSAtom atom);
     JSValue quickjs_get(jobject object, JSAtom atom, JSValueConst receiver);
     int quickjs_set(jobject object, JSAtom atom, JSValueConst value, JSValueConst receiver, int flags);
@@ -183,14 +183,17 @@ public:
     jmethodID quackHasMethod;
     jmethodID quackGetMethod;
     jmethodID quackSetMethod;
-    jmethodID quackApply;
-    jmethodID quackConstruct;
+    jmethodID quackApplyMethod;
+    jmethodID quackMapNativeMethod;
+    jmethodID quackUnmapNativeMethod;
+    jmethodID quackConstructMethod;
     jmethodID javaScriptObjectConstructor;
     jmethodID javaObjectConstructor;
     jmethodID byteBufferAllocateDirect;
     jmethodID byteBufferGetLimit;
     jmethodID byteBufferGetPosition;
     jmethodID byteBufferSetPosition;
+    jmethodID byteBufferClear;
     jmethodID quackGetNativeContext;
     jmethodID quackGetNativePointer;
     jfieldID quackJsonField;

@@ -21,12 +21,17 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.WeakHashMap;
 import java.util.concurrent.Executor;
 import java.util.logging.Logger;
 
 /** A simple EMCAScript (Javascript) interpreter. */
 @SuppressWarnings({"unchecked", "rawtypes"})
 public final class QuackContext implements Closeable {
+  // mapped java objects are held as weak keys to strong javascript object references.
+  // ie, a js ArrayBuffer or Uint8Array value will be mapped from the java DirectByteBuffer key.
+  private final Map<Object, Object> nativeMappings = new WeakHashMap<>();
+
   private final Map<Class, QuackCoercion> JavaScriptToJavaCoercions = new LinkedHashMap<>();
   private final Map<Class, QuackCoercion> JavaToJavascriptCoercions = new LinkedHashMap<>();
   final Map<Method, QuackMethodCoercion> JavaScriptToJavaMethodCoercions = new LinkedHashMap<>();
@@ -494,11 +499,11 @@ public final class QuackContext implements Closeable {
     // coercing a java enum into javascript string
     putJavaToJavaScriptCoercion(Enum.class, (clazz, o) -> o.toString());
 
-    // buffers are transferred one way
     putJavaToJavaScriptCoercion(ByteBuffer.class, (clazz, o) -> {
       // send as is to quickjs, it can handle direct buffers at any position/limit.
       if (o.isDirect() && useQuickJS)
         return o;
+
       // duktape supports reading whole buffers
       if (o.isDirect() && o.remaining() == o.capacity()) {
         o.position(o.limit());
@@ -877,6 +882,12 @@ public final class QuackContext implements Closeable {
   }
   private Object quackConstruct(QuackObject quackObject, Object... args) {
     return quackObject.construct(args == null ? empty : args);
+  }
+  private void quackMapNative(Object key, Object value) {
+    nativeMappings.put(key, value);
+  }
+  private Object quackUnmapNative(Object key) {
+    return nativeMappings.get(key);
   }
 
   private static native long getHeapSize(long context);
