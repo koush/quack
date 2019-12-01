@@ -410,7 +410,7 @@ jobject QuickJSContext::toObject(JNIEnv *env, JSValue value) {
                 // on the Java side.
                 if (!env->IsInstanceOf(localJavaThis, byteBufferClass) || env->GetDirectBufferCapacity(localJavaThis) < 0)
                     return localJavaThis;
-                env->CallVoidMethod(localJavaThis, byteBufferClear);
+                env->CallObjectMethod(localJavaThis, byteBufferClear);
                 return localJavaThis;
             }
             // it was collected, so clean it up

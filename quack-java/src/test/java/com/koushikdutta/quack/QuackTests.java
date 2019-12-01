@@ -13,7 +13,10 @@ import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 public class QuackTests {
     private static boolean useQuickJS = true;
@@ -816,22 +819,37 @@ public class QuackTests {
         assertTrue(semaphore.tryAcquire(500, TimeUnit.MILLISECONDS));
     }
 
-    static class Foo2 {
+    public static class Foo2 {
         public void hello(String str) {
             System.out.println(str);
         }
     }
 
+    // this fails on android, probably something to do with the class loader.
     @Test
-    public void testClassCreation() {
+    public void testClassCreation() throws ClassNotFoundException {
         String script =
-        "var Foo2 = JavaClass.forName('com.koushikdutta.quack.QuackTests$Foo2');\n" +
-        "var foo = new Foo2();\n" +
-        "foo.hello('hello world');\n";
+                "var Foo2 = JavaClass.forName('com.koushikdutta.quack.QuackTests$Foo2');\n" +
+                        "var foo = new Foo2();\n" +
+                        "foo.hello('hello world');\n";
 
         QuackContext quack = QuackContext.create();
         JavaScriptObject global = quack.getGlobalObject();
         global.set("JavaClass", Class.class);
+        quack.evaluate(script);
+        quack.close();
+    }
+
+    // unlike above, this works on android, because the class is provided directly.
+    @Test
+    public void testClassCreationExplicit() throws ClassNotFoundException {
+        String script =
+                        "var foo = new Foo2();\n" +
+                        "foo.hello('hello world');\n";
+
+        QuackContext quack = QuackContext.create();
+        JavaScriptObject global = quack.getGlobalObject();
+        global.set("Foo2", Foo2.class);
         quack.evaluate(script);
         quack.close();
     }
