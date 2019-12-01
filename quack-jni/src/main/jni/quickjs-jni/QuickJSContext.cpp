@@ -457,9 +457,9 @@ jobject QuickJSContext::toObject(JNIEnv *env, JSValue value) {
             auto ab = hold(JS_GetTypedArrayBuffer(ctx, value, &offset, &size, &bpe));
 
             size_t ab_size;
-            uint8_t *ptr = JS_GetArrayBuffer(ctx, &ab_size, ab);
+            uint8_t *ab_ptr = JS_GetArrayBuffer(ctx, &ab_size, ab);
 
-            jobject byteBuffer = env->NewDirectByteBuffer(ptr + offset, size);
+            jobject byteBuffer = env->NewDirectByteBuffer(ab_ptr + offset, size);
             // this holds a weak ref to the DirectByteBuffer and a strong ref to the QuickJS Uint8Array.
             env->CallVoidMethod(javaQuack, quackMapNativeMethod, byteBuffer, javaThis);
             javaThis = byteBuffer;
