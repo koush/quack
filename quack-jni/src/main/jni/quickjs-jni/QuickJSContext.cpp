@@ -404,13 +404,14 @@ jobject QuickJSContext::toObject(JNIEnv *env, JSValue value) {
             // found something, but make sure the weak ref is still alive.
             // if so, return a new local ref, because the global weak ref could be by side effect gc.
             if (!env->IsSameObject(javaThis, nullptr)) {
+                jobject localJavaThis = env->NewLocalRef(javaThis);
                 // DirectByteBuffers from QuickJS need to be cleared to reset the position and limit:
                 // The buffer is owned by QuickJS/JavaScript, so position and limit only have meaning
                 // on the Java side.
-                if (!env->IsInstanceOf(javaThis, byteBufferClass) || env->GetDirectBufferCapacity(javaThis) < 0)
-                    return env->NewLocalRef(javaThis);
-                env->CallVoidMethod(javaThis, byteBufferClear);
-                return javaThis;
+                if (!env->IsInstanceOf(localJavaThis, byteBufferClass) || env->GetDirectBufferCapacity(localJavaThis) < 0)
+                    return localJavaThis;
+                env->CallVoidMethod(localJavaThis, byteBufferClear);
+                return localJavaThis;
             }
             // it was collected, so clean it up
             data->udata = nullptr;

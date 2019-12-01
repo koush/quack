@@ -175,13 +175,6 @@ public final class QuackContext implements Closeable {
    * Coerce a JavaScript value into an equivalent Java object.
    */
   public Object coerceJavaScriptToJava(Class<?> clazz, Object o) {
-    Object ret = coerceJavaScriptToJavaOrNull(clazz, o);
-    if (ret != null)
-      return ret;
-    return o;
-  }
-
-  public Object coerceJavaScriptToJavaOrNull(Class<?> clazz, Object o) {
     if (o == null)
       return null;
     while (o instanceof QuackJavaObject) {
@@ -259,7 +252,7 @@ public final class QuackContext implements Closeable {
 
     // coercion was a failure, and returning the input value may cause a class
     // cast exception if the caller is expecting a specific type.
-    return null;
+    return o;
   }
 
   public interface JavaMethodReference<T> {
