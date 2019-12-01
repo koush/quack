@@ -38,14 +38,14 @@ static void javaRefFinalizer(QuickJSContext *ctx, JSValue val, void *udata) {
 }
 
 static void customFinalizer(JSRuntime *rt, JSValue val) {
-    CustomFinalizerData *data = reinterpret_cast<CustomFinalizerData *>(JS_GetOpaque(val, customFinalizerClassId));
+    auto *data = reinterpret_cast<CustomFinalizerData *>(JS_GetOpaque(val, customFinalizerClassId));
     // prevent double finalization from when the java side dies
     data->finalizer(data->ctx, val, data->udata);
     free(data);
 }
 
 static void quackObjectFinalizer(JSRuntime *rt, JSValue val) {
-    CustomFinalizerData *data = reinterpret_cast<CustomFinalizerData *>(JS_GetOpaque(val, quackObjectProxyClassId));
+    auto *data = reinterpret_cast<CustomFinalizerData *>(JS_GetOpaque(val, quackObjectProxyClassId));
     if (data)
         data->finalizer(data->ctx, val, data->udata);
     free(data);
@@ -57,28 +57,28 @@ static struct JSClassDef customFinalizerClassDef = {
 };
 
 int quickjs_has(JSContext *ctx, JSValueConst obj, JSAtom atom) {
-    CustomFinalizerData *data = reinterpret_cast<CustomFinalizerData *>(JS_GetOpaque(obj, quackObjectProxyClassId));
-    jobject object = reinterpret_cast<jobject>(data->udata);
+    auto *data = reinterpret_cast<CustomFinalizerData *>(JS_GetOpaque(obj, quackObjectProxyClassId));
+    auto object = reinterpret_cast<jobject>(data->udata);
     return data->ctx->quickjs_has(object, atom);
 }
 JSValue quickjs_get(JSContext *ctx, JSValueConst obj, JSAtom atom, JSValueConst receiver) {
-    CustomFinalizerData *data = reinterpret_cast<CustomFinalizerData *>(JS_GetOpaque(obj, quackObjectProxyClassId));
-    jobject object = reinterpret_cast<jobject>(data->udata);
+    auto *data = reinterpret_cast<CustomFinalizerData *>(JS_GetOpaque(obj, quackObjectProxyClassId));
+    auto object = reinterpret_cast<jobject>(data->udata);
     return data->ctx->quickjs_get(object, atom, receiver);
 }
 /* return < 0 if exception or TRUE/FALSE */
 int quickjs_set(JSContext *ctx, JSValueConst obj, JSAtom atom, JSValueConst value, JSValueConst receiver, int flags) {
-    CustomFinalizerData *data = reinterpret_cast<CustomFinalizerData *>(JS_GetOpaque(obj, quackObjectProxyClassId));
-    jobject object = reinterpret_cast<jobject>(data->udata);
+    auto *data = reinterpret_cast<CustomFinalizerData *>(JS_GetOpaque(obj, quackObjectProxyClassId));
+    auto object = reinterpret_cast<jobject>(data->udata);
     return data->ctx->quickjs_set(object, atom, value, receiver, flags);
 }
 JSValue quickjs_apply(JSContext *ctx, JSValueConst func_obj, JSValueConst this_val, int argc, JSValueConst *argv) {
-    CustomFinalizerData *data = reinterpret_cast<CustomFinalizerData *>(JS_GetOpaque(func_obj, quackObjectProxyClassId));
-    jobject object = reinterpret_cast<jobject>(data->udata);
+    auto *data = reinterpret_cast<CustomFinalizerData *>(JS_GetOpaque(func_obj, quackObjectProxyClassId));
+    auto object = reinterpret_cast<jobject>(data->udata);
     return data->ctx->quickjs_apply(object, this_val, argc, argv);
 }
 int quickjs_construct(JSContext *ctx, JSValue func_obj, JSValueConst this_val, int argc, JSValueConst *argv) {
-    QuickJSContext *qctx = reinterpret_cast<QuickJSContext *>(JS_GetContextOpaque(ctx));
+    auto *qctx = reinterpret_cast<QuickJSContext *>(JS_GetContextOpaque(ctx));
     return qctx->quickjs_construct(func_obj, this_val, argc, argv);
 }
 
@@ -232,7 +232,7 @@ void QuickJSContext::finalizeJavaScriptObject(JNIEnv *env, jlong object) {
 }
 
 void QuickJSContext::setFinalizerOnFinalizerObject(JSValue finalizerObject, CustomFinalizer finalizer, void *udata) {
-    struct CustomFinalizerData *data = new CustomFinalizerData();
+    auto *data = new CustomFinalizerData();
     *data = {
         this,
         finalizer,
@@ -325,12 +325,12 @@ JSValue QuickJSContext::toObject(JNIEnv *env, jobject value) {
     }
 
     if (env->IsAssignableFrom(clazz, quackjsonObjectClass)) {
-        jstring json = (jstring)env->GetObjectField(value, quackJsonField);
+        auto json = (jstring)env->GetObjectField(value, quackJsonField);
         const char *jsonPtr = env->GetStringUTFChars(json, 0);
         return JS_ParseJSON(ctx, jsonPtr, (size_t)env->GetStringUTFLength(json), "<QuackJsonObject>");
     }
     else if (env->IsAssignableFrom(clazz, quackJavaScriptObjectClass)) {
-        QuickJSContext *context = reinterpret_cast<QuickJSContext *>(env->CallLongMethod(value, quackGetNativeContext));
+        auto *context = reinterpret_cast<QuickJSContext *>(env->CallLongMethod(value, quackGetNativeContext));
         // matching context, grab the native JSValue
         if (context == this)
             return toValueAsDup(ctx, env->CallLongMethod(value, quackGetNativePointer));
