@@ -39,16 +39,53 @@ static void javaRefFinalizer(QuickJSContext *ctx, JSValue val, void *udata) {
 
 static void customFinalizer(JSRuntime *rt, JSValue val) {
     auto *data = reinterpret_cast<CustomFinalizerData *>(JS_GetOpaque(val, customFinalizerClassId));
-    // prevent double finalization from when the java side dies
+    if (!data)
+        return;
     data->finalizer(data->ctx, val, data->udata);
     free(data);
 }
 
 static void quackObjectFinalizer(JSRuntime *rt, JSValue val) {
     auto *data = reinterpret_cast<CustomFinalizerData *>(JS_GetOpaque(val, quackObjectProxyClassId));
-    if (data)
-        data->finalizer(data->ctx, val, data->udata);
+    if (!data)
+        return;
+    data->finalizer(data->ctx, val, data->udata);
     free(data);
+}
+// called when the JavaScriptObject on the Java side gets collected.
+// the object may continue living in the QuickJS side, but clean up all references
+// to the java side.
+void QuickJSContext::finalizeJavaScriptObject(JNIEnv *env, jlong object) {
+    // the JavaScriptObject is referenced in two spots:
+    // on the private atom for the JSValue and also in the stash.
+    // delete them both, and the finalizer will be triggered.
+    JSValue value = toValueAsLocal(object);
+
+    // JSValue prop that has the finalizer thats attached to the weak ref of the JavaScriptObject
+    JS_DeleteProperty(ctx, value, customFinalizerAtom, 0);
+
+    // delete the entry in the stash that was keeping this alive from the java side.
+    auto id = hash((uint64_t)object);
+    auto prop = JS_NewAtomUInt32(ctx, id);
+    assert(JS_DeleteProperty(ctx, stash, prop, 0));
+    JS_FreeAtom(ctx, prop);
+}
+
+void QuickJSContext::setFinalizerOnFinalizerObject(JSValue finalizerObject, CustomFinalizer finalizer, void *udata) {
+    auto *data = new CustomFinalizerData();
+    *data = {
+        this,
+        finalizer,
+        udata
+    };
+    assert(JS_IsObject(finalizerObject));
+    JS_SetOpaque(finalizerObject, data);
+}
+
+void QuickJSContext::setFinalizer(JSValue value, CustomFinalizer finalizer, void *udata) {
+    JSValue finalizerObject = JS_NewObjectClass(ctx, customFinalizerClassId);
+    setFinalizerOnFinalizerObject(finalizerObject, finalizer, udata);
+    JS_SetProperty(ctx, value, customFinalizerAtom, finalizerObject);
 }
 
 static struct JSClassDef customFinalizerClassDef = {
@@ -211,43 +248,6 @@ QuickJSContext::~QuickJSContext() {
 JSAtom QuickJSContext::privateAtom(const char *str) {
     return JS_NewAtomLenPrivate(ctx, str, strlen(str));
 }
-
-// called when the JavaScriptObject on the Java side gets collected.
-// the object may continue living in the QuickJS side, but clean up all references
-// to the java side.
-void QuickJSContext::finalizeJavaScriptObject(JNIEnv *env, jlong object) {
-    // the JavaScriptObject is referenced in two spots:
-    // on the private atom for the JSValue and also in the stash.
-    // delete them both, and the finalizer will be triggered.
-    JSValue value = toValueAsLocal(object);
-
-    // JSValue prop that has the finalizer thats attached to the weak ref of the JavaScriptObject
-    JS_DeleteProperty(ctx, value, customFinalizerAtom, 0);
-
-    // delete the entry in the stash that was keeping this alive from the java side.
-    auto id = hash((uint64_t)object);
-    auto prop = JS_NewAtomUInt32(ctx, id);
-    assert(JS_DeleteProperty(ctx, stash, prop, 0));
-    JS_FreeAtom(ctx, prop);
-}
-
-void QuickJSContext::setFinalizerOnFinalizerObject(JSValue finalizerObject, CustomFinalizer finalizer, void *udata) {
-    auto *data = new CustomFinalizerData();
-    *data = {
-        this,
-        finalizer,
-        udata
-    };
-    assert(JS_IsObject(finalizerObject));
-    JS_SetOpaque(finalizerObject, data);
-}
-
-void QuickJSContext::setFinalizer(JSValue value, CustomFinalizer finalizer, void *udata) {
-    JSValue finalizerObject = JS_NewObjectClass(ctx, customFinalizerClassId);
-    setFinalizerOnFinalizerObject(finalizerObject, finalizer, udata);
-    JS_SetProperty(ctx, value, customFinalizerAtom, finalizerObject);
-}
-
 
 jclass QuickJSContext::findClass(JNIEnv *env, const char *className) {
     return (jclass)env->NewGlobalRef(env->FindClass(className));
