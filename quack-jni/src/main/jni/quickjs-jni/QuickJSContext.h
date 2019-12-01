@@ -7,6 +7,7 @@
 #include "../../../../../../quickjs/quickjs-debugger.h"
 #include "../JSContext.h"
 #include <vector>
+#include <map>
 
 class QuickJSContext;
 
@@ -57,6 +58,10 @@ private:
 
 class JSValueHolder {
 public:
+    JSValueHolder():
+        ctx(nullptr),
+        value(JS_UNDEFINED) {
+    }
     JSValueHolder(JSContext *ctx, JSValue value):
         ctx(ctx),
         value(value) {
@@ -67,7 +72,7 @@ public:
     JSValueHolder(const JSValueHolder &other) {
         ctx = other.ctx;
         value = JS_DupValue(ctx, other.value);
-    }  
+    }
 
     inline JSValueHolder& operator=(const JSValueHolder& other) {
         if (&other != this) {
@@ -78,7 +83,10 @@ public:
             ctx = other.ctx;
             value = JS_DupValue(ctx, other.value);
 
-            JS_FreeValue(ctx, oldValue);
+            JS_FreeValue(oldCtx, oldValue);
+        }
+        else {
+            assert(false);
         }
         return *this;
     }
@@ -166,7 +174,7 @@ public:
     jobject javaQuack;
     JSRuntime *runtime;
     JSContext *ctx;
-    JSValue stash;
+    std::map<jlong, JSValueHolder> stash;
     JSValue thrower_function;
 
     jclass objectClass;

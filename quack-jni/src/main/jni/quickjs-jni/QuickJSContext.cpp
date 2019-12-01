@@ -14,10 +14,6 @@ inline static JSValue toValueAsDup(JSContext *ctx, jlong object) {
     return JS_DupValue(ctx, JS_MKPTR(JS_TAG_OBJECT, reinterpret_cast<void *>(object)));
 }
 
-inline uint32_t hash(uint64_t v) {
-    return (uint32_t)(((v >> 32) & 0x00000000FFFFFFFF) ^ (v & 0x00000000FFFFFFFF));
-}
-
 static JSClassID customFinalizerClassId = 0;
 static JSClassID quackObjectProxyClassId = 0;
 
@@ -65,10 +61,7 @@ void QuickJSContext::finalizeJavaScriptObject(JNIEnv *env, jlong object) {
     JS_DeleteProperty(ctx, value, customFinalizerAtom, 0);
 
     // delete the entry in the stash that was keeping this alive from the java side.
-    auto id = hash((uint64_t)object);
-    auto prop = JS_NewAtomUInt32(ctx, id);
-    assert(JS_DeleteProperty(ctx, stash, prop, 0));
-    JS_FreeAtom(ctx, prop);
+    assert(stash.erase(object) == 1);
 }
 
 void QuickJSContext::setFinalizerOnFinalizerObject(JSValue finalizerObject, CustomFinalizer finalizer, void *udata) {
@@ -151,7 +144,6 @@ QuickJSContext::QuickJSContext(JavaVM* javaVM, jobject javaQuack):
     // end test
 
     JS_SetMaxStackSize(ctx, 1024 * 1024 * 4);
-    stash = JS_NewObject(ctx);
 
     auto global = hold(JS_GetGlobalObject(ctx));
     uint8ArrayConstructor = JS_GetPropertyStr(ctx, global, "Uint8Array");
@@ -239,7 +231,7 @@ QuickJSContext::QuickJSContext(JavaVM* javaVM, jobject javaQuack):
 QuickJSContext::~QuickJSContext() {
     JS_FreeValue(ctx, uint8ArrayPrototype);
     JS_FreeValue(ctx, uint8ArrayConstructor);
-    JS_FreeValue(ctx, stash);
+    stash.clear();
     JS_FreeValue(ctx, thrower_function);
     JS_FreeContext(ctx);
     JS_FreeRuntime(runtime);
@@ -431,10 +423,10 @@ jobject QuickJSContext::toObject(JNIEnv *env, JSValue value) {
     }
 
     // no luck, so create a JavaScriptObject
-    void* ptr = JS_VALUE_GET_PTR(value);
+    jlong ptr = reinterpret_cast<jlong>(JS_VALUE_GET_PTR(value));
 
     jobject javaThis = env->NewObject(javaScriptObjectClass, javaScriptObjectConstructor, javaQuack,
-                reinterpret_cast<jlong>(this), reinterpret_cast<jlong>(ptr));
+                reinterpret_cast<jlong>(this), ptr);
 
     // if the JavaScriptObject is an ArrayBuffer or Uint8Array, create a
     // corresponding DirectByteBuffer, rather than marshalling the JavaScriptObject.
@@ -467,10 +459,7 @@ jobject QuickJSContext::toObject(JNIEnv *env, JSValue value) {
     }
 
     // stash this to hold a reference, and to free automatically on runtime shutdown.
-    auto id = hash(reinterpret_cast<uint64_t>(ptr));
-    value = JS_DupValue(ctx, value);
-    auto prop = JS_NewAtomUInt32(ctx, id);
-    JS_SetProperty(ctx, stash, prop, value);
+    stash[ptr] = hold(JS_DupValue(ctx, value));
 
     setFinalizer(value, javaWeakRefFinalizer, env->NewWeakGlobalRef(javaThis));
     return javaThis;
