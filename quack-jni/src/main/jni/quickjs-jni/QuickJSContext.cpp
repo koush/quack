@@ -395,9 +395,8 @@ jobject QuickJSContext::toObject(JNIEnv *env, JSValue value) {
                 // DirectByteBuffers from QuickJS need to be cleared to reset the position and limit:
                 // The buffer is owned by QuickJS/JavaScript, so position and limit only have meaning
                 // on the Java side.
-                if (!env->IsInstanceOf(localJavaThis, byteBufferClass) || env->GetDirectBufferCapacity(localJavaThis) < 0)
-                    return localJavaThis;
-                env->CallObjectMethod(localJavaThis, byteBufferClear);
+                if (env->IsInstanceOf(localJavaThis, byteBufferClass) && env->GetDirectBufferCapacity(localJavaThis) >= 0)
+                    env->CallObjectMethod(localJavaThis, byteBufferClear);
                 return localJavaThis;
             }
             // the jobject is dead, so remove the twin from the JSValue and from the stash.
