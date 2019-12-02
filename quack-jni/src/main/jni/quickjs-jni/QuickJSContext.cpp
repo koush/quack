@@ -7,11 +7,9 @@ extern "C" {
 
 #define JS_IsUndefinedOrNull(value) (JS_IsUndefined(value) || JS_IsNull(value))
 
-inline static JSValue toValueAsLocal(jlong object) {
-    return JS_MKPTR(JS_TAG_OBJECT, reinterpret_cast<void *>(object));
-}
-inline static JSValue toValueAsDup(JSContext *ctx, jlong object) {
-    return JS_DupValue(ctx, JS_MKPTR(JS_TAG_OBJECT, reinterpret_cast<void *>(object)));
+inline JSValueHolder QuickJSContext::toValueAsLocal(jlong object) {
+    JSValue twin = JS_MKPTR(JS_TAG_OBJECT, reinterpret_cast<void *>(object));
+    return JSValueHolder(ctx, JS_GetProperty(ctx, twin, atomHoldsJavaScriptObject));
 }
 
 static JSClassID customFinalizerClassId = 0;
@@ -48,20 +46,14 @@ static void quackObjectFinalizer(JSRuntime *rt, JSValue val) {
     data->finalizer(data->ctx, val, data->udata);
     free(data);
 }
+
 // called when the JavaScriptObject on the Java side gets collected.
 // the object may continue living in the QuickJS side, but clean up all references
 // to the java side.
+// this will trigger a GC on the stashed twin, which will clean up the weak global reference.
 void QuickJSContext::finalizeJavaScriptObject(JNIEnv *env, jlong object) {
-    // the JavaScriptObject is referenced in two spots:
-    // on the private atom for the JSValue and also in the stash.
-    // delete them both, and the finalizer will be triggered.
-    JSValue value = toValueAsLocal(object);
-
-    // JSValue prop that has the finalizer thats attached to the weak ref of the JavaScriptObject
-    JS_DeleteProperty(ctx, value, customFinalizerAtom, 0);
-
     // delete the entry in the stash that was keeping this alive from the java side.
-    assert(stash.erase(object) == 1);
+    stash.erase(object);
 }
 
 void QuickJSContext::setFinalizerOnFinalizerObject(JSValue finalizerObject, CustomFinalizer finalizer, void *udata) {
@@ -155,6 +147,7 @@ QuickJSContext::QuickJSContext(JavaVM* javaVM, jobject javaQuack):
     JS_SetContextOpaque(ctx, this);
 
     atomHoldsJavaObject = privateAtom("javaObject");
+    atomHoldsJavaScriptObject = privateAtom("javaScriptObject");
     customFinalizerAtom = privateAtom("customFinalizer");
     javaExceptionAtom = privateAtom("javaException");
     // JS_NewClassID is static run once mechanism
@@ -324,8 +317,10 @@ JSValue QuickJSContext::toObject(JNIEnv *env, jobject value) {
     else if (env->IsAssignableFrom(clazz, quackJavaScriptObjectClass)) {
         auto *context = reinterpret_cast<QuickJSContext *>(env->CallLongMethod(value, quackGetNativeContext));
         // matching context, grab the native JSValue
-        if (context == this)
-            return toValueAsDup(ctx, env->CallLongMethod(value, quackGetNativePointer));
+        if (context == this) {
+            auto twin = toValueAsLocal(env->CallLongMethod(value, quackGetNativePointer));
+            return JS_DupValue(ctx, twin);
+        }
         // a proxy already exists, but not for the correct QuackContext, so native javascript heap
         // pointer can't be used.
     }
@@ -383,14 +378,14 @@ jobject QuickJSContext::toObject(JNIEnv *env, JSValue value) {
     }
 
     // attempt to find an existing JavaScriptObject (or object like ByteBuffer) that exists on the java side (weak ref)
-    auto finalizerFound = hold(JS_GetProperty(ctx, value, customFinalizerAtom));
+    auto twinFound = hold(JS_GetProperty(ctx, value, customFinalizerAtom));
     int ownProp;
-    if (!JS_IsUndefinedOrNull(finalizerFound) && (ownProp = JS_GetOwnProperty(ctx, nullptr, value, customFinalizerAtom))) {
+    if (!JS_IsUndefinedOrNull(twinFound) && (ownProp = JS_GetOwnProperty(ctx, nullptr, value, customFinalizerAtom))) {
         // exception
         if (ownProp == -1)
             return nullptr;
 
-        auto data = reinterpret_cast<CustomFinalizerData *>(JS_GetOpaque(finalizerFound, customFinalizerClassId));
+        auto data = reinterpret_cast<CustomFinalizerData *>(JS_GetOpaque(twinFound, customFinalizerClassId));
         auto javaThis = reinterpret_cast<jobject>(data->udata);
         if (javaThis) {
             // found something, but make sure the weak ref is still alive.
@@ -405,11 +400,12 @@ jobject QuickJSContext::toObject(JNIEnv *env, JSValue value) {
                 env->CallObjectMethod(localJavaThis, byteBufferClear);
                 return localJavaThis;
             }
-            // it was collected, so clean it up
-            data->udata = nullptr;
-            env->DeleteWeakGlobalRef(javaThis);
-            // remove the property to prevent double deletes.
+            // the jobject is dead, so remove the twin from the JSValue and from the stash.
+            // eventually the Java side will trigger the finalizer which will again
+            // try to remove the twin from the stash, but it will already be gone.
             JS_DeleteProperty(ctx, value, customFinalizerAtom, 0);
+            jlong foundPtr = reinterpret_cast<jlong>(JS_VALUE_GET_PTR((JSValue)twinFound));
+            stash.erase(foundPtr);
         }
     }
     else {
@@ -422,13 +418,29 @@ jobject QuickJSContext::toObject(JNIEnv *env, JSValue value) {
         }
     }
 
-    // no luck, so create a JavaScriptObject
-    jlong ptr = reinterpret_cast<jlong>(JS_VALUE_GET_PTR(value));
+    // must create a JavaScriptObject jobject to pass back to Java
 
+    // Create a QuicKJS twin object to mirror the lifetime of java side JavaScriptObject
+    // The JavaScriptObject will stash a hard reference to the twin.
+    // The twin will hold a weak global reference to the JavaScriptObject.
+    // The twin will also hold a reference to the JSValue. This will be
+    // used to convert the JavaScriptObject back into theJSValue.
+    // The JavaScriptObject may be collected on the Java side, and continue surviving on the
+    // QuickJS side. So any references held from the QuickJS side need to be mindful of this.
+    // The JavaScriptObject can't stash a reference to the JSValue itself, but
+    // rather must stash the twin due to GC race conditions.
+    // The JSValue will hold a reference to the most recent twin.
+    // Garbage collection of the JavaScriptObject will trigger garbage collection of the
+    // twin, which may indirectly trigger garbage collection of the JSValue.
+    JSValue twin = JS_NewObjectClass(ctx, customFinalizerClassId);
+
+    // grab a pointer to the twin finalizer object and create the JavaScriptObject
+    // with the twin
+    jlong ptr = reinterpret_cast<jlong>(JS_VALUE_GET_PTR(twin));
     jobject javaThis = env->NewObject(javaScriptObjectClass, javaScriptObjectConstructor, javaQuack,
                 reinterpret_cast<jlong>(this), ptr);
 
-    // if the JavaScriptObject is an ArrayBuffer or Uint8Array, create a
+    // if the JSValue is an ArrayBuffer or Uint8Array, create a
     // corresponding DirectByteBuffer, rather than marshalling the JavaScriptObject.
     if ((buf = JS_GetArrayBuffer(ctx, &buf_size, value))) {
         jobject byteBuffer = env->NewDirectByteBuffer(buf, buf_size);
@@ -458,10 +470,18 @@ jobject QuickJSContext::toObject(JNIEnv *env, JSValue value) {
         }
     }
 
-    // stash this to hold a reference, and to free automatically on runtime shutdown.
-    stash[ptr] = hold(JS_DupValue(ctx, value));
+    // hook the jobject (JavaScriptObject/DirectByteBuffer/etc) up to the twin
+    setFinalizerOnFinalizerObject(twin, javaWeakRefFinalizer, env->NewWeakGlobalRef(javaThis));
 
-    setFinalizer(value, javaWeakRefFinalizer, env->NewWeakGlobalRef(javaThis));
+    // stash the twin to hold a reference, and to free the global weak ref on runtime shutdown.
+    stash[ptr] = hold(JS_DupValue(ctx, twin));
+
+    // set the jobject on the finalizer object
+    JS_SetProperty(ctx, twin, atomHoldsJavaScriptObject, JS_DupValue(ctx, value));
+
+    // set the finalizer object on the JSValue
+    JS_SetProperty(ctx, value, customFinalizerAtom, twin);
+
     return javaThis;
 }
 

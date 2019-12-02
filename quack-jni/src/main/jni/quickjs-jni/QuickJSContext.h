@@ -121,7 +121,9 @@ public:
     jobject toObject(JNIEnv *env, JSValue value);
     jobject toObjectCheckQuickJSError(JNIEnv *env, JSValue value);
     JSValue toObject(JNIEnv *env, jobject value);
-    
+ 
+    inline JSValueHolder toValueAsLocal(jlong object);
+
     void setFinalizer(JSValue value, CustomFinalizer finalizer, void *udata);
     void setFinalizerOnFinalizerObject(JSValue finalizerObject, CustomFinalizer finalizer, void *udata);
 
@@ -223,6 +225,7 @@ public:
     jmethodID addJavaStack;
 
     JSAtom atomHoldsJavaObject;
+    JSAtom atomHoldsJavaScriptObject;
     JSAtom customFinalizerAtom;
     JSAtom javaExceptionAtom;
     JSValue uint8ArrayConstructor;
