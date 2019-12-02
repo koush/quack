@@ -945,6 +945,7 @@ public class QuackTests {
         String scriptString = "(function(a, b, c, d) { return c; })";
         VarArgTest test = quack.evaluate(scriptString, VarArgTest.class);
         assertEquals(test.invoke("a", "b", "c"), "c");
+        quack.close();
     }
 
     @Test
@@ -1059,6 +1060,7 @@ public class QuackTests {
             return;
         }
         fail("exception was expected");
+        quack.close();
     }
 
     public static interface InterfaceWithProperty {
@@ -1125,5 +1127,6 @@ public class QuackTests {
         JavaScriptObject jo = quack.evaluateForJavaScriptObject("var last = null; function checker(ab) { if (last != null && last != ab) throw new Error('arraybuffer mismatch'); last = ab; }; checker;");
         jo.call(ab);
         jo.call(ab);
+        quack.close();
     }
 }
