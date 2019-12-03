@@ -15,6 +15,7 @@ import java.util.regex.Pattern;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
@@ -928,13 +929,6 @@ public class QuackTests {
         assertEquals(FieldTest.staticFoo, 4);
     }
 
-    @Test
-    public void testModule() {
-        QuackContext quack = QuackContext.create();
-        JavaScriptObject jo = quack.evaluateModule("console.log('test');", "test.js");
-        quack.close();
-    }
-
     public interface VarArgTest {
         Object invoke(Object... args);
     }
@@ -1127,6 +1121,15 @@ public class QuackTests {
         JavaScriptObject jo = quack.evaluateForJavaScriptObject("var last = null; function checker(ab) { if (last != null && last != ab) throw new Error('arraybuffer mismatch'); last = ab; }; checker;");
         jo.call(ab);
         jo.call(ab);
+        quack.close();
+    }
+
+    @Test
+    public void testModule() {
+        QuackContext quack = QuackContext.create(useQuickJS);
+        JavaScriptObject jo = quack.evaluateModule("import * as std from 'std';");
+        // at the moment modules return null. there doesn't seem to be a way to get the exports out.
+        assertNull(jo);
         quack.close();
     }
 }
