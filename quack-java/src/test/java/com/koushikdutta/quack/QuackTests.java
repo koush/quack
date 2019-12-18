@@ -1074,7 +1074,8 @@ public class QuackTests {
         quack.close();
     }
 
-    @Test
+    // disabled because tracking memory pointers is expensive.
+//    @Test
     public void testNativeArrayBufferSame() {
         QuackContext quack = QuackContext.create(useQuickJS);
         JavaScriptObject jo = quack.evaluateForJavaScriptObject("(function(cb) { var a = new ArrayBuffer(10); cb.callback(a); cb.callback(a); })");
@@ -1093,7 +1094,8 @@ public class QuackTests {
         quack.close();
     }
 
-    @Test
+    // disabled because tracking memory pointers is expensive.
+//    @Test
     public void testNativeArrayBufferSameAndPositionResets() {
         QuackContext quack = QuackContext.create(useQuickJS);
         JavaScriptObject jo = quack.evaluateForJavaScriptObject("(function(cb) { var a = new ArrayBuffer(10); cb.callback(a); cb.callback(a); })");

@@ -435,11 +435,13 @@ jobject QuickJSContext::toObject(JNIEnv *env, JSValue value) {
 
     // if the JSValue is an ArrayBuffer or Uint8Array, create a
     // corresponding DirectByteBuffer, rather than marshalling the JavaScriptObject.
+    bool trackJavaScriptObjectInstance = true;
     if ((buf = JS_GetArrayBuffer(ctx, &buf_size, value))) {
         jobject byteBuffer = env->NewDirectByteBuffer(buf, buf_size);
         // this holds a weak ref to the DirectByteBuffer and a strong ref to the QuickJS ArrayBuffer.
         env->CallVoidMethod(javaQuack, quackMapNativeMethod, byteBuffer, javaThis);
         javaThis = byteBuffer;
+        trackJavaScriptObjectInstance = false;
     }
     else {
         // attempting to probe for an array buffer will throw an exception, so clear it.
@@ -460,11 +462,15 @@ jobject QuickJSContext::toObject(JNIEnv *env, JSValue value) {
             // this holds a weak ref to the DirectByteBuffer and a strong ref to the QuickJS Uint8Array.
             env->CallVoidMethod(javaQuack, quackMapNativeMethod, byteBuffer, javaThis);
             javaThis = byteBuffer;
+            trackJavaScriptObjectInstance = false;
         }
     }
 
-    // hook the jobject (JavaScriptObject/DirectByteBuffer/etc) up to the twin
-    setFinalizerOnFinalizerObject(twin, javaWeakRefFinalizer, env->NewWeakGlobalRef(javaThis));
+    jobject javaThisWeakGlobalRef = nullptr;
+    if (trackJavaScriptObjectInstance)
+        setFinalizerOnFinalizerObject(twin, javaWeakRefFinalizer, env->NewWeakGlobalRef(javaThis));
+    else
+        setFinalizerOnFinalizerObject(twin, javaWeakRefFinalizer, nullptr);
 
     // stash the twin to hold a reference, and to free the global weak ref on runtime shutdown.
     stash[ptr] = hold(JS_DupValue(ctx, twin));
