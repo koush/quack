@@ -67,12 +67,6 @@ void QuickJSContext::setFinalizerOnFinalizerObject(JSValue finalizerObject, Cust
     JS_SetOpaque(finalizerObject, data);
 }
 
-void QuickJSContext::setFinalizer(JSValue value, CustomFinalizer finalizer, void *udata) {
-    JSValue finalizerObject = JS_NewObjectClass(ctx, customFinalizerClassId);
-    setFinalizerOnFinalizerObject(finalizerObject, finalizer, udata);
-    JS_SetProperty(ctx, value, customFinalizerAtom, finalizerObject);
-}
-
 static struct JSClassDef customFinalizerClassDef = {
     .class_name = "CustomFinalizer",
     .finalizer = customFinalizer,
@@ -423,7 +417,7 @@ jobject QuickJSContext::toObject(JNIEnv *env, JSValue value) {
     // The JavaScriptObject will stash a hard reference to the twin.
     // The twin will hold a weak global reference to the JavaScriptObject.
     // The twin will also hold a reference to the JSValue. This will be
-    // used to convert the JavaScriptObject back into theJSValue.
+    // used to convert the JavaScriptObject back into the JSValue.
     // The JavaScriptObject may be collected on the Java side, and continue surviving on the
     // QuickJS side. So any references held from the QuickJS side need to be mindful of this.
     // The JavaScriptObject can't stash a reference to the JSValue itself, but
@@ -475,7 +469,7 @@ jobject QuickJSContext::toObject(JNIEnv *env, JSValue value) {
     // stash the twin to hold a reference, and to free the global weak ref on runtime shutdown.
     stash[ptr] = hold(JS_DupValue(ctx, twin));
 
-    // set the jobject on the finalizer object
+    // set the JSValue on the finalizer object
     JS_SetProperty(ctx, twin, atomHoldsJavaScriptObject, JS_DupValue(ctx, value));
 
     // set the finalizer object on the JSValue
