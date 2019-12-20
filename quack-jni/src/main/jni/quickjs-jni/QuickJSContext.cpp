@@ -433,9 +433,14 @@ jobject QuickJSContext::toObject(JNIEnv *env, JSValue value) {
     jobject javaThis = env->NewObject(javaScriptObjectClass, javaScriptObjectConstructor, javaQuack,
                 reinterpret_cast<jlong>(this), ptr);
 
+
+    // whether the JavaScriptObject instance should be interned.
+    // disabled because this is contingent on GC being run consistently by the JVM
+    // which allows global weak ref to be deleted.
+    bool trackJavaScriptObjectInstance = false;
+
     // if the JSValue is an ArrayBuffer or Uint8Array, create a
     // corresponding DirectByteBuffer, rather than marshalling the JavaScriptObject.
-    bool trackJavaScriptObjectInstance = true;
     if ((buf = JS_GetArrayBuffer(ctx, &buf_size, value))) {
         jobject byteBuffer = env->NewDirectByteBuffer(buf, buf_size);
         // this holds a weak ref to the DirectByteBuffer and a strong ref to the QuickJS ArrayBuffer.
@@ -466,7 +471,6 @@ jobject QuickJSContext::toObject(JNIEnv *env, JSValue value) {
         }
     }
 
-    jobject javaThisWeakGlobalRef = nullptr;
     if (trackJavaScriptObjectInstance)
         setFinalizerOnFinalizerObject(twin, javaWeakRefFinalizer, env->NewWeakGlobalRef(javaThis));
     else
