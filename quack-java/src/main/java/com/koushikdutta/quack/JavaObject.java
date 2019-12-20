@@ -251,6 +251,15 @@ public final class JavaObject implements QuackJavaObject {
         throw new UnsupportedOperationException("can not call " + target);
     }
 
+    public Object callProperty(Object property, Object... args) {
+        if (property == null)
+            throw new NullPointerException();
+        property = get(property);
+        if (property instanceof QuackObject)
+            return ((QuackObject)property).callMethod(this, args);
+        throw new UnsupportedOperationException("can not call " + target);
+    }
+
     @Override
     public Object construct(Object... args) {
         if (!(target instanceof Class))
