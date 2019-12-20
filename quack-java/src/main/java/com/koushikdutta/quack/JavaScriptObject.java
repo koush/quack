@@ -7,6 +7,7 @@ import java.lang.reflect.Proxy;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Enumeration;
 
 @SuppressWarnings({"unchecked", "rawtypes"})
 public class JavaScriptObject implements QuackObject, QuackJavaScriptObject {
@@ -68,7 +69,7 @@ public class JavaScriptObject implements QuackObject, QuackJavaScriptObject {
     @Override
     public Object callMethod(Object thiz, Object... args) {
         quackContext.coerceJavaArgsToJavaScript(args);
-        return quackContext.coerceJavaScriptToJava(null, quackContext.callMethod(pointer, thiz, args));
+        return quackContext.coerceJavaScriptToJava(null, quackContext.callMethod(pointer, quackContext.coerceJavaToJavaScript(thiz), args));
     }
 
     public Object callProperty(Object property, Object... args) {
@@ -87,7 +88,7 @@ public class JavaScriptObject implements QuackObject, QuackJavaScriptObject {
                 return get(number.intValue());
         }
 
-        return quackContext.coerceJavaScriptToJava(null, quackContext.getKeyObject(pointer, key));
+        return quackContext.coerceJavaScriptToJava(null, quackContext.getKeyObject(pointer, quackContext.coerceJavaToJavaScript(key)));
     }
 
     public boolean set(String key, Object value) {
@@ -203,7 +204,7 @@ public class JavaScriptObject implements QuackObject, QuackJavaScriptObject {
         quackContext.finalizeJavaScriptObject(pointer);
     }
 
-    protected JSValue asJSValue() {
+    public JSValue asJSValue() {
         return new JSValue(quackContext, this);
     }
 }

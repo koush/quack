@@ -202,7 +202,7 @@ DuktapeContext::DuktapeContext(JavaVM* javaVM, jobject javaDuktape)
 
   m_javaScriptObjectConstructor = env->GetMethodID(m_javaScriptObjectClass, "<init>", "(Lcom/koushikdutta/quack/QuackContext;JJ)V");
   m_javaObjectConstructor = env->GetMethodID(m_javaObjectClass, "<init>", "(Lcom/koushikdutta/quack/QuackContext;Ljava/lang/Object;)V");
-  m_javaObjectGetObject = env->GetMethodID(duktapeJavaObject, "getObject", "(Ljava/lang/Class;)Ljava/lang/Object;");
+  m_javaObjectGetObject = env->GetMethodID(duktapeJavaObject, "getObject", "()Ljava/lang/Object;");
   m_byteBufferAllocateDirect = env->GetStaticMethodID(m_byteBufferClass, "allocateDirect", "(I)Ljava/nio/ByteBuffer;");
 
   m_contextField = env->GetFieldID(m_javaScriptObjectClass, "context", "J");
@@ -1088,7 +1088,7 @@ void queueJavaExceptionForDuktapeError(JNIEnv *env, duk_context *ctx) {
       duk_get_prop_string(ctx, -2, JAVA_EXCEPTION_PROP_NAME);
       DuktapeContext* duktapeContext = getDuktapeContext(ctx);
       jobject wrappedEx = duktapeContext->popObject(env);
-      jthrowable ex = (jthrowable)env->CallObjectMethod(wrappedEx, duktapeContext->m_javaObjectGetObject, nullptr);
+      jthrowable ex = (jthrowable)env->CallObjectMethod(wrappedEx, duktapeContext->m_javaObjectGetObject);
 
       // add the Duktape JavaScript stack to this exception.
       const jmethodID addDuktapeStack =

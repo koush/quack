@@ -35,7 +35,8 @@ static void customFinalizer(JSRuntime *rt, JSValue val) {
     auto *data = reinterpret_cast<CustomFinalizerData *>(JS_GetOpaque(val, customFinalizerClassId));
     if (!data)
         return;
-    data->finalizer(data->ctx, val, data->udata);
+    if (data->finalizer)
+        data->finalizer(data->ctx, val, data->udata);
     free(data);
 }
 
@@ -207,7 +208,7 @@ QuickJSContext::QuickJSContext(JavaVM* javaVM, jobject javaQuack):
 
     // QuackJavaObject
     quackJavaObject = findClass(env, "com/koushikdutta/quack/QuackJavaObject");
-    quackJavaObjectGetObject = env->GetMethodID(quackJavaObject, "getObject", "(Ljava/lang/Class;)Ljava/lang/Object;");
+    quackJavaObjectGetObject = env->GetMethodID(quackJavaObject, "getObject", "()Ljava/lang/Object;");
 
     // exceptions
     quackExceptionClass = findClass(env, "com/koushikdutta/quack/QuackException");
@@ -366,10 +367,10 @@ jobject QuickJSContext::toObject(JNIEnv *env, JSValue value) {
         std::string val = toStdString(exception);
         return nullptr;
     }
-    else if (!JS_IsObject(value)) {
-        // todo: symbol?
-        return nullptr;
-    }
+//    else if (!JS_IsObject(value) && !JS_IsSymbol(value)) {
+//        // todo: symbol?
+//        return nullptr;
+//    }
 
     // attempt to find an existing JavaScriptObject (or object like ByteBuffer) that exists on the java side (weak ref)
     auto twinFound = hold(JS_GetProperty(ctx, value, customFinalizerAtom));
@@ -437,6 +438,7 @@ jobject QuickJSContext::toObject(JNIEnv *env, JSValue value) {
     // whether the JavaScriptObject instance should be interned.
     // disabled because this is contingent on GC being run consistently by the JVM
     // which allows global weak ref to be deleted.
+    // todo: reenable this optionally? perform this on jvm side?
     bool trackJavaScriptObjectInstance = false;
 
     // if the JSValue is an ArrayBuffer or Uint8Array, create a
@@ -471,19 +473,22 @@ jobject QuickJSContext::toObject(JNIEnv *env, JSValue value) {
         }
     }
 
-    if (trackJavaScriptObjectInstance)
+    // set the finalizer on the twin to release the tracked JavaScriptObject
+    if (trackJavaScriptObjectInstance) {
         setFinalizerOnFinalizerObject(twin, javaWeakRefFinalizer, env->NewWeakGlobalRef(javaThis));
-    else
-        setFinalizerOnFinalizerObject(twin, javaWeakRefFinalizer, nullptr);
+        // set the finalizer object on the JSValue for tracking
+        JS_SetProperty(ctx, value, customFinalizerAtom, JS_DupValue(ctx, twin));
+    }
+    else {
+        // not tracked, but set nullptr.
+        setFinalizerOnFinalizerObject(twin, nullptr, nullptr);
+    }
 
     // stash the twin to hold a reference, and to free the global weak ref on runtime shutdown.
-    stash[ptr] = hold(JS_DupValue(ctx, twin));
+    stash[ptr] = hold(twin);
 
     // set the JSValue on the finalizer object
     JS_SetProperty(ctx, twin, atomHoldsJavaScriptObject, JS_DupValue(ctx, value));
-
-    // set the finalizer object on the JSValue
-    JS_SetProperty(ctx, value, customFinalizerAtom, twin);
 
     return javaThis;
 }
@@ -752,7 +757,7 @@ void QuickJSContext::rethrowQuickJSErrorToJava(JNIEnv *env, JSValue exception) {
             auto stack = hold(JS_GetPropertyStr(ctx, exception, "stack"));
 
             jobject unwrappedException = toObject(env, javaException);
-            jthrowable ex = (jthrowable)env->CallObjectMethod(unwrappedException, quackJavaObjectGetObject, nullptr);
+            jthrowable ex = (jthrowable)env->CallObjectMethod(unwrappedException, quackJavaObjectGetObject);
             env->CallStaticVoidMethod(quackExceptionClass, addJSStack, ex, toString(env, stack));
             env->Throw(ex);
         }

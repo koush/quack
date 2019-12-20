@@ -1134,4 +1134,16 @@ public class QuackTests {
         assertNull(jo);
         quack.close();
     }
+
+    @Test
+    public void testIterable() {
+        QuackContext quack = QuackContext.create(useQuickJS);
+        JSValue value = quack.evaluateForJavaScriptObject("([2,3,4,5])").asJSValue();
+        int total = 0;
+        for (int i: value.asIterable(int.class)) {
+            total += i;
+        }
+        assertEquals(total, 14);
+        quack.close();
+    }
 }

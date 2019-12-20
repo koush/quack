@@ -131,6 +131,14 @@ public final class QuackContext implements Closeable {
   public Object coerceJavaToJavaScript(Class clazz, Object o) {
     if (o == null)
       return null;
+
+    while (o instanceof QuackJavaObject) {
+      Object coerced = ((QuackJavaObject)o).getObject();;
+      if (o == coerced)
+        break;
+      o = coerced;
+    }
+
     Object ret = coerceJavaToJavaScript(JavaToJavascriptCoercions, o, clazz);
     if (ret != null)
       return ret;
@@ -139,10 +147,11 @@ public final class QuackContext implements Closeable {
     // automatically coerce functional interfaces into functions
     Method method = getLambdaMethod(clazz);
     if (method != null) {
-      return new JavaMethodObject(this, o, method.getName()) {
+      final Object thiz = o;
+      return new JavaMethodObject(this, thiz, method.getName()) {
         @Override
         public Object callMethod(Object thiz, Object... args) {
-          return super.callMethod(o, args);
+          return super.callMethod(thiz, args);
         }
 
         @Override
@@ -178,7 +187,7 @@ public final class QuackContext implements Closeable {
     if (o == null)
       return null;
     while (o instanceof QuackJavaObject) {
-      Object coerced = ((QuackJavaObject)o).getObject(clazz);;
+      Object coerced = ((QuackJavaObject)o).getObject();;
       if (o == coerced)
         break;
       o = coerced;

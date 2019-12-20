@@ -8,7 +8,7 @@ import java.util.Map;
 import static com.koushikdutta.quack.QuackContext.isEmpty;
 
 @SuppressWarnings({"unchecked", "rawtypes"})
-public final class JavaObject implements QuackJavaObject {
+public final class JavaObject implements QuackObject, QuackJavaObject {
     private final Object target;
     private final QuackContext quackContext;
 
@@ -18,7 +18,7 @@ public final class JavaObject implements QuackJavaObject {
     }
 
     @Override
-    public Object getObject(Class clazz) {
+    public Object getObject() {
         return target;
     }
 
@@ -259,7 +259,7 @@ public final class JavaObject implements QuackJavaObject {
     @Override
     public Object construct(Object... args) {
         if (!(target instanceof Class))
-            return QuackJavaObject.super.construct(args);
+            return QuackObject.super.construct(args);
 
         Class clazz = (Class)target;
         Constructor[] constructors = clazz.getConstructors();

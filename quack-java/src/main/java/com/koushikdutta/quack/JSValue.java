@@ -1,13 +1,22 @@
 package com.koushikdutta.quack;
 
-import java.nio.ByteBuffer;
+import org.jetbrains.annotations.NotNull;
 
-public class JSValue {
+import java.nio.ByteBuffer;
+import java.util.Iterator;
+import java.util.NoSuchElementException;
+
+public class JSValue implements QuackJavaObject {
     QuackContext quack;
     Object value;
     JSValue(QuackContext quack, Object value) {
         this.quack = quack;
         this.value = value;
+    }
+
+    @Override
+    public Object getObject() {
+        return value;
     }
 
     public boolean isNumber() {
@@ -32,6 +41,38 @@ public class JSValue {
 
     public <T> T as(Class<T> clazz) {
         return (T)quack.coerceJavaScriptToJava(clazz, value);
+    }
+
+    public <T> Iterable<T> asIterable(Class<T> clazz) {
+        JSValue iteratorSymbol = quack.evaluateForJavaScriptObject("Symbol").asJSValue().get("iterator");
+        JSValue iteratorFunc = get(iteratorSymbol);
+        JSValue iterator = iteratorFunc.apply(this);
+        JSValue iteratorNext = iterator.get("next");
+        return () -> new Iterator<T>() {
+            JSValue current;
+
+            private void maybeNext() {
+                if (current != null)
+                    return;
+                current = iteratorNext.apply(iterator);
+            }
+
+            @Override
+            public boolean hasNext() {
+                maybeNext();
+                return !(Boolean)current.get("done").getObject();
+            }
+
+            @Override
+            public T next() {
+                maybeNext();
+                if ((Boolean)current.get("done").getObject())
+                    throw new NoSuchElementException("end of iterator");
+                T ret = current.get("value").as(clazz);
+                current = null;
+                return ret;
+            }
+        };
     }
 
     private QuackObject quackify() {
