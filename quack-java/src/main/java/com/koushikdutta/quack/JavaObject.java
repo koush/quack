@@ -97,7 +97,6 @@ public final class JavaObject implements QuackJavaObject {
         }, key, clazz.getDeclaredFields());
     }
 
-    @Override
     public Object get(String key) {
         Object ret = getMap(key);
         if (ret != null)
@@ -145,7 +144,6 @@ public final class JavaObject implements QuackJavaObject {
         return null;
     }
 
-    @Override
     public Object get(int index) {
         if (target.getClass().isArray())
             return Array.get(target, index);
@@ -178,7 +176,6 @@ public final class JavaObject implements QuackJavaObject {
         throw new UnsupportedOperationException("can not set value on this JavaObject");
     }
 
-    @Override
     public boolean set(int index, Object value) {
         if (target instanceof Array) {
             Array.set(target, index, value);
@@ -202,7 +199,6 @@ public final class JavaObject implements QuackJavaObject {
         return false;
     }
 
-    @Override
     public boolean set(String key, Object value) {
         Class clazz = target.getClass();
 

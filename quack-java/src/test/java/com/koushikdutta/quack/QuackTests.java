@@ -863,8 +863,8 @@ public class QuackTests {
     public void testJavaScriptObjectCallCoercion() {
         QuackContext quack = QuackContext.create(useQuickJS);
         String script = "function() { return (function() { return 'HI'; }) }";
-        JavaScriptObject func = quack.compileFunction(script, "?");
-        TestJS foo = func.callCoerced(TestJS.class);
+        JSValue func = quack.compileFunction(script, "?").asJSValue();
+        TestJS foo = func.apply(null).as(TestJS.class);
         assertEquals(foo.foo(), "HI");
     }
 
@@ -877,8 +877,8 @@ public class QuackTests {
     public void testJavaScriptObjectCallCoercion2() {
         QuackContext quack = QuackContext.create(useQuickJS);
         String script = "function() { return { foo1: function() { return 'HI'; }, foo2: function() { return 'BYE'; } } }";
-        JavaScriptObject func = quack.compileFunction(script, "?");
-        TestJS2 foo = func.callCoerced(TestJS2.class);
+        JSValue func = quack.compileFunction(script, "?").asJSValue();
+        TestJS2 foo = func.apply(null).as(TestJS2.class);
         assertEquals(foo.foo1(), "HI");
         assertEquals(foo.foo2(), "BYE");
     }

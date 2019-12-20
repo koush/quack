@@ -1,22 +1,10 @@
 package com.koushikdutta.quack;
 
 public interface QuackObject {
-    default Object get(String key) {
-        return null;
-    };
-    default Object get(int index) {
-        return null;
-    }
     default Object get(Object key) {
         return null;
     }
 
-    default boolean set(String key, Object value) {
-        return false;
-    }
-    default boolean set(int index, Object value) {
-        return false;
-    }
     default boolean set(Object key, Object value) {
         return false;
     }

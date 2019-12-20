@@ -45,49 +45,35 @@ public class JavaScriptObject implements QuackObject, QuackJavaScriptObject {
     }
 
     public String typeof() {
-        return quackContext.evaluateForJavaScriptObject("(function(f) { return typeof f; })").callCoerced(String.class, this);
+        return (String)quackContext.evaluateForJavaScriptObject("(function(f) { return typeof f; })").call(this);
     }
 
     public String stringify() {
         return quackContext.stringify(pointer);
     }
 
-    @Override
     public Object get(String key) {
         return quackContext.coerceJavaScriptToJava(null, quackContext.getKeyString(pointer, key));
     }
 
-    @Override
     public Object get(int index) {
         return quackContext.coerceJavaScriptToJava(null, quackContext.getKeyInteger(pointer, index));
     }
 
     public Object call(Object... args) {
-        return callCoerced(null, args);
+        quackContext.coerceJavaArgsToJavaScript(args);
+        return quackContext.coerceJavaScriptToJava(null, quackContext.call(pointer, args));
     }
 
     @Override
     public Object callMethod(Object thiz, Object... args) {
-        return callMethodCoerced(null, thiz, args);
+        quackContext.coerceJavaArgsToJavaScript(args);
+        return quackContext.coerceJavaScriptToJava(null, quackContext.callMethod(pointer, thiz, args));
     }
 
     public Object callProperty(Object property, Object... args) {
-        return callPropertyCoerced(null, property, args);
-    }
-
-    public <T> T callCoerced(Class<T> clazz, Object... args) {
         quackContext.coerceJavaArgsToJavaScript(args);
-        return (T)quackContext.coerceJavaScriptToJava(clazz, quackContext.call(pointer, args));
-    }
-
-    public <T> T callMethodCoerced(Class<T> clazz, Object thiz, Object... args) {
-        quackContext.coerceJavaArgsToJavaScript(args);
-        return (T)quackContext.coerceJavaScriptToJava(clazz, quackContext.callMethod(pointer, thiz, args));
-    }
-
-    public <T> T callPropertyCoerced(Class<T> clazz, Object property, Object... args) {
-        quackContext.coerceJavaArgsToJavaScript(args);
-        return (T)quackContext.coerceJavaScriptToJava(clazz, quackContext.callProperty(pointer, property, args));
+        return quackContext.coerceJavaScriptToJava(null, quackContext.callProperty(pointer, property, args));
     }
 
     @Override
@@ -104,12 +90,10 @@ public class JavaScriptObject implements QuackObject, QuackJavaScriptObject {
         return quackContext.coerceJavaScriptToJava(null, quackContext.getKeyObject(pointer, key));
     }
 
-    @Override
     public boolean set(String key, Object value) {
         return quackContext.setKeyString(pointer, key, value);
     }
 
-    @Override
     public boolean set(int index, Object value) {
         return quackContext.setKeyInteger(pointer, index, value);
     }
@@ -217,5 +201,9 @@ public class JavaScriptObject implements QuackObject, QuackJavaScriptObject {
     protected void finalize() throws Throwable {
         super.finalize();
         quackContext.finalizeJavaScriptObject(pointer);
+    }
+
+    protected JSValue asJSValue() {
+        return new JSValue(quackContext, this);
     }
 }
