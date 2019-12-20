@@ -1146,4 +1146,20 @@ public class QuackTests {
         assertEquals(total, 14);
         quack.close();
     }
+
+    interface ArrayInterface {
+        int[] getNumbers();
+    }
+
+    @Test
+    public void testArray() {
+        QuackContext quack = QuackContext.create(useQuickJS);
+        ArrayInterface iface = quack.evaluate("(function() { return [2, 3, 4, 5] })", ArrayInterface.class);
+        int total = 0;
+        for (int i: iface.getNumbers()) {
+            total += i;
+        }
+        assertEquals(total, 14);
+        quack.close();
+    }
 }

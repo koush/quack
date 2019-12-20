@@ -229,9 +229,7 @@ public final class QuackContext implements Closeable {
       JavaScriptObject jo = (JavaScriptObject)o;
       int length = ((Number)jo.get("length")).intValue();
       Class componentType = clazz.getComponentType();
-      // should be Object.class component type, because coercion
-      // can change the type
-      Object ret = Array.newInstance(Object.class, length);
+      Object ret = Array.newInstance(componentType, length);
       for (int i = 0; i < length; i++) {
         Array.set(ret, i, coerceJavaScriptToJava(componentType, jo.get(i)));
       }
