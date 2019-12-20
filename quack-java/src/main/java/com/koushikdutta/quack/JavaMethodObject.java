@@ -35,16 +35,6 @@ public class JavaMethodObject implements QuackMethodObject {
     }
 
     @Override
-    public Object callProperty(Object property, Object... args) {
-        throw new UnsupportedOperationException("can not call property of a JavaMethodObject");
-    }
-
-    @Override
-    public Object call(Object... args) {
-        throw new UnsupportedOperationException("can not call JavaMethodObject with no 'this'");
-    }
-
-    @Override
     public Object callMethod(Object thiz, Object... args) {
         if (thiz == null || thiz instanceof JavaScriptObject)
             thiz = originalThis;

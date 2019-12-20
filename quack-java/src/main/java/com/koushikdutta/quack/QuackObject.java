@@ -27,33 +27,12 @@ public interface QuackObject {
 
     /**
      * Call this object with the expectation that it is a function. The this argument
-     * is implicit to the runtime.
-     * @param args
-     * @return
-     */
-    default Object call(Object... args) {
-        throw new UnsupportedOperationException();
-    }
-
-    /**
-     * Call this object with the expectation that it is a function. The this argument
      * is provided.
      * @param thiz
      * @param args
      * @return
      */
     default Object callMethod(Object thiz, Object... args) {
-        throw new UnsupportedOperationException();
-    }
-
-    /**
-     * Call the property of this object with the expectation that it is a function.
-     * The this argument is the the instance holding the property.
-     * @param property
-     * @param args
-     * @return
-     */
-    default Object callProperty(Object property, Object... args) {
         throw new UnsupportedOperationException();
     }
 

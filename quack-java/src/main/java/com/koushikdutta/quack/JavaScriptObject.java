@@ -62,7 +62,6 @@ public class JavaScriptObject implements QuackObject, QuackJavaScriptObject {
         return quackContext.coerceJavaScriptToJava(null, quackContext.getKeyInteger(pointer, index));
     }
 
-    @Override
     public Object call(Object... args) {
         return callCoerced(null, args);
     }
@@ -72,7 +71,6 @@ public class JavaScriptObject implements QuackObject, QuackJavaScriptObject {
         return callMethodCoerced(null, thiz, args);
     }
 
-    @Override
     public Object callProperty(Object property, Object... args) {
         return callPropertyCoerced(null, property, args);
     }
