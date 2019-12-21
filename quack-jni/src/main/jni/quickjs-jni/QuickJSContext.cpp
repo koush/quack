@@ -89,21 +89,25 @@ int quickjs_set(JSContext *ctx, JSValueConst obj, JSAtom atom, JSValueConst valu
     auto object = reinterpret_cast<jobject>(data->udata);
     return data->ctx->quickjs_set(object, atom, value, receiver, flags);
 }
-JSValue quickjs_apply(JSContext *ctx, JSValueConst func_obj, JSValueConst this_val, int argc, JSValueConst *argv) {
-    auto *data = reinterpret_cast<CustomFinalizerData *>(JS_GetOpaque(func_obj, quackObjectProxyClassId));
-    auto object = reinterpret_cast<jobject>(data->udata);
-    return data->ctx->quickjs_apply(object, this_val, argc, argv);
-}
 int quickjs_construct(JSContext *ctx, JSValue func_obj, JSValueConst this_val, int argc, JSValueConst *argv) {
     auto *qctx = reinterpret_cast<QuickJSContext *>(JS_GetContextOpaque(ctx));
     return qctx->quickjs_construct(func_obj, this_val, argc, argv);
+}
+JSValue quickjs_apply(JSContext *ctx, JSValueConst func_obj, JSValueConst this_val, int argc, JSValueConst *argv, int flags) {
+    if (flags & JS_CALL_FLAG_CONSTRUCTOR) {
+        if (quickjs_construct(ctx, func_obj, this_val, argc, argv) < 0)
+            return JS_EXCEPTION;
+        return JS_DupValue(ctx, this_val);
+    }
+    auto *data = reinterpret_cast<CustomFinalizerData *>(JS_GetOpaque(func_obj, quackObjectProxyClassId));
+    auto object = reinterpret_cast<jobject>(data->udata);
+    return data->ctx->quickjs_apply(object, this_val, argc, argv);
 }
 
 struct JSClassExoticMethods quackObjectProxyMethods = {
     .has_property = quickjs_has,
     .get_property = quickjs_get,
     .set_property = quickjs_set,
-    .construct = quickjs_construct,
 };
 
 static struct JSClassDef quackObjectProxyClassDef = {
@@ -330,6 +334,7 @@ JSValue QuickJSContext::toObject(JNIEnv *env, jobject value) {
     // so, it works without any further coercion.
 
     JSValue ret = JS_NewObjectClass(ctx, quackObjectProxyClassId);
+    JS_SetConstructorBit(ctx, ret, 1);
     setFinalizerOnFinalizerObject(ret, javaRefFinalizer, env->NewGlobalRef(value));
     return ret;
 }

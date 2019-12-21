@@ -1,5 +1,6 @@
 package com.koushikdutta.quack
 
+import org.junit.Assert
 import org.junit.Test
 import java.io.File
 import kotlin.coroutines.Continuation
@@ -21,6 +22,26 @@ class QuackKotlinTests {
             catch (e: Error) {
             }
         }
+    }
+
+    internal interface ArrayTypeInterface {
+        fun foo(): Int
+    }
+
+    internal interface ArrayInterface {
+        val numbers: Array<ArrayTypeInterface>
+    }
+
+    @Test
+    fun testArray() {
+        val quack = QuackContext.create()
+        val iface = quack.evaluate("(function() { return [() => 2, () => 3, () => 4, () => 5] })", ArrayInterface::class.java)
+        var total = 0
+        for (i in iface.numbers) {
+            total += i.foo()
+        }
+        Assert.assertEquals(total.toLong(), 14)
+        quack.close()
     }
 
     @Test
