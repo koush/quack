@@ -824,18 +824,19 @@ public final class QuackContext implements Closeable {
     }
   }
   synchronized private void finalizeJavaScriptObjects() {
-    ArrayList<Long> copy;
+    long[] copy;
     synchronized (finalizationQueue) {
       if (finalizationQueue.isEmpty())
         return;
-      copy = new ArrayList<>(finalizationQueue);
+      copy = new long[finalizationQueue.size()];
+      for (int i = 0; i < finalizationQueue.size(); i++) {
+        copy[i] = finalizationQueue.get(i);
+      }
       finalizationQueue.clear();
     }
     if (context == 0)
       return;
-    for (Long object: copy) {
-      finalizeJavaScriptObject(context, object);
-    }
+    finalizeJavaScriptObjects(context, copy);
   }
   synchronized private boolean hasPostInvocationTasks() {
     synchronized (finalizationQueue) {
@@ -914,7 +915,7 @@ public final class QuackContext implements Closeable {
   private static native Object callProperty(long context, long object, Object property, Object... args);
   private static native JavaScriptObject getGlobalObject(long context);
   private static native String stringify(long context, long object);
-  private static native void finalizeJavaScriptObject(long context, long object);
+  private static native void finalizeJavaScriptObjects(long context, long[] objects);
   private static native boolean hasPendingJobs(long context);
   private static native void runJobs(long context);
 }

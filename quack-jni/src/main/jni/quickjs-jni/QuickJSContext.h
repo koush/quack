@@ -127,7 +127,7 @@ public:
     void setFinalizer(JSValue value, CustomFinalizer finalizer, void *udata);
     void setFinalizerOnFinalizerObject(JSValue finalizerObject, CustomFinalizer finalizer, void *udata);
 
-    void finalizeJavaScriptObject(JNIEnv *env, jlong object);
+    void finalizeJavaScriptObjects(JNIEnv *env, jlongArray objects);
 
     jobject evaluateInternal(JNIEnv *env, jstring code, jstring filename, int flags);
     jobject evaluate(JNIEnv *env, jstring code, jstring filename) { return evaluateInternal(env, code, filename, JS_EVAL_TYPE_GLOBAL); }

@@ -52,9 +52,13 @@ static void quackObjectFinalizer(JSRuntime *rt, JSValue val) {
 // the object may continue living in the QuickJS side, but clean up all references
 // to the java side.
 // this will trigger a GC on the stashed twin, which will clean up the weak global reference.
-void QuickJSContext::finalizeJavaScriptObject(JNIEnv *env, jlong object) {
-    // delete the entry in the stash that was keeping this alive from the java side.
-    stash.erase(object);
+void QuickJSContext::finalizeJavaScriptObjects(JNIEnv *env, jlongArray objects) {
+    jsize len = env->GetArrayLength(objects);
+    jlong *ptr = env->GetLongArrayElements(objects, 0);
+    for (int i = 0; i < len; i++) {
+        // delete the entry in the stash that was keeping this alive from the java side.
+        stash.erase(ptr[i]);
+    }
 }
 
 void QuickJSContext::setFinalizerOnFinalizerObject(JSValue finalizerObject, CustomFinalizer finalizer, void *udata) {

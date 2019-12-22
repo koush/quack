@@ -980,27 +980,31 @@ jstring DuktapeContext::stringify(JNIEnv *env, jlong object) {
   return (jstring)popObject2(env);
 }
 
-void DuktapeContext::finalizeJavaScriptObject(JNIEnv *env, jlong object) {
+void DuktapeContext::finalizeJavaScriptObjects(JNIEnv *env, jlongArray objects) {
   CHECK_STACK(m_context);
 
-  // the JavaScriptObject (java representation) was collected.
+  jsize len = env->GetArrayLength(objects);
+  jlong *lptr = env->GetLongArrayElements(objects, 0);
+  for (int i = 0; i < len; i++) {
+    // the JavaScriptObject (java representation) was collected.
 
-  // clean up the ref to the duktape heap object
-  void* ptr = reinterpret_cast<void*>(object);
-  duk_push_heapptr(m_context, ptr);
-  // unset the finalizer, no longer necessary
-  duk_push_undefined(m_context);
-  duk_set_finalizer(m_context, -2);
-  // release the ref to the javascript object
-  javascriptObjectFinalizerInternal(m_context);
-  duk_pop(m_context);
+    // clean up the ref to the duktape heap object
+    void* ptr = reinterpret_cast<void*>(lptr[i]);
+    duk_push_heapptr(m_context, ptr);
+    // unset the finalizer, no longer necessary
+    duk_push_undefined(m_context);
+    duk_set_finalizer(m_context, -2);
+    // release the ref to the javascript object
+    javascriptObjectFinalizerInternal(m_context);
+    duk_pop(m_context);
 
-  // the Java side kept this duktape heap object alive with a reference in the global stash.
-  // can delete that now.
-  duk_push_global_stash(m_context);
-  duk_uarridx_t heapIndex = (duk_uarridx_t)reinterpret_cast<long>(ptr);
-  duk_del_prop_index(m_context, -1, heapIndex);
-  duk_pop(m_context);
+    // the Java side kept this duktape heap object alive with a reference in the global stash.
+    // can delete that now.
+    duk_push_global_stash(m_context);
+    duk_uarridx_t heapIndex = (duk_uarridx_t)reinterpret_cast<long>(ptr);
+    duk_del_prop_index(m_context, -1, heapIndex);
+    duk_pop(m_context);
+  }
 }
 
 

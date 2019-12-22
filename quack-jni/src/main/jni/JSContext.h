@@ -23,7 +23,7 @@ class JSContext {
 public:
     virtual ~JSContext() {};
 
-    virtual void finalizeJavaScriptObject(JNIEnv *env, jlong object) = 0;
+    virtual void finalizeJavaScriptObjects(JNIEnv *env, jlongArray objects) = 0;
 
     virtual jobject evaluate(JNIEnv *env, jstring code, jstring filename) = 0;
     virtual jobject evaluateModule(JNIEnv *env, jstring code, jstring filename) = 0;

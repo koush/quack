@@ -76,9 +76,9 @@ Java_com_koushikdutta_quack_QuackContext_getGlobalObject(JNIEnv *env, jclass typ
 }
 
 JNIEXPORT void JNICALL
-Java_com_koushikdutta_quack_QuackContext_finalizeJavaScriptObject__JJ(JNIEnv *env, jclass type,
-                                                               jlong context, jlong object) {
-    return reinterpret_cast<JSContext *>(context)->finalizeJavaScriptObject(env, object);
+Java_com_koushikdutta_quack_QuackContext_finalizeJavaScriptObjects(JNIEnv *env, jclass type,
+                                                               jlong context, jlongArray objects) {
+    return reinterpret_cast<JSContext *>(context)->finalizeJavaScriptObjects(env, objects);
                                        
 }
 

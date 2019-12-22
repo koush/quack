@@ -53,7 +53,7 @@ public:
   jobject callProperty(JNIEnv* env, jlong object, jobject target, jobjectArray args);
   jobject getGlobalObject(JNIEnv *env);
   jstring stringify(JNIEnv *env, jlong object);
-  void finalizeJavaScriptObject(JNIEnv *env, jlong object);
+  void finalizeJavaScriptObjects(JNIEnv *env, jlongArray objects);
   jlong getHeapSize(JNIEnv *env);
   jboolean hasPendingJobs(JNIEnv *env) { return JNI_FALSE; }
   void runJobs(JNIEnv *env) {}
