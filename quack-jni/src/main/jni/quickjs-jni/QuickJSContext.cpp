@@ -263,7 +263,7 @@ JSValue QuickJSContext::toString(JNIEnv *env, jstring value) {
 }
 
 jstring QuickJSContext::stringify(JNIEnv *env, jlong object) {
-    return toString(env, js_debugger_json_stringify(ctx, toValueAsLocal(object)));
+    return toString(env, JS_JSONStringify(ctx, toValueAsLocal(object), JS_UNDEFINED, JS_UNDEFINED));
 }
 
 
