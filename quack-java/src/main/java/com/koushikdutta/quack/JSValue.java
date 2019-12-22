@@ -1,7 +1,5 @@
 package com.koushikdutta.quack;
 
-import org.jetbrains.annotations.NotNull;
-
 import java.nio.ByteBuffer;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
