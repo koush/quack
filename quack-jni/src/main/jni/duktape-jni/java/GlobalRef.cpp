@@ -15,6 +15,8 @@
  */
 #include "GlobalRef.h"
 
+#include "../../JSContext.h"
+
 GlobalRef::GlobalRef(JNIEnv* env, jobject object)
     : m_object(env->NewGlobalRef(object)) {
   env->GetJavaVM(&m_javaVM);

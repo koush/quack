@@ -120,6 +120,7 @@ public class JavaMethodObject implements QuackMethodObject {
             else if (i < args.length) {
                 System.err.println("dropping javascript to java arguments on the floor: " + (args.length - i) + " " + best.toString());
             }
+//            System.out.println(best.getDeclaringClass().getSimpleName() + "." + best.getName());
             return quackContext.coerceJavaToJavaScript(best.invoke(thiz, coerced.toArray()));
         }
         catch (RuntimeException e) {
