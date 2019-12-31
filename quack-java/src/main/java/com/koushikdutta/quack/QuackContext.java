@@ -30,7 +30,7 @@ import java.util.logging.Logger;
 public final class QuackContext implements Closeable {
   // mapped java objects are held as weak keys to strong javascript object references.
   // ie, a js ArrayBuffer or Uint8Array value will be mapped from the java DirectByteBuffer key.
-  private final Map<Object, Object> nativeMappings = new WeakHashMap<>();
+  private final WeakExactHashMap<Object, Object> nativeMappings = new WeakExactHashMap<>();
 
   private final Map<Class, QuackCoercion> JavaScriptToJavaCoercions = new LinkedHashMap<>();
   private final Map<Class, QuackCoercion> JavaToJavascriptCoercions = new LinkedHashMap<>();
