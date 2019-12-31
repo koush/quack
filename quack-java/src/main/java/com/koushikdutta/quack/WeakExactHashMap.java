@@ -43,12 +43,16 @@ public class WeakExactHashMap<K, V> {
     }
 
     public void purge() {
+        int before = map.size();
         Iterator<Entry<K>> iter = map.keySet().iterator();
         while (iter.hasNext()) {
             Entry<K> entry = iter.next();
             if (entry.key.get() == null)
                 iter.remove();
         }
+        int after = map.size();
+//        int purged = before - after;
+        setPurgeThreshold(after * 2);
     }
 
     public V get(K key) {
@@ -57,6 +61,7 @@ public class WeakExactHashMap<K, V> {
     }
 
     public V put(K key, V value) {
+        maybePurge();
         return map.put(new Entry<>(key), value);
     }
 
