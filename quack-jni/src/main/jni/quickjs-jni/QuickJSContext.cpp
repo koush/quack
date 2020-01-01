@@ -143,6 +143,8 @@ QuickJSContext::QuickJSContext(JavaVM* javaVM, jobject javaQuack):
     auto global = hold(JS_GetGlobalObject(ctx));
     uint8ArrayConstructor = JS_GetPropertyStr(ctx, global, "Uint8Array");
     uint8ArrayPrototype = JS_GetPropertyStr(ctx, uint8ArrayConstructor, "prototype");
+    auto arrayBufferConstructor = hold(JS_GetPropertyStr(ctx, global, "ArrayBuffer"));
+    arrayBufferPrototype = JS_GetPropertyStr(ctx, arrayBufferConstructor, "prototype");
 
     const char *thrower_str = "(function() { try { throw new Error(); } catch (e) { return e; } })";
     thrower_function = JS_Eval(ctx, thrower_str, strlen(thrower_str), "<thrower>", JS_EVAL_TYPE_GLOBAL);
@@ -227,6 +229,7 @@ QuickJSContext::QuickJSContext(JavaVM* javaVM, jobject javaQuack):
 QuickJSContext::~QuickJSContext() {
     JS_FreeValue(ctx, uint8ArrayPrototype);
     JS_FreeValue(ctx, uint8ArrayConstructor);
+    JS_FreeValue(ctx, arrayBufferPrototype);
     stash.clear();
     JS_FreeValue(ctx, thrower_function);
     JS_FreeContext(ctx);
@@ -353,7 +356,6 @@ jobject QuickJSContext::toObject(JNIEnv *env, JSValue value) {
         return nullptr;
 
     jvalue ret;
-    void *buf = nullptr;
     size_t buf_size;
     if (JS_IsInteger(value)) {
         JS_ToInt32(ctx, &ret.i, value);
@@ -450,36 +452,33 @@ jobject QuickJSContext::toObject(JNIEnv *env, JSValue value) {
     // todo: reenable this optionally? perform this on jvm side?
     bool trackJavaScriptObjectInstance = false;
 
+    // this does not seem to be dup'd, so don't hold it.
+    auto prototype = JS_GetPrototype(ctx, value);
+
     // if the JSValue is an ArrayBuffer or Uint8Array, create a
     // corresponding DirectByteBuffer, rather than marshalling the JavaScriptObject.
-    if ((buf = JS_GetArrayBuffer(ctx, &buf_size, value))) {
+    if (JS_VALUE_GET_PTR((JSValue)prototype) == JS_VALUE_GET_PTR(arrayBufferPrototype)) {
+        void *buf = JS_GetArrayBuffer(ctx, &buf_size, value);
         jobject byteBuffer = env->NewDirectByteBuffer(buf, buf_size);
         // this holds a weak ref to the DirectByteBuffer and a strong ref to the QuickJS ArrayBuffer.
         env->CallVoidMethod(javaQuack, quackMapNativeMethod, byteBuffer, javaThis);
         javaThis = byteBuffer;
         trackJavaScriptObjectInstance = false;
     }
-    else {
-        // attempting to probe for an array buffer will throw an exception, so clear it.
-        JS_FreeValue(ctx, JS_GetException(ctx));
+    else if (JS_VALUE_GET_PTR((JSValue)prototype) == JS_VALUE_GET_PTR(uint8ArrayPrototype)) {
+        size_t offset;
+        size_t size;
+        size_t bpe;
+        auto ab = hold(JS_GetTypedArrayBuffer(ctx, value, &offset, &size, &bpe));
 
-        // this does not seem to be dup'd, so don't hold it.
-        auto prototype = JS_GetPrototype(ctx, value);
-        if (JS_VALUE_GET_PTR((JSValue)prototype) == JS_VALUE_GET_PTR(uint8ArrayPrototype)) {
-            size_t offset;
-            size_t size;
-            size_t bpe;
-            auto ab = hold(JS_GetTypedArrayBuffer(ctx, value, &offset, &size, &bpe));
+        size_t ab_size;
+        uint8_t *ab_ptr = JS_GetArrayBuffer(ctx, &ab_size, ab);
 
-            size_t ab_size;
-            uint8_t *ab_ptr = JS_GetArrayBuffer(ctx, &ab_size, ab);
-
-            jobject byteBuffer = env->NewDirectByteBuffer(ab_ptr + offset, size);
-            // this holds a weak ref to the DirectByteBuffer and a strong ref to the QuickJS Uint8Array.
-            env->CallVoidMethod(javaQuack, quackMapNativeMethod, byteBuffer, javaThis);
-            javaThis = byteBuffer;
-            trackJavaScriptObjectInstance = false;
-        }
+        jobject byteBuffer = env->NewDirectByteBuffer(ab_ptr + offset, size);
+        // this holds a weak ref to the DirectByteBuffer and a strong ref to the QuickJS Uint8Array.
+        env->CallVoidMethod(javaQuack, quackMapNativeMethod, byteBuffer, javaThis);
+        javaThis = byteBuffer;
+        trackJavaScriptObjectInstance = false;
     }
 
     // set the finalizer on the twin to release the tracked JavaScriptObject

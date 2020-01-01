@@ -229,6 +229,7 @@ public:
     JSAtom customFinalizerAtom;
     JSAtom javaExceptionAtom;
     JSValue uint8ArrayConstructor;
+    JSValue arrayBufferPrototype;
     JSValue uint8ArrayPrototype;
 };
 
