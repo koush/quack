@@ -77,31 +77,29 @@ static struct JSClassDef customFinalizerClassDef = {
     .finalizer = customFinalizer,
 };
 
-int quickjs_has(JSContext *ctx, JSValueConst obj, JSAtom atom) {
+static int quickjs_has(JSContext *ctx, JSValueConst obj, JSAtom atom) {
     auto *data = reinterpret_cast<CustomFinalizerData *>(JS_GetOpaque(obj, quackObjectProxyClassId));
     auto object = reinterpret_cast<jobject>(data->udata);
     return data->ctx->quickjs_has(object, atom);
 }
-JSValue quickjs_get(JSContext *ctx, JSValueConst obj, JSAtom atom, JSValueConst receiver) {
+static JSValue quickjs_get(JSContext *ctx, JSValueConst obj, JSAtom atom, JSValueConst receiver) {
     auto *data = reinterpret_cast<CustomFinalizerData *>(JS_GetOpaque(obj, quackObjectProxyClassId));
     auto object = reinterpret_cast<jobject>(data->udata);
     return data->ctx->quickjs_get(object, atom, receiver);
 }
 /* return < 0 if exception or TRUE/FALSE */
-int quickjs_set(JSContext *ctx, JSValueConst obj, JSAtom atom, JSValueConst value, JSValueConst receiver, int flags) {
+static int quickjs_set(JSContext *ctx, JSValueConst obj, JSAtom atom, JSValueConst value, JSValueConst receiver, int flags) {
     auto *data = reinterpret_cast<CustomFinalizerData *>(JS_GetOpaque(obj, quackObjectProxyClassId));
     auto object = reinterpret_cast<jobject>(data->udata);
     return data->ctx->quickjs_set(object, atom, value, receiver, flags);
 }
-int quickjs_construct(JSContext *ctx, JSValue func_obj, JSValueConst this_val, int argc, JSValueConst *argv) {
+static JSValue quickjs_construct(JSContext *ctx, JSValue func_obj, JSValueConst this_val, int argc, JSValueConst *argv) {
     auto *qctx = reinterpret_cast<QuickJSContext *>(JS_GetContextOpaque(ctx));
     return qctx->quickjs_construct(func_obj, this_val, argc, argv);
 }
 JSValue quickjs_apply(JSContext *ctx, JSValueConst func_obj, JSValueConst this_val, int argc, JSValueConst *argv, int flags) {
     if (flags & JS_CALL_FLAG_CONSTRUCTOR) {
-        if (quickjs_construct(ctx, func_obj, this_val, argc, argv) < 0)
-            return JS_EXCEPTION;
-        return JS_DupValue(ctx, this_val);
+        return quickjs_construct(ctx, func_obj, this_val, argc, argv);
     }
     auto *data = reinterpret_cast<CustomFinalizerData *>(JS_GetOpaque(func_obj, quackObjectProxyClassId));
     auto object = reinterpret_cast<jobject>(data->udata);
@@ -720,7 +718,7 @@ JSValue QuickJSContext::quickjs_apply(jobject func_obj, JSValueConst this_val, i
 
     return toObject(env, result);
 }
-int QuickJSContext::quickjs_construct(JSValue func_obj, JSValueConst this_val, int argc, JSValueConst *argv) {
+JSValue QuickJSContext::quickjs_construct(JSValue func_obj, JSValueConst this_val, int argc, JSValueConst *argv) {
     JNIEnv *env = getEnvFromJavaVM(javaVM);
 
     // unpack the arguments
@@ -734,12 +732,10 @@ int QuickJSContext::quickjs_construct(JSValue func_obj, JSValueConst this_val, i
     env->DeleteLocalRef(javaArgs);
 
     if (rethrowJavaExceptionToQuickJS(env))
-        return -1;
+        return JS_EXCEPTION;
 
     auto value = LocalRefHolder(env, env->NewObject(javaObjectClass, javaObjectConstructor, javaQuack, (jobject)result));
-
-    setFinalizerOnFinalizerObject(this_val, javaRefFinalizer, env->NewGlobalRef(value));
-    return 1;
+    return toObject(env, value);
 }
 
 jboolean QuickJSContext::checkQuickJSErrorAndThrow(JNIEnv *env, int maybeException) {

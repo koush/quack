@@ -1162,4 +1162,22 @@ public class QuackTests {
         assertEquals(total, 14);
         quack.close();
     }
+
+    @Test
+    public void testDotConstructBug() {
+        QuackContext quack = QuackContext.create(useQuickJS);
+        quack.getGlobalObject().set("global", quack.getGlobalObject());
+        QuackObject Test = new QuackObject() {
+            @Override
+            public Object construct(Object... args) {
+                return new Object();
+            }
+        };
+        quack.getGlobalObject().set("Test", Test);
+
+        assertEquals(quack.getGlobalObject().get("Test"), Test);
+        quack.evaluate("new Test()");
+        assertEquals(quack.getGlobalObject().get("Test"), Test);
+        quack.close();
+    }
 }
