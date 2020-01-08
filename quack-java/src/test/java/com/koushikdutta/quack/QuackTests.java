@@ -234,13 +234,13 @@ public class QuackTests {
         RoundtripCallback cb = ((JavaScriptObject)func.call()).proxyInterface(RoundtripCallback.class);
 
         // should all come back as doubles.
-        List<Object> values = Arrays.asList((byte)0, (short)0, 0, 0f, 0d);
+        List<Object> values = Arrays.asList((byte)0, (short)0, 0, 0f, 0d, 0L);
         for (Object value: values) {
             Object ret = cb.callback(value);
             assertTrue(ret instanceof Double || ret instanceof Integer);
         }
 
-        values = Arrays.asList(0L, "0");
+        values = Arrays.asList("0");
         for (Object value: values) {
             Object ret = cb.callback(value);
             assertTrue(ret instanceof String);
@@ -1179,5 +1179,14 @@ public class QuackTests {
         quack.evaluate("new Test()");
         assertEquals(quack.getGlobalObject().get("Test"), Test);
         quack.close();
+    }
+
+    @Test
+    public void testLong() {
+        QuackContext quack = QuackContext.create(useQuickJS);
+        JavaScriptObject jo = quack.evaluateForJavaScriptObject("(function(o){ return o; })");
+        long value = 4000000000L;
+        Object ret = quack.coerceJavaScriptToJava(long.class, jo.call(value));
+        assertEquals(value, ret);
     }
 }

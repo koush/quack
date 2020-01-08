@@ -214,6 +214,9 @@ public:
     jclass intClass;
     jmethodID intValueOf;
     jmethodID intValue;
+    jclass longClass;
+    jmethodID longValueOf;
+    jmethodID longValue;
     jclass doubleClass;
     jmethodID doubleValueOf;
     jmethodID doubleValue;

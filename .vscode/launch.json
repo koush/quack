@@ -40,7 +40,7 @@
             "name": "(lldb) Attach",
             "type": "cppdbg",
             "request": "attach",
-            "program": "/Volumes/Dev/Scrypted/quack/quack-jni/build/lib/main/debug/libquack-jni.dylib",
+            "program": "/Volumes/Dev/quackfill/quack/quack-jni/build/lib/main/debug/libquack-jni.dylib",
             "processId": "${command:pickProcess}",
             "MIMode": "lldb",
             "preLaunchTask": "build-jni"

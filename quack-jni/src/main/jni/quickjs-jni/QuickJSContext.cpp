@@ -171,6 +171,9 @@ QuickJSContext::QuickJSContext(JavaVM* javaVM, jobject javaQuack):
     intClass = findClass(env, "java/lang/Integer");
     intValueOf = env->GetStaticMethodID(intClass, "valueOf", "(I)Ljava/lang/Integer;");
     intValue = env->GetMethodID(intClass, "intValue", "()I");
+    longClass = findClass(env, "java/lang/Long");
+    longValueOf = env->GetStaticMethodID(longClass, "valueOf", "(J)Ljava/lang/Long;");
+    longValue = env->GetMethodID(longClass, "longValue", "()J");
     doubleClass = findClass(env, "java/lang/Double");
     doubleValueOf = env->GetStaticMethodID(doubleClass, "valueOf", "(D)Ljava/lang/Double;");
     doubleValue = env->GetMethodID(doubleClass, "doubleValue", "()D");
@@ -283,6 +286,8 @@ JSValue QuickJSContext::toObject(JNIEnv *env, jobject value) {
         return JS_NewBool(ctx, env->CallBooleanMethodA(value, booleanValue, nullptr));
     else if (env->IsAssignableFrom(clazz, intClass))
         return JS_NewInt32(ctx, env->CallIntMethod(value, intValue, nullptr));
+    else if (env->IsAssignableFrom(clazz, longClass))
+        return JS_NewInt64(ctx, env->CallLongMethod(value, longValue, nullptr));
     else if (env->IsAssignableFrom(clazz, doubleClass))
         return JS_NewFloat64(ctx, env->CallDoubleMethodA(value, doubleValue, nullptr));
     else if (env->IsAssignableFrom(clazz, stringClass))
@@ -356,8 +361,14 @@ jobject QuickJSContext::toObject(JNIEnv *env, JSValue value) {
     jvalue ret;
     size_t buf_size;
     if (JS_IsInteger(value)) {
-        JS_ToInt32(ctx, &ret.i, value);
-        return box(env, intClass, intValueOf, ret);
+        jlong i64;
+        JS_ToInt64(ctx, &i64, value);
+        if (i64 >= INT32_MIN && i64 <= INT32_MAX) {
+            ret.i = (jint)i64;
+            return box(env, intClass, intValueOf, ret);
+        }
+        ret.j = i64;
+        return box(env, longClass, longValueOf, ret);
     }
     else if (JS_IsNumber(value)) {
         JS_ToFloat64(ctx, &ret.d, value);

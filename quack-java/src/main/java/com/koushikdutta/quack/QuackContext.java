@@ -439,7 +439,7 @@ public final class QuackContext implements Closeable {
    */
   private boolean useQuickJS;
   public static QuackContext create(boolean useQuickJS) {
-    QuackContext quack = new QuackContext();
+    QuackContext quack = new QuackContext(useQuickJS);
     // context will hold a weak ref, so this doesn't matter if it fails.
     long context = createContext(quack, useQuickJS);
     if (context == 0) {
@@ -456,7 +456,7 @@ public final class QuackContext implements Closeable {
 
   private long context;
 
-  private QuackContext() {
+  private QuackContext(boolean useQuickJS) {
     // coercing javascript string into an enum for java
     JavaScriptToJavaCoercions.put(Enum.class, (QuackCoercion<Enum, Object>) (clazz, o) -> {
       if (o == null)
@@ -484,8 +484,10 @@ public final class QuackContext implements Closeable {
     JavaScriptToJavaCoercions.put(long.class, (clazz, o) -> o instanceof Number ? ((Number)o).longValue() : o instanceof String ? Long.parseLong(o.toString()) : o);
     // by default longs become strings, precision loss going to double. that's no good.
     // coercions can be used to get numbers if necessary.
-    putJavaToJavaScriptCoercion(long.class, (clazz, o) -> o.toString());
-    putJavaToJavaScriptCoercion(Long.class, (clazz, o) -> o.toString());
+    if (!useQuickJS) {
+      putJavaToJavaScriptCoercion(long.class, (clazz, o) -> o.toString());
+      putJavaToJavaScriptCoercion(Long.class, (clazz, o) -> o.toString());
+    }
 
     JavaScriptToJavaCoercions.put(Float.class, (clazz, o) -> o instanceof Number ? ((Number)o).floatValue() : o instanceof String ? Float.parseFloat(o.toString()) : o);
     JavaScriptToJavaCoercions.put(float.class, (clazz, o) -> o instanceof Number ? ((Number)o).floatValue() : o instanceof String ? Float.parseFloat(o.toString()) : o);
@@ -504,11 +506,6 @@ public final class QuackContext implements Closeable {
       if (o.isDirect() && useQuickJS)
         return o;
 
-      // duktape supports reading whole buffers
-      if (o.isDirect() && o.remaining() == o.capacity()) {
-        o.position(o.limit());
-        return o;
-      }
       ByteBuffer direct = ByteBuffer.allocateDirect(o.remaining());
       direct.put(o);
       direct.flip();
