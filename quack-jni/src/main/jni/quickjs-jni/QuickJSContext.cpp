@@ -361,14 +361,8 @@ jobject QuickJSContext::toObject(JNIEnv *env, JSValue value) {
     jvalue ret;
     size_t buf_size;
     if (JS_IsInteger(value)) {
-        jlong i64;
-        JS_ToInt64(ctx, &i64, value);
-        if (i64 >= INT32_MIN && i64 <= INT32_MAX) {
-            ret.i = (jint)i64;
-            return box(env, intClass, intValueOf, ret);
-        }
-        ret.j = i64;
-        return box(env, longClass, longValueOf, ret);
+        JS_ToInt32(ctx, &ret.i, value);
+        return box(env, intClass, intValueOf, ret);
     }
     else if (JS_IsNumber(value)) {
         JS_ToFloat64(ctx, &ret.d, value);
