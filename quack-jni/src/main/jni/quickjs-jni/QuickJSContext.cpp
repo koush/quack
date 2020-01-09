@@ -293,13 +293,16 @@ JSValue QuickJSContext::toObject(JNIEnv *env, jobject value) {
     else if (env->IsAssignableFrom(clazz, stringClass))
         return toString(env, reinterpret_cast<jstring>(value));
 
+    LocalRefHolder tempHolder(env, nullptr);
+
     if (env->IsAssignableFrom(clazz, byteBufferClass)) {
         jlong capacity = env->GetDirectBufferCapacity(value);
         if (capacity >= 0) {
             // ArrayBuffer and Uint8Arrays originating from QuickJS are mapped to DirectByteBuffers in Java
             // Java allocated DirectByteBuffers are deep copied because position and limit are mutable properties
             // that can't be mapped to immutable JavaScript buffer types.
-            jobject nativeValue = env->CallObjectMethod(javaQuack, quackUnmapNativeMethod, value);
+            auto nativeValue = env->CallObjectMethod(javaQuack, quackUnmapNativeMethod, value);
+            tempHolder = LocalRefHolder(env, nativeValue);
             if (nativeValue == nullptr) {
                 int position = env->CallIntMethod(value, byteBufferGetPosition);
                 int limit = env->CallIntMethod(value, byteBufferGetLimit);
@@ -313,7 +316,7 @@ JSValue QuickJSContext::toObject(JNIEnv *env, jobject value) {
                 return JS_CallConstructor(ctx, uint8ArrayConstructor, 1, args);
             }
 
-            value = nativeValue;
+            value = tempHolder;
             clazz = env->GetObjectClass(value);
         }
     }
@@ -405,7 +408,7 @@ jobject QuickJSContext::toObject(JNIEnv *env, JSValue value) {
                 // The buffer is owned by QuickJS/JavaScript, so position and limit only have meaning
                 // on the Java side.
                 if (env->IsInstanceOf(localJavaThis, byteBufferClass) && env->GetDirectBufferCapacity(localJavaThis) >= 0)
-                    env->CallObjectMethod(localJavaThis, byteBufferClear);
+                    LocalRefHolder(env, env->CallObjectMethod(localJavaThis, byteBufferClear));
                 return localJavaThis;
             }
             // the jobject is dead, so remove the twin from the JSValue and from the stash.
@@ -681,7 +684,7 @@ JSValue QuickJSContext::quickjs_get(jobject object, JSAtom atom, JSValueConst re
 
     auto prop = hold(JS_AtomToValue(ctx, atom));
     const auto jprop = LocalRefHolder(env, toObject(env, prop));
-    jobject result = env->CallObjectMethod(javaQuack, quackGetMethod, object, (jobject)jprop);
+    auto result = LocalRefHolder(env, env->CallObjectMethod(javaQuack, quackGetMethod, object, (jobject)jprop));
 
     if (rethrowJavaExceptionToQuickJS(env))
         return JS_EXCEPTION;
@@ -711,11 +714,11 @@ JSValue QuickJSContext::quickjs_apply(jobject func_obj, JSValueConst this_val, i
     // unpack the arguments
     jobjectArray javaArgs = env->NewObjectArray((jsize)argc, objectClass, nullptr);
     for (int i = 0; i < argc; i++) {
-        env->SetObjectArrayElement(javaArgs, (jsize)i, toObject(env, argv[i]));
+        env->SetObjectArrayElement(javaArgs, (jsize)i, LocalRefHolder(env, toObject(env, argv[i])));
     }
 
     const auto thiz = LocalRefHolder(env, toObject(env, this_val));
-    jobject result = env->CallObjectMethod(javaQuack, quackApplyMethod, func_obj, (jobject)thiz, javaArgs);
+    auto result = LocalRefHolder(env, env->CallObjectMethod(javaQuack, quackApplyMethod, func_obj, (jobject)thiz, javaArgs));
     env->DeleteLocalRef(javaArgs);
 
     if (rethrowJavaExceptionToQuickJS(env))
@@ -729,7 +732,7 @@ JSValue QuickJSContext::quickjs_construct(JSValue func_obj, JSValueConst this_va
     // unpack the arguments
     jobjectArray javaArgs = env->NewObjectArray((jsize)argc, objectClass, nullptr);
     for (int i = 0; i < argc; i++) {
-        env->SetObjectArrayElement(javaArgs, (jsize)i, toObject(env, argv[i]));
+        env->SetObjectArrayElement(javaArgs, (jsize)i, LocalRefHolder(env, toObject(env, argv[i])));
     }
 
     const auto thiz = LocalRefHolder(env, toObject(env, func_obj));
@@ -765,10 +768,11 @@ void QuickJSContext::rethrowQuickJSErrorToJava(JNIEnv *env, JSValue exception) {
 //            auto errorMessage = hold(JS_ToString(ctx, exception));
             auto stack = hold(JS_GetPropertyStr(ctx, exception, "stack"));
 
-            jobject unwrappedException = toObject(env, javaException);
+            jobject unwrappedException = LocalRefHolder(env, toObject(env, javaException));
             jthrowable ex = (jthrowable)env->CallObjectMethod(unwrappedException, quackJavaObjectGetObject);
             env->CallStaticVoidMethod(quackExceptionClass, addJSStack, ex, toString(env, stack));
             env->Throw(ex);
+            env->DeleteLocalRef(ex);
         }
         else {
             auto errorMessage = hold(JS_ToString(ctx, exception));

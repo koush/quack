@@ -26,7 +26,8 @@ public:
         value(value) {
     }
     ~LocalRefHolder() {
-        env->DeleteLocalRef(value);
+        if (value)
+            env->DeleteLocalRef(value);
     }
     LocalRefHolder(const LocalRefHolder &other) {
         env = other.env;
@@ -42,7 +43,8 @@ public:
             env = other.env;
             value = env->NewLocalRef(other.value);
 
-            oldEnv->DeleteLocalRef(oldValue);
+            if (oldValue)
+                oldEnv->DeleteLocalRef(oldValue);
         }
         return *this;
     }
