@@ -183,10 +183,10 @@ QuickJSContext::QuickJSContext(JavaVM* javaVM, jobject javaQuack):
     byteBufferClass = findClass(env, "java/nio/ByteBuffer");
     byteBufferAllocateDirect = env->GetStaticMethodID(byteBufferClass, "allocateDirect", "(I)Ljava/nio/ByteBuffer;");
     auto bufferClass = env->FindClass("java/nio/ByteBuffer");
-    byteBufferGetPosition = env->GetMethodID(bufferClass, "position", "()I");
-    byteBufferGetLimit = env->GetMethodID(bufferClass, "limit", "()I");
-    byteBufferSetPosition = env->GetMethodID(byteBufferClass, "position", "(I)Ljava/nio/Buffer;");
-    byteBufferClear = env->GetMethodID(byteBufferClass, "clear", "()Ljava/nio/Buffer;");
+    bufferGetPosition = env->GetMethodID(bufferClass, "position", "()I");
+    bufferGetLimit = env->GetMethodID(bufferClass, "limit", "()I");
+    bufferSetPosition = env->GetMethodID(bufferClass, "position", "(I)Ljava/nio/Buffer;");
+    bufferClear = env->GetMethodID(bufferClass, "clear", "()Ljava/nio/Buffer;");
     env->DeleteLocalRef(bufferClass);
 
     // Quack
@@ -304,11 +304,11 @@ JSValue QuickJSContext::toObject(JNIEnv *env, jobject value) {
             auto nativeValue = env->CallObjectMethod(javaQuack, quackUnmapNativeMethod, value);
             tempHolder = LocalRefHolder(env, nativeValue);
             if (nativeValue == nullptr) {
-                int position = env->CallIntMethod(value, byteBufferGetPosition);
-                int limit = env->CallIntMethod(value, byteBufferGetLimit);
+                int position = env->CallIntMethod(value, bufferGetPosition);
+                int limit = env->CallIntMethod(value, bufferGetLimit);
                 jvalue newPosition;
                 newPosition.i = limit;
-                env->CallObjectMethod(value, byteBufferSetPosition, newPosition);
+                env->CallObjectMethod(value, bufferSetPosition, newPosition);
                 auto buffer = hold(JS_NewArrayBufferCopy(ctx,
                     reinterpret_cast<uint8_t *>(env->GetDirectBufferAddress(value))  + position,
                     (size_t)(limit - position)));
@@ -408,7 +408,7 @@ jobject QuickJSContext::toObject(JNIEnv *env, JSValue value) {
                 // The buffer is owned by QuickJS/JavaScript, so position and limit only have meaning
                 // on the Java side.
                 if (env->IsInstanceOf(localJavaThis, byteBufferClass) && env->GetDirectBufferCapacity(localJavaThis) >= 0)
-                    LocalRefHolder(env, env->CallObjectMethod(localJavaThis, byteBufferClear));
+                    LocalRefHolder(env, env->CallObjectMethod(localJavaThis, bufferClear));
                 return localJavaThis;
             }
             // the jobject is dead, so remove the twin from the JSValue and from the stash.

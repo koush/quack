@@ -202,10 +202,10 @@ public:
     jmethodID javaScriptObjectConstructor;
     jmethodID javaObjectConstructor;
     jmethodID byteBufferAllocateDirect;
-    jmethodID byteBufferGetLimit;
-    jmethodID byteBufferGetPosition;
-    jmethodID byteBufferSetPosition;
-    jmethodID byteBufferClear;
+    jmethodID bufferGetLimit;
+    jmethodID bufferGetPosition;
+    jmethodID bufferSetPosition;
+    jmethodID bufferClear;
     jmethodID quackGetNativeContext;
     jmethodID quackGetNativePointer;
     jfieldID quackJsonField;
