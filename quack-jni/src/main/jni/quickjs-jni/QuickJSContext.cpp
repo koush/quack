@@ -768,7 +768,7 @@ void QuickJSContext::rethrowQuickJSErrorToJava(JNIEnv *env, JSValue exception) {
 //            auto errorMessage = hold(JS_ToString(ctx, exception));
             auto stack = hold(JS_GetPropertyStr(ctx, exception, "stack"));
 
-            jobject unwrappedException = LocalRefHolder(env, toObject(env, javaException));
+            jobject unwrappedException = toObject(env, javaException);
             jthrowable ex = (jthrowable)env->CallObjectMethod(unwrappedException, quackJavaObjectGetObject);
             env->CallStaticVoidMethod(quackExceptionClass, addJSStack, ex, toString(env, stack));
             env->Throw(ex);
