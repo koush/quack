@@ -22,6 +22,7 @@ file(GLOB quickjs_SRC
     "../../../../quack-jni/src/main/jni/quickjs-jni/*.cpp"
     "../../../../../../quickjs/*.h"
     "../../../../../quickjs/quickjs.c"
+    "../../../../../quickjs/libbf.c"
     "../../../../../quickjs/quickjs-libc.c"
     "../../../../../quickjs/quickjs-debugger.c"
     "../../../../../quickjs/quickjs-debugger-transport-unix.c"
