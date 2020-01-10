@@ -182,7 +182,7 @@ QuickJSContext::QuickJSContext(JavaVM* javaVM, jobject javaQuack):
     // ByteBuffer
     byteBufferClass = findClass(env, "java/nio/ByteBuffer");
     byteBufferAllocateDirect = env->GetStaticMethodID(byteBufferClass, "allocateDirect", "(I)Ljava/nio/ByteBuffer;");
-    auto bufferClass = env->FindClass("java/nio/ByteBuffer");
+    auto bufferClass = env->FindClass("java/nio/Buffer");
     bufferGetPosition = env->GetMethodID(bufferClass, "position", "()I");
     bufferGetLimit = env->GetMethodID(bufferClass, "limit", "()I");
     bufferSetPosition = env->GetMethodID(bufferClass, "position", "(I)Ljava/nio/Buffer;");
