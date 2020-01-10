@@ -707,12 +707,11 @@ public class QuackTests {
                 "\treturn 'done'\n" +
                 "}";
 
-        ByteBuffer b = ByteBuffer.allocateDirect(10);
+        ByteBuffer b = ByteBuffer.allocate(10);
         for (int i = 0; i < 10; i++) {
             b.put(i, (byte)i);
         }
         assertEquals("done", quack.compileFunction(script, "?").call(b));
-        assertTrue(!b.hasRemaining());
 
         quack.close();
     }

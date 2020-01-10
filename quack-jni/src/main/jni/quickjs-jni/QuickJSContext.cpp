@@ -306,9 +306,9 @@ JSValue QuickJSContext::toObject(JNIEnv *env, jobject value) {
             if (nativeValue == nullptr) {
                 int position = env->CallIntMethod(value, bufferGetPosition);
                 int limit = env->CallIntMethod(value, bufferGetLimit);
-                jvalue newPosition;
-                newPosition.i = limit;
-                env->CallObjectMethod(value, bufferSetPosition, newPosition);
+//                jvalue newPosition;
+//                newPosition.i = limit;
+//                env->CallObjectMethod(value, bufferSetPosition, newPosition);
                 auto buffer = hold(JS_NewArrayBufferCopy(ctx,
                     reinterpret_cast<uint8_t *>(env->GetDirectBufferAddress(value))  + position,
                     (size_t)(limit - position)));
