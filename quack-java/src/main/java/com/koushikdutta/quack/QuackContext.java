@@ -881,10 +881,10 @@ public final class QuackContext implements Closeable {
   private Object quackConstruct(QuackObject quackObject, Object... args) {
     return quackObject.construct(args == null ? empty : args);
   }
-  private void quackMapNative(Object key, Object value) {
+  public void quackMapNative(Object key, Object value) {
     nativeMappings.put(key, value);
   }
-  private Object quackUnmapNative(Object key) {
+  public Object quackUnmapNative(Object key) {
     return nativeMappings.get(key);
   }
 
