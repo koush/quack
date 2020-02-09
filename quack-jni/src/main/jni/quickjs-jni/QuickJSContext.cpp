@@ -198,6 +198,8 @@ QuickJSContext::QuickJSContext(JavaVM* javaVM, jobject javaQuack):
     quackConstructMethod = env->GetMethodID(quackClass, "quackConstruct", "(Lcom/koushikdutta/quack/QuackObject;[Ljava/lang/Object;)Ljava/lang/Object;");
     quackMapNativeMethod = env->GetMethodID(quackClass, "quackMapNative", "(Ljava/lang/Object;Ljava/lang/Object;)V");
     quackUnmapNativeMethod = env->GetMethodID(quackClass, "quackUnmapNative", "(Ljava/lang/Object;)Ljava/lang/Object;");
+    quackGetNativePointer = env->GetMethodID(quackClass, "getNativePointer", "(Lcom/koushikdutta/quack/QuackJavaScriptObject;)J");
+
     quackObjectClass = findClass(env, "com/koushikdutta/quack/QuackObject");
 
     // QuackJsonObject
@@ -210,8 +212,6 @@ QuickJSContext::QuickJSContext(JavaVM* javaVM, jobject javaQuack):
 
     // QuackJavaScriptObject (interface, which can be implemented by proxies)
     quackJavaScriptObjectClass = findClass(env, "com/koushikdutta/quack/QuackJavaScriptObject");
-    quackGetNativeContext = env->GetMethodID(quackJavaScriptObjectClass, "getNativeContext", "()J");
-    quackGetNativePointer = env->GetMethodID(quackJavaScriptObjectClass, "getNativePointer", "()J");
 
     // JavaObject
     javaObjectClass = findClass(env, "com/koushikdutta/quack/JavaObject");
@@ -327,10 +327,9 @@ JSValue QuickJSContext::toObject(JNIEnv *env, jobject value) {
         return JS_ParseJSON(ctx, jsonPtr, (size_t)env->GetStringUTFLength(json), "<QuackJsonObject>");
     }
     else if (env->IsAssignableFrom(clazz, quackJavaScriptObjectClass)) {
-        auto *context = reinterpret_cast<QuickJSContext *>(env->CallLongMethod(value, quackGetNativeContext));
-        // matching context, grab the native JSValue
-        if (context == this) {
-            auto twin = toValueAsLocal(env->CallLongMethod(value, quackGetNativePointer));
+        auto ptr = env->CallLongMethod(javaQuack, quackGetNativePointer, value);
+        if (ptr != 0) {
+            auto twin = toValueAsLocal(ptr);
             return JS_DupValue(ctx, twin);
         }
         // a proxy already exists, but not for the correct QuackContext, so native javascript heap

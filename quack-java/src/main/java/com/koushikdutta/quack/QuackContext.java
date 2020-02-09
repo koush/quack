@@ -887,6 +887,11 @@ public final class QuackContext implements Closeable {
   public Object quackUnmapNative(Object key) {
     return nativeMappings.get(key);
   }
+  private long getNativePointer(QuackJavaScriptObject quackJavaScriptObject) {
+    if (quackJavaScriptObject.getNativeContext() != context)
+      return 0;
+    return quackJavaScriptObject.getNativePointer();
+  }
 
   private static native long getHeapSize(long context);
 

@@ -206,7 +206,6 @@ public:
     jmethodID bufferGetPosition;
     jmethodID bufferSetPosition;
     jmethodID bufferClear;
-    jmethodID quackGetNativeContext;
     jmethodID quackGetNativePointer;
     jfieldID quackJsonField;
 
