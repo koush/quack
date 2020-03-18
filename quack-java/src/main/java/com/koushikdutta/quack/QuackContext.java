@@ -637,6 +637,7 @@ public final class QuackContext implements Closeable {
       context = 0;
       destroyContext(contextToClose);
     }
+    nativeMappings.clear();
   }
 
   @Override protected synchronized void finalize() throws Throwable {

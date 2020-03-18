@@ -68,4 +68,8 @@ public class WeakExactHashMap<K, V> {
     public int size() {
         return map.size();
     }
+
+    public void clear() {
+        map.clear();
+    }
 }
