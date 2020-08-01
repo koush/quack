@@ -35,14 +35,13 @@ library {
 
 }
 
-
 tasks.withType(CppCompile).configureEach {
     compilerArgs.add '-std=c++11'
     compilerArgs.add '-Werror'
 }
 
 tasks.withType(LinkSharedLibrary).configureEach {
-    linkerArgs.add '-L../..//quickjs/'
+    linkerArgs.add '-L../../quickjs/'
     linkerArgs.add '-lquickjs'
 
     linkerArgs.add '../../quickjs/.obj/quickjs-libc.o'
