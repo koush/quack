@@ -233,6 +233,7 @@ QuickJSContext::~QuickJSContext() {
     JS_FreeValue(ctx, arrayBufferPrototype);
     stash.clear();
     JS_FreeValue(ctx, thrower_function);
+    js_debugger_free(ctx, js_debugger_info(ctx));
     JS_FreeContext(ctx);
     JS_FreeRuntime(runtime);
 }
@@ -463,8 +464,7 @@ jobject QuickJSContext::toObject(JNIEnv *env, JSValue value) {
     // todo: reenable this optionally? perform this on jvm side?
     bool trackJavaScriptObjectInstance = false;
 
-    // this does not seem to be dup'd, so don't hold it.
-    auto prototype = JS_GetPrototype(ctx, value);
+    auto prototype = hold(JS_GetPrototype(ctx, value));
 
     // if the JSValue is an ArrayBuffer or Uint8Array, create a
     // corresponding DirectByteBuffer, rather than marshalling the JavaScriptObject.
