@@ -861,8 +861,11 @@ public final class QuackContext implements Closeable {
     runJobs(context);
   }
   private Executor jobExecutor;
-  synchronized public void setJobExecutor(Executor executor) {
+  public void setJobExecutor(Executor executor) {
     jobExecutor = executor;
+  }
+  public Executor getJobExecutor() {
+    return jobExecutor;
   }
 
   // hooks from js/jni to java

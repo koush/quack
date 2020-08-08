@@ -233,7 +233,7 @@ QuickJSContext::~QuickJSContext() {
     JS_FreeValue(ctx, arrayBufferPrototype);
     stash.clear();
     JS_FreeValue(ctx, thrower_function);
-    js_debugger_free(ctx, js_debugger_info(ctx));
+    js_debugger_free(runtime, js_debugger_info(runtime));
     JS_FreeContext(ctx);
     JS_FreeRuntime(runtime);
 }
@@ -871,7 +871,7 @@ void QuickJSContext::waitForDebugger(JNIEnv *env, jstring connectionString) {
 }
 
 jboolean QuickJSContext::isDebugging() {
-    return (jboolean)(js_debugger_is_transport_connected(ctx) ? JNI_TRUE : JNI_FALSE);
+    return (jboolean)(js_debugger_is_transport_connected(runtime) ? JNI_TRUE : JNI_FALSE);
 }
 
 void QuickJSContext::cooperateDebugger() {

@@ -15,7 +15,8 @@ file(GLOB_RECURSE duktape_SRC
 )
 
 add_definitions(-DCONFIG_VERSION="2019-10-27")
-add_definitions(-DDISABLE_STACK_CHECK)
+add_definitions(-DCONFIG_DISABLE_STACK_CHECK)
+add_definitions(-DCONFIG_DISABLE_WORKER)
 
 file(GLOB quickjs_SRC
     "../../../../quack-jni/src/main/jni/quickjs-jni/*.h"

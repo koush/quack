@@ -201,7 +201,8 @@ public class JavaScriptObject implements QuackObject, QuackJavaScriptObject {
     @Override
     protected void finalize() throws Throwable {
         super.finalize();
-        quackContext.finalizeJavaScriptObject(pointer);
+        if (quackContext != null)
+            quackContext.finalizeJavaScriptObject(pointer);
     }
 
     public JSValue asJSValue() {
