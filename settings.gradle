@@ -1,4 +1,4 @@
 include 'quack-java'
-include 'quack-android'
+// include 'quack-android'
 include 'quack-jni'
 

@@ -13,11 +13,7 @@ import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
+import static org.junit.Assert.*;
 
 public class QuackTests {
     private static boolean useQuickJS = true;
@@ -1187,5 +1183,18 @@ public class QuackTests {
         long value = 4000000000L;
         Object ret = quack.coerceJavaScriptToJava(long.class, jo.call(value));
         assertEquals(value, ret);
+    }
+
+    @Test
+    public void testHeap() {
+        QuackContext quack = QuackContext.create(useQuickJS);
+
+        ByteBuffer buffer = ByteBuffer.allocateDirect(10000000);
+        String script = "function(ret) { return ret; }";
+        JavaScriptObject func = quack.compileFunction(script, "?");
+
+        ByteBuffer ret = (ByteBuffer)func.call(buffer);
+        assertSame(buffer, ret);
+        quack.close();
     }
 }
