@@ -59,6 +59,7 @@ void QuickJSContext::finalizeJavaScriptObjects(JNIEnv *env, jlongArray objects) 
         // delete the entry in the stash that was keeping this alive from the java side.
         stash.erase(ptr[i]);
     }
+    JS_RunGC(runtime);
 }
 
 void QuickJSContext::setFinalizerOnFinalizerObject(JSValue finalizerObject, CustomFinalizer finalizer, void *udata) {

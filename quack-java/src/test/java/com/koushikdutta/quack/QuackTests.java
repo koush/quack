@@ -1174,27 +1174,46 @@ public class QuackTests {
     public void testHeapBehavior() {
         QuackContext quack = QuackContext.create(useQuickJS);
 
-        ByteBuffer buffer = ByteBuffer.allocateDirect(10000000);
+        final int allocSize = 10000000;
+        ByteBuffer directIn = ByteBuffer.allocateDirect(allocSize);
+        ByteBuffer arrayIn = ByteBuffer.allocate(allocSize);
         String script = "function(ret) { return ret; }";
         JavaScriptObject func = quack.compileFunction(script, "?");
 
-        ByteBuffer ret = (ByteBuffer)func.call(buffer);
-        assertEquals(quack.getMappedNativeCount(), 1);
-        assertNotSame(buffer, ret);
-        buffer.putInt(0, 1);
-        assertEquals(1, ret.getInt(0));
+        ByteBuffer direct = (ByteBuffer)func.call(directIn);
+        ByteBuffer array = (ByteBuffer)func.call(arrayIn);
 
-        assertEquals(1, quack.getMappedNativeCount());
+        assertEquals(quack.getMappedNativeCount(), 2);
+        assertNotSame(directIn, direct);
+        assertNotSame(arrayIn, array);
 
-        ret = null;
-        buffer = null;
+        directIn.putInt(0, 1);
+        assertEquals(1, direct.getInt(0));
+
+        arrayIn.putInt(0, 1);
+        assertNotEquals(1, array.getInt(0));
+
+        assertEquals(2, quack.getMappedNativeCount());
+
+        long beforeHeap = quack.getHeapSize();
+
+        direct = null;
+        directIn = null;
+
+        array = null;
+        arrayIn = null;
 
         for (int i = 0; i < 10; i++) {
             System.gc();
         }
         int purged = quack.purgeNativeMappings();
+        quack.gc();
 
-        assertEquals(1, purged);
+        long afterHeap = quack.getHeapSize();
+
+        assertTrue(beforeHeap - afterHeap >= allocSize);
+
+        assertEquals(2, purged);
         quack.close();
     }
 }
