@@ -21,7 +21,6 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.WeakHashMap;
 import java.util.concurrent.Executor;
 import java.util.logging.Logger;
 
@@ -507,7 +506,7 @@ public final class QuackContext implements Closeable {
         return o;
 
       ByteBuffer direct = ByteBuffer.allocateDirect(o.remaining());
-      direct.put(o);
+      direct.put(o.duplicate());
       direct.flip();
       return direct;
     });
@@ -885,16 +884,33 @@ public final class QuackContext implements Closeable {
   private Object quackConstruct(QuackObject quackObject, Object... args) {
     return quackObject.construct(args == null ? empty : args);
   }
-  public void quackMapNative(Object key, Object value) {
+  synchronized public void quackMapNative(Object key, Object value) {
     nativeMappings.put(key, value);
   }
   public Object quackUnmapNative(Object key) {
     return nativeMappings.get(key);
   }
+  synchronized public int purgeNativeMappings() {
+    return nativeMappings.purge();
+  }
+  synchronized public int getMappedNativeCount() {
+    return nativeMappings.size();
+  }
   private long getNativePointer(QuackJavaScriptObject quackJavaScriptObject) {
     if (quackJavaScriptObject.getNativeContext() != context)
       return 0;
     return quackJavaScriptObject.getNativePointer();
+  }
+
+  public void gc() {
+    for (int i = 0; i < 2; i++) {
+      System.gc();
+      System.gc();
+      finalizeJavaScriptObjects();
+      System.gc();
+      System.gc();
+      purgeNativeMappings();
+    }
   }
 
   private static native long getHeapSize(long context);

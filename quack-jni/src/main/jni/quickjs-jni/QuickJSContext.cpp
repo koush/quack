@@ -260,7 +260,6 @@ std::string QuickJSContext::toStdString(JSValue value) {
     return ret;
 }
 
-
 static std::string toStdString(JNIEnv *env, jstring value) {
     const char *str = env->GetStringUTFChars(value, 0);
     std::string ret = str;
@@ -275,6 +274,17 @@ jstring QuickJSContext::stringify(JNIEnv *env, jlong object) {
     return toString(env, JS_JSONStringify(ctx, toValueAsLocal(object), JS_UNDEFINED, JS_UNDEFINED));
 }
 
+struct ByteBufferOpaque {
+    QuickJSContext *context;
+    jobject buffer;
+};
+
+void ByteBufferFree(JSRuntime *rt, void *opaque, void *ptr) {
+    struct ByteBufferOpaque *bbo = reinterpret_cast<ByteBufferOpaque *>(opaque);
+    auto env = getEnvFromJavaVM(bbo->context->javaVM);
+    env->DeleteGlobalRef(bbo->buffer);
+    delete bbo;
+}
 
 JSValue QuickJSContext::toObject(JNIEnv *env, jobject value) {
     if (value == nullptr)
@@ -307,16 +317,18 @@ JSValue QuickJSContext::toObject(JNIEnv *env, jobject value) {
             if (nativeValue == nullptr) {
                 int position = env->CallIntMethod(value, bufferGetPosition);
                 int limit = env->CallIntMethod(value, bufferGetLimit);
-//                jvalue newPosition;
-//                newPosition.i = limit;
-//                env->CallObjectMethod(value, bufferSetPosition, newPosition);
-                auto buffer = hold(JS_NewArrayBufferCopy(ctx,
+                auto opaque = new ByteBufferOpaque();
+                opaque->context = this;
+                opaque->buffer = value;
+                auto buffer = hold(JS_NewArrayBuffer(ctx,
                     reinterpret_cast<uint8_t *>(env->GetDirectBufferAddress(value))  + position,
-                    (size_t)(limit - position)));
+                    (size_t)(limit - position), ByteBufferFree, opaque, 0));
                 JSValue args[] = { (JSValue)buffer };
                 return JS_CallConstructor(ctx, uint8ArrayConstructor, 1, args);
             }
 
+            // if successfully unmapped, the object will be a JavaScriptObject
+            // which will be unpacked into a JSValue.
             value = tempHolder;
             clazz = env->GetObjectClass(value);
         }

@@ -688,8 +688,7 @@ public class QuackTests {
         quack.close();
     }
 
-    @Test
-    public void testBufferIn() {
+    public void testBufferInBase(ByteBuffer b) {
         QuackContext quack = QuackContext.create(useQuickJS);
 
         String script = "function testBuffer(buf) {\n" +
@@ -703,14 +702,25 @@ public class QuackTests {
                 "\treturn 'done'\n" +
                 "}";
 
-        ByteBuffer b = ByteBuffer.allocate(10);
         for (int i = 0; i < 10; i++) {
             b.put(i, (byte)i);
         }
         assertEquals("done", quack.compileFunction(script, "?").call(b));
+        assertEquals(b.remaining(), 10);
 
         quack.close();
     }
+
+    @Test
+    public void testBufferIn() {
+        testBufferInBase(ByteBuffer.allocate(10));
+    }
+
+    @Test
+    public void testBufferInDirect() {
+        testBufferInBase(ByteBuffer.allocateDirect(10));
+    }
+
     @Test
     public void testBufferOut() {
         QuackContext quack = QuackContext.create(useQuickJS);
@@ -727,31 +737,6 @@ public class QuackTests {
         for (int i = 0; i < 10; i++) {
             assertEquals(i, b.get(i));
         }
-
-        quack.close();
-    }
-
-    @Test
-    public void testBufferInArray() {
-        QuackContext quack = QuackContext.create(useQuickJS);
-
-        String script = "function testBuffer(buf) {\n" +
-                "\tif (buf.constructor.name !== 'Uint8Array') throw new Error('unexpected type ' + buf.constructor.name);\n" +
-                // "\tvar u = new Uint8Array(buf);\n" +
-                "\tvar u = buf\n" +
-                "\tfor (var i = 0; i < 10; i++) {\n" +
-                "\t\tif (u[i] != i)\n" +
-                "\t\t\tthrow new Error('expected ' + i);\n" +
-                "\t}\n" +
-                "\treturn 'done'\n" +
-                "}";
-
-        ByteBuffer b = ByteBuffer.allocate(10);
-        for (int i = 0; i < 10; i++) {
-            b.put(i, (byte)i);
-        }
-        assertEquals("done", quack.compileFunction(script, "?").call(b));
-        assertTrue(!b.hasRemaining());
 
         quack.close();
     }
@@ -1186,7 +1171,7 @@ public class QuackTests {
     }
 
     @Test
-    public void testHeap() {
+    public void testHeapBehavior() {
         QuackContext quack = QuackContext.create(useQuickJS);
 
         ByteBuffer buffer = ByteBuffer.allocateDirect(10000000);
@@ -1194,7 +1179,22 @@ public class QuackTests {
         JavaScriptObject func = quack.compileFunction(script, "?");
 
         ByteBuffer ret = (ByteBuffer)func.call(buffer);
-        assertSame(buffer, ret);
+        assertEquals(quack.getMappedNativeCount(), 1);
+        assertNotSame(buffer, ret);
+        buffer.putInt(0, 1);
+        assertEquals(1, ret.getInt(0));
+
+        assertEquals(1, quack.getMappedNativeCount());
+
+        ret = null;
+        buffer = null;
+
+        for (int i = 0; i < 10; i++) {
+            System.gc();
+        }
+        int purged = quack.purgeNativeMappings();
+
+        assertEquals(1, purged);
         quack.close();
     }
 }

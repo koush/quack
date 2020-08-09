@@ -42,7 +42,7 @@ public class WeakExactHashMap<K, V> {
         purge();
     }
 
-    public void purge() {
+    public int purge() {
         int before = map.size();
         Iterator<Entry<K>> iter = map.keySet().iterator();
         while (iter.hasNext()) {
@@ -53,6 +53,7 @@ public class WeakExactHashMap<K, V> {
         int after = map.size();
 //        int purged = before - after;
         setPurgeThreshold(after * 2);
+        return before - after;
     }
 
     public V get(K key) {
