@@ -320,7 +320,7 @@ JSValue QuickJSContext::toObject(JNIEnv *env, jobject value) {
                 int limit = env->CallIntMethod(value, bufferGetLimit);
                 auto opaque = new ByteBufferOpaque();
                 opaque->context = this;
-                opaque->buffer = value;
+                opaque->buffer = env->NewGlobalRef(value);
                 auto buffer = hold(JS_NewArrayBuffer(ctx,
                     reinterpret_cast<uint8_t *>(env->GetDirectBufferAddress(value))  + position,
                     (size_t)(limit - position), ByteBufferFree, opaque, 0));
