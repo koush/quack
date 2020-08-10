@@ -310,9 +310,7 @@ JSValue QuickJSContext::toObject(JNIEnv *env, jobject value) {
     if (env->IsAssignableFrom(clazz, byteBufferClass)) {
         jlong capacity = env->GetDirectBufferCapacity(value);
         if (capacity >= 0) {
-            // ArrayBuffer and Uint8Arrays originating from QuickJS are mapped to DirectByteBuffers in Java
-            // Java allocated DirectByteBuffers are deep copied because position and limit are mutable properties
-            // that can't be mapped to immutable JavaScript buffer types.
+            // ArrayBuffer and Uint8Arrays mapped to DirectByteBuffers in Java
             auto nativeValue = env->CallObjectMethod(javaQuack, quackUnmapNativeMethod, value);
             tempHolder = LocalRefHolder(env, nativeValue);
             if (nativeValue == nullptr) {
