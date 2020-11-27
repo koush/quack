@@ -1,6 +1,7 @@
 #ifndef QUICKJS_CONTEXT_H
 #define QUICKJS_CONTEXT_H
 
+#include <cassert>
 #include <jni.h>
 #include <list>
 #include "../../../../../../quickjs/quickjs.h"

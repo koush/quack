@@ -41,7 +41,7 @@ android {
     externalNativeBuild {
       cmake {
         arguments '-DANDROID_TOOLCHAIN=clang', '-DANDROID_STL=c++_static'
-        cFlags '-std=c99', '-fstrict-aliasing', '-DDUK_USE_DEBUGGER_SUPPORT', '-DDUK_USE_INTERRUPT_COUNTER', '-DDUK_USE_DEBUGGER_INSPECT', '-DDUK_USE_DEBUGGER_THROW_NOTIFY', '-DDUK_USE_DEBUGGER_PAUSE_UNCAUGHT', '-DDUK_USE_DEBUGGER_DUMPHEAP', '-Werror'
+        cFlags '-std=c99', '-fstrict-aliasing', '-DDUK_USE_DEBUGGER_SUPPORT', '-DDUK_USE_INTERRUPT_COUNTER', '-DDUK_USE_DEBUGGER_INSPECT', '-DDUK_USE_DEBUGGER_THROW_NOTIFY', '-DDUK_USE_DEBUGGER_PAUSE_UNCAUGHT', '-DDUK_USE_DEBUGGER_DUMPHEAP', '-Werror', '-Wno-implicit-const-int-float-conversion', '-Wno-pointer-to-int-cast'
         cppFlags '-std=c++11', '-fstrict-aliasing', '-fexceptions', '-Werror'
       }
     }
